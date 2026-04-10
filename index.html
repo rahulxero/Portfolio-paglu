@@ -106,6 +106,16 @@
       color: var(--ghost); letter-spacing: .02em;
       margin-bottom: 40px; min-height: 16px;
     }
+    .cache-bar {
+      display: none;
+      font-size: 10px; font-family: var(--mono);
+      color: #555; letter-spacing: .04em;
+      padding: 7px 14px; margin-bottom: 16px;
+      border: 1px solid #1a1a1a; background: #080808;
+      align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .cache-bar.show { display: flex; }
+    .cache-bar.stale { border-color: #2a1a00; color: var(--amber); }
     .dot {
       width: 6px; height: 6px; border-radius: 50%;
       background: var(--green);
@@ -424,7 +434,13 @@
   <!-- No key notices for users — keys managed at /admin -->
 
   <!-- Status bar -->
-  <div class="status" id="status"><span>Click Refresh to load live data</span></div>
+  <!-- Cache freshness bar — shown when serving cached data -->
+  <div class="cache-bar" id="cache-bar">
+    <span id="cache-msg">Showing cached data</span>
+    <button class="btn-ghost" onclick="refreshAll()" style="font-size:10px;padding:2px 10px;">Refresh now</button>
+  </div>
+
+  <div class="status" id="status"><span>Loading…</span></div>
 
   <!-- Hero -->
   <div class="hero">
@@ -558,6 +574,15 @@ let perfInst=null, pieInst=null, curTF='7d', loading=false;
 // Regular users have no token and no API keys visible to them
 const SESSION_TOKEN = localStorage.getItem('nestegg_admin_token') || '';
 
+// ── CACHE CONFIG ──────────────────────────────────────────
+// Portfolio structure (wallets/stocks/MF list) stored in nestegg_d4
+// Price cache stored separately so structure changes don't wipe prices
+const CACHE_KEY   = 'nestegg_prices_v1';
+const CACHE_TTL   = 5 * 60 * 1000;   // 5 minutes — auto-refresh if stale
+const CACHE_MAX   = 30 * 60 * 1000;  // 30 minutes — show stale banner after this
+
+let lastFetchedAt = 0; // epoch ms of last successful full refresh
+
 const GECKO={
   ETH:'ethereum',BTC:'bitcoin',SOL:'solana',MATIC:'matic-network',BNB:'binancecoin',
   AVAX:'avalanche-2',OP:'optimism',ARB:'arbitrum',XMR:'monero',DOT:'polkadot',
@@ -587,7 +612,74 @@ let D={
   ]
 };
 try{const p=localStorage.getItem('nestegg_d4');if(p)D=JSON.parse(p);}catch(e){}
+
+// Restore cached prices into D on load
+function loadPriceCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw) return false;
+    const cache=JSON.parse(raw);
+    if(!cache.ts) return false;
+    lastFetchedAt=cache.ts;
+    // Restore prices into wallet positions
+    if(cache.wallets){
+      D.wallets.forEach(w=>{
+        const cw=cache.wallets.find(x=>x.id===w.id);
+        if(cw?.positions?.length){w.positions=cw.positions;w.totalUSD=cw.totalUSD||0;}
+      });
+    }
+    if(cache.btc) D.btc.forEach(a=>{const c=cache.btc.find(x=>x.id===a.id);if(c){a.balance=c.balance;a.priceINR=c.priceINR;a.priceUSD=c.priceUSD;a.ch24=c.ch24;}});
+    if(cache.indian) D.indian.forEach(a=>{const c=cache.indian.find(x=>x.id===a.id);if(c){a.price=c.price;a.ch24=c.ch24;}});
+    if(cache.intl) D.intl.forEach(a=>{const c=cache.intl.find(x=>x.id===a.id);if(c){a.price=c.price;a.ch24=c.ch24;}});
+    if(cache.mf) D.mf.forEach(a=>{const c=cache.mf.find(x=>x.id===a.id);if(c){a.nav=c.nav;a.ch24=c.ch24;}});
+    if(cache.usdInr) USD_INR=cache.usdInr;
+    return true;
+  }catch(e){return false;}
+}
+
+function savePriceCache(){
+  try{
+    const cache={
+      ts: Date.now(),
+      usdInr: USD_INR,
+      wallets: D.wallets.map(w=>({id:w.id,positions:w.positions,totalUSD:w.totalUSD})),
+      btc:    D.btc.map(a=>({id:a.id,balance:a.balance,priceINR:a.priceINR,priceUSD:a.priceUSD,ch24:a.ch24})),
+      indian: D.indian.map(a=>({id:a.id,price:a.price,ch24:a.ch24})),
+      intl:   D.intl.map(a=>({id:a.id,price:a.price,ch24:a.ch24})),
+      mf:     D.mf.map(a=>({id:a.id,nav:a.nav,ch24:a.ch24})),
+    };
+    localStorage.setItem(CACHE_KEY,JSON.stringify(cache));
+    lastFetchedAt=cache.ts;
+  }catch(e){}
+}
+
+function showCacheBar(stale, label){
+  const bar = document.getElementById('cache-bar');
+  const msg = document.getElementById('cache-msg');
+  bar.className = 'cache-bar show' + (stale ? ' stale' : '');
+  msg.textContent = stale
+    ? `⚠ Data is ${label} old — refreshing in background…`
+    : `Showing cached data from ${label} · prices may have changed`;
+}
+function hideCacheBar(){
+  document.getElementById('cache-bar').className = 'cache-bar';
+}
 function save(){try{localStorage.setItem('nestegg_d4',JSON.stringify(D));}catch(e){}}
+
+function cacheAge(){
+  if(!lastFetchedAt) return Infinity;
+  return Date.now()-lastFetchedAt;
+}
+function cacheAgeLabel(){
+  const ms=cacheAge();
+  if(ms===Infinity) return null;
+  const m=Math.floor(ms/60000);
+  if(m<1) return 'just now';
+  if(m<60) return `${m}m ago`;
+  const h=Math.floor(m/60);
+  if(h<24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
 
 // ══════════════════════════════════════════════════════════
 //  ZERION via /api/zerion proxy (no CORS, key stays server-side)
@@ -772,11 +864,12 @@ async function refreshAll(){
   setStatus('loading','Fetching stock prices via AI…');
   try{await fetchStocks();}catch(e){errs.push('Stocks: '+e.message);}
 
-  save(); updateSummary(); buildPie(); buildPerf(); renderHoldings();
+  save(); savePriceCache(); hideCacheBar(); updateSummary(); buildPie(); buildPerf(); renderHoldings();
+  const t=document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
   loading=false; btn.disabled=false; btn.textContent='⟳ Refresh';
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   if(errs.length) setStatus('warn',`Partial · ${ts} · ${errs[0]}${errs.length>1?` +${errs.length-1} more`:''}`);
-  else setStatus('ok',`Live data · Updated at ${ts} · USD/INR ≈ ${USD_INR}`);
+  else setStatus('ok',`Live · Updated at ${ts} · USD/INR ≈ ${USD_INR}`);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1076,8 +1169,52 @@ function openSettings(){document.getElementById('smo').classList.add('open');}
 function closeSettings(){document.getElementById('smo').classList.remove('open');}
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
 
-// ── INIT ──────────────────────────────────────────────────
-renderHoldings(); updateSummary(); buildPerf();
+// ── INIT — smart cache-aware startup ─────────────────────
+(function init(){
+  const hasCachedPrices = loadPriceCache();
+
+  // Always render structure immediately (fast, from localStorage)
+  renderHoldings(); updateSummary(); buildPerf();
+
+  if(hasCachedPrices){
+    const age = cacheAge();
+    const lbl = cacheAgeLabel();
+
+    if(age < CACHE_TTL){
+      // Fresh cache (< 5 min) — show cached data, no auto-refresh needed
+      buildPie();
+      const t = document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
+      showCacheBar(false, lbl);
+      setStatus('ok', `Cached · Last updated ${lbl} · USD/INR ≈ ${USD_INR}`);
+
+    } else if(age < CACHE_MAX){
+      // Stale cache (5–30 min) — show cached data instantly, refresh silently in background
+      buildPie();
+      showCacheBar(false, lbl);
+      setStatus('loading', `Refreshing prices in background… (last updated ${lbl})`);
+      refreshAll();
+
+    } else {
+      // Very old cache (> 30 min) — show it with a clear stale warning
+      buildPie();
+      showCacheBar(true, lbl);
+      setStatus('warn', `Data is ${lbl} old — refreshing…`);
+      refreshAll();
+    }
+  } else {
+    // No cache — first visit or cleared storage
+    setStatus('loading', 'Loading live data…');
+    setTimeout(()=>refreshAll(), 100);
+  }
+
+  // Auto-refresh when tab becomes visible again after being hidden
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible' && cacheAge() > CACHE_TTL && !loading){
+      setStatus('loading', 'Refreshing prices…');
+      refreshAll();
+    }
+  });
+})();
 </script>
 </body>
 </html>
