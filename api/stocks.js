@@ -1,17 +1,19 @@
 // api/stocks.js — Vercel serverless function
-// Calls Anthropic API with web_search to fetch live stock prices
-// API key stored in Vercel env ANTHROPIC_API_KEY — never exposed to browser
+// Key priority: Vercel env var ANTHROPIC_API_KEY → x-anthropic-key request header
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-anthropic-key');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || req.headers['x-anthropic-key'];
+
   if (!ANTHROPIC_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY environment variable not set in Vercel dashboard.' });
+    return res.status(401).json({
+      error: 'No Anthropic API key found. Add ANTHROPIC_API_KEY to Vercel env vars, or paste it in the app Settings.'
+    });
   }
 
   const { indianSymbols = [], intlSymbols = [] } = req.body || {};
@@ -50,13 +52,11 @@ Example: {"RELIANCE":2680,"TCS":4120,"AAPL":192,"NVDA":875,"USD_INR":84}`;
     const data = await upstream.json();
     const txt = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
 
-    // Parse the JSON prices from the response
     let prices = null;
     try { prices = JSON.parse(txt.trim()); } catch(e) {}
     if (!prices) { const m = txt.match(/\{[\s\S]*?\}/); if (m) try { prices = JSON.parse(m[0]); } catch(e) {} }
     if (!prices) { const m = txt.match(/```(?:json)?\s*([\s\S]*?)\s*```/); if (m) try { prices = JSON.parse(m[1]); } catch(e) {} }
-
-    if (!prices) return res.status(500).json({ error: 'Failed to parse stock prices from AI response', raw: txt.slice(0, 300) });
+    if (!prices) return res.status(500).json({ error: 'Failed to parse AI response', raw: txt.slice(0, 300) });
 
     return res.status(200).json(prices);
   } catch (err) {
