@@ -1,22 +1,21 @@
 // api/zerion.js — Vercel serverless function
-// Proxies requests to api.zerion.io server-side (bypasses CORS)
-// API key stored in Vercel environment variable ZERION_API_KEY
+// Key priority: Vercel env var ZERION_API_KEY → x-zerion-key request header (from browser localStorage)
 
 export default async function handler(req, res) {
-  // CORS headers so the browser can call /api/zerion
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-zerion-key');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Pull Zerion key from Vercel env (set in dashboard, never exposed to browser)
-  const ZERION_KEY = process.env.ZERION_API_KEY;
+  // Accept key from env var OR from request header (user pasted it in app settings)
+  const ZERION_KEY = process.env.ZERION_API_KEY || req.headers['x-zerion-key'];
+
   if (!ZERION_KEY) {
-    return res.status(500).json({ error: 'ZERION_API_KEY environment variable not set in Vercel dashboard.' });
+    return res.status(401).json({
+      error: 'No Zerion API key found. Add ZERION_API_KEY to Vercel env vars, or paste it in the app Settings.'
+    });
   }
 
-  // Forward the path + query string from the client to Zerion
-  // Client calls: /api/zerion?path=/v1/wallets/0x.../positions/&filter[positions]=only_simple&...
   const { path, ...rest } = req.query;
   if (!path) return res.status(400).json({ error: 'Missing path query param' });
 
@@ -30,11 +29,8 @@ export default async function handler(req, res) {
         Accept: 'application/json',
       },
     });
-
     const body = await upstream.text();
-    res.status(upstream.status)
-       .setHeader('Content-Type', 'application/json')
-       .end(body);
+    res.status(upstream.status).setHeader('Content-Type', 'application/json').end(body);
   } catch (err) {
     res.status(502).json({ error: 'Upstream fetch failed: ' + err.message });
   }
