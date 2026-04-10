@@ -422,12 +422,12 @@
 
   <!-- Notices -->
   <div class="notice" id="n-zerion" style="display:none">
-    <p><strong>ZERION_API_KEY</strong> not set — only native ETH balance shown. Add it in Vercel → Settings → Environment Variables, then redeploy.</p>
-    <button class="btn btn-p btn-xs" onclick="openSettings()" style="flex-shrink:0">How to set up</button>
+    <p>Add your free <strong>Zerion API key</strong> in ⚙ Settings to fetch all EVM tokens (USDT, USDC, PEPE, WBTC…) across 40+ chains in one call.</p>
+    <button class="btn btn-p btn-xs" onclick="openSettings()" style="flex-shrink:0">Add Key</button>
   </div>
   <div class="notice" id="n-stocks" style="display:none">
-    <p><strong>ANTHROPIC_API_KEY</strong> not set — stock prices unavailable. Add it in Vercel → Settings → Environment Variables, then redeploy.</p>
-    <button class="btn btn-p btn-xs" onclick="openSettings()" style="flex-shrink:0">How to set up</button>
+    <p>Add your <strong>Anthropic API key</strong> in ⚙ Settings to enable live Indian &amp; US stock prices via AI web search.</p>
+    <button class="btn btn-p btn-xs" onclick="openSettings()" style="flex-shrink:0">Add Key</button>
   </div>
 
   <!-- Status bar -->
@@ -550,26 +550,31 @@
 
     <div class="divider"></div>
 
-    <p class="sect-title" style="margin-bottom:8px;">API Keys — set in Vercel Dashboard</p>
+    <p class="sect-title">API Keys</p>
     <p style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;line-height:1.8;margin-bottom:18px;">
-      API keys are stored as <strong style="color:#888">Vercel Environment Variables</strong>, not in the browser.<br>
-      This keeps them secret and fixes the CORS error.<br><br>
-      In your Vercel project → <strong style="color:#888">Settings → Environment Variables</strong>, add:<br>
-      &nbsp;· <code style="color:#5cba8a">ZERION_API_KEY</code> — get free at <a href="https://developers.zerion.io" target="_blank">developers.zerion.io</a><br>
-      &nbsp;· <code style="color:#5cba8a">ANTHROPIC_API_KEY</code> — get free at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+      Keys are saved to your browser's localStorage and sent securely to the Vercel proxy.<br>
+      Alternatively, set <code style="color:#5cba8a">ZERION_API_KEY</code> / <code style="color:#5cba8a">ANTHROPIC_API_KEY</code> as Vercel Environment Variables — those take priority.
     </p>
 
-    <div style="background:#080808;border:1px solid #1a1a1a;padding:14px 16px;font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;line-height:1.9;">
-      <div style="color:#888;margin-bottom:6px;">After adding env vars in Vercel:</div>
-      <div>1. Go to Vercel dashboard → your project</div>
-      <div>2. Settings → Environment Variables</div>
-      <div>3. Add <span style="color:#5cba8a">ZERION_API_KEY</span> and <span style="color:#5cba8a">ANTHROPIC_API_KEY</span></div>
-      <div>4. Redeploy (Deployments → ⋯ → Redeploy)</div>
+    <div class="field">
+      <label>Zerion API Key <span style="color:#5cba8a;text-transform:none;letter-spacing:0;font-size:10px;">★ Required for full ERC-20 token support</span></label>
+      <input type="password" id="s-zer" placeholder="zk_dev_…" autocomplete="off">
+      <p class="field-note">
+        Free at <a href="https://developers.zerion.io" target="_blank">developers.zerion.io</a> → Sign Up → API Keys (no credit card).<br>
+        Fetches every token — ETH, USDT, USDC, PEPE, WBTC, LP positions — across 40+ chains in one call.
+      </p>
+    </div>
+
+    <div class="field">
+      <label>Anthropic API Key <span style="color:#555;text-transform:none;letter-spacing:0;font-size:10px;">— for live NSE/BSE + NASDAQ stock prices</span></label>
+      <input type="password" id="s-ant" placeholder="sk-ant-api03-…" autocomplete="off">
+      <p class="field-note">Free at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Powers live Indian &amp; US stock prices via AI web search.</p>
     </div>
 
     <div class="divider"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn btn-p" onclick="closeSettings()">Close</button>
+      <button class="btn" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-p" onclick="saveSettings()">Save Keys</button>
     </div>
   </div>
 </div>
@@ -580,8 +585,10 @@
 // ══════════════════════════════════════════════════════════
 let USD_INR=84, activeTab='crypto', addOpen=false;
 let perfInst=null, pieInst=null, curTF='7d', loading=false;
-// API keys are stored as Vercel env vars and accessed via /api/* proxy endpoints
-// No keys stored in browser
+// Keys stored in localStorage — sent to Vercel proxy as request headers
+// Vercel env vars (ZERION_API_KEY / ANTHROPIC_API_KEY) take priority if set
+let S={zerKey:'',antKey:''};
+try{const s=localStorage.getItem('nestegg_s5');if(s)S={...S,...JSON.parse(s)};}catch(e){}
 
 const GECKO={
   ETH:'ethereum',BTC:'bitcoin',SOL:'solana',MATIC:'matic-network',BNB:'binancecoin',
@@ -630,12 +637,14 @@ async function zerionGetPositions(address){
   while(nextPath){
     // Build proxy URL: /api/zerion?path=...&param=val&...
     const qs=new URLSearchParams({path:nextPath,...baseParams}).toString();
-    const r=await fetch(`/api/zerion?${qs}`,{signal:AbortSignal.timeout(25000)});
+    const headers={'Content-Type':'application/json'};
+    if(S.zerKey) headers['x-zerion-key']=S.zerKey; // fallback if no Vercel env var
+    const r=await fetch(`/api/zerion?${qs}`,{headers,signal:AbortSignal.timeout(25000)});
 
     if(r.status===202){
       // Zerion still indexing — wait 3s and retry
       await new Promise(res=>setTimeout(res,3000));
-      const r2=await fetch(`/api/zerion?${qs}`,{signal:AbortSignal.timeout(25000)});
+      const r2=await fetch(`/api/zerion?${qs}`,{headers,signal:AbortSignal.timeout(25000)});
       if(!r2.ok){
         const e=await r2.json().catch(()=>({}));
         throw new Error(e.error||'Zerion indexing wallet — try again in a moment');
@@ -747,11 +756,13 @@ async function fetchMF(){
 async function fetchStocks(){
   const iS=D.indian.map(s=>s.symbol), xS=D.intl.map(s=>s.symbol);
   if(!iS.length&&!xS.length) return;
+  const headers={'Content-Type':'application/json'};
+  if(S.antKey) headers['x-anthropic-key']=S.antKey; // fallback if no Vercel env var
   const resp=await fetch('/api/stocks',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers,
     body:JSON.stringify({indianSymbols:iS, intlSymbols:xS}),
-    signal:AbortSignal.timeout(45000), // AI web search takes time
+    signal:AbortSignal.timeout(45000),
   });
   if(!resp.ok){
     const e=await resp.json().catch(()=>({}));
@@ -1013,7 +1024,7 @@ function renderAddForm(){
       <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x…  /  bc1…"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok">✓ Calls /api/zerion server-side proxy — fetches every token + DeFi position across 40+ chains. Requires ZERION_API_KEY set in Vercel env vars.</div>
+    <div class="info-box ${S.zerKey?'info-ok':''}">${S.zerKey?'✓ Zerion key set — will fetch every token + DeFi position across 40+ chains.':'⚠ No Zerion key — only native ETH shown. <a href="#" onclick="openSettings();return false">Add your free Zerion key</a> in Settings.'}</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -1065,11 +1076,27 @@ function doAddIntl(){const sym=(document.getElementById('f-sym').value||'').toUp
 function doAddMF(){const name=(document.getElementById('f-fn').value||'').trim();const code=(document.getElementById('f-code').value||'').trim();const units=+document.getElementById('f-units').value,navB=+document.getElementById('f-pnav').value;if(!name||!units||!navB){alert('Fill all fields');return;}D.mf.push({id:Date.now(),name,code:code||'CUSTOM',units,navBought:navB,nav:null,ch24:null});toggleAdd();save();renderHoldings();if(code)fetchMF().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
 
 // ── SETTINGS ──────────────────────────────────────────────
-function openSettings(){document.getElementById('smo').classList.add('open');}
+function openSettings(){
+  document.getElementById('s-zer').value=S.zerKey||'';
+  document.getElementById('s-ant').value=S.antKey||'';
+  document.getElementById('smo').classList.add('open');
+}
 function closeSettings(){document.getElementById('smo').classList.remove('open');}
+function saveSettings(){
+  S.zerKey=document.getElementById('s-zer').value.trim();
+  S.antKey=document.getElementById('s-ant').value.trim();
+  try{localStorage.setItem('nestegg_s5',JSON.stringify(S));}catch(e){}
+  // Hide notices if keys now present
+  if(S.zerKey) document.getElementById('n-zerion').style.display='none';
+  if(S.antKey) document.getElementById('n-stocks').style.display='none';
+  closeSettings();
+}
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
 
 // ── INIT ──────────────────────────────────────────────────
+// Show notices if keys missing
+if(!S.zerKey) document.getElementById('n-zerion').style.display='flex';
+if(!S.antKey) document.getElementById('n-stocks').style.display='flex';
 renderHoldings(); updateSummary(); buildPerf();
 </script>
 </body>
