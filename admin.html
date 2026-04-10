@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NestEgg — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+      background:#000;color:#fff;
+      font-family:'Syne',sans-serif;font-size:14px;line-height:1.5;
+      min-height:100vh;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;padding:24px;
+    }
+    a{color:#888;text-underline-offset:3px;}
+    a:hover{color:#fff;}
+
+    .wrap{width:100%;max-width:460px;}
+
+    /* logo */
+    .logo{display:flex;align-items:center;gap:10px;margin-bottom:48px;}
+    .logo-mark{width:32px;height:32px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#000;flex-shrink:0;}
+    .logo-text{font-size:16px;font-weight:700;letter-spacing:-.03em;text-transform:uppercase;}
+    .logo-badge{font-size:9px;font-family:'JetBrains Mono',monospace;color:#333;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border:1px solid #1a1a1a;margin-left:4px;}
+
+    /* panels */
+    .panel{border:1px solid #1a1a1a;padding:32px;animation:fadeUp .25s ease both;}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .panel-title{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:6px;}
+    .panel-sub{font-size:11px;font-family:'JetBrains Mono',monospace;color:#444;margin-bottom:28px;line-height:1.7;}
+
+    /* form */
+    .field{margin-bottom:20px;}
+    label{font-size:9px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;color:#444;display:block;margin-bottom:7px;}
+    input{
+      background:#000;border:1px solid #222;
+      padding:11px 14px;color:#fff;width:100%;
+      font-family:'JetBrains Mono',monospace;font-size:13px;
+      transition:border-color .12s;
+      -webkit-appearance:none;
+    }
+    input:focus{outline:none;border-color:#666;}
+    input::placeholder{color:#2a2a2a;}
+    .field-hint{font-size:10px;font-family:'JetBrains Mono',monospace;color:#333;margin-top:6px;line-height:1.6;}
+    .field-hint a{color:#444;}
+
+    /* buttons */
+    .btn{
+      width:100%;padding:12px;
+      background:#fff;color:#000;border:none;
+      font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+      letter-spacing:.05em;text-transform:uppercase;
+      cursor:pointer;transition:background .1s;
+    }
+    .btn:hover{background:#ddd;}
+    .btn:disabled{opacity:.35;cursor:default;}
+    .btn:disabled:hover{background:#fff;}
+    .btn-out{
+      background:transparent;color:#333;
+      border:1px solid #1a1a1a;
+      font-family:'Syne',sans-serif;font-size:11px;font-weight:500;
+      letter-spacing:.04em;text-transform:uppercase;
+      cursor:pointer;padding:7px 14px;transition:all .1s;
+    }
+    .btn-out:hover{border-color:#444;color:#fff;}
+
+    /* messages */
+    .msg{font-size:11px;font-family:'JetBrains Mono',monospace;padding:10px 14px;margin-top:14px;line-height:1.6;display:none;}
+    .msg.show{display:block;}
+    .msg-err{background:#0c0000;border:1px solid #3a0000;color:#ff6060;}
+    .msg-ok {background:#001208;border:1px solid #1a3a2a;color:#5cba8a;}
+    .msg-info{background:#080808;border:1px solid #1a1a1a;color:#555;}
+
+    /* key status */
+    .keys-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px;}
+    .key-card{padding:14px;border:1px solid #1a1a1a;background:#080808;}
+    .key-card-name{font-size:10px;font-family:'JetBrains Mono',monospace;color:#444;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+    .key-card-status{display:flex;align-items:center;gap:7px;}
+    .key-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+    .key-dot.on{background:#00e676;box-shadow:0 0 6px rgba(0,230,118,.4);}
+    .key-dot.off{background:#222;}
+    .key-card-label{font-size:12px;font-weight:600;}
+    .key-card-label.on{color:#fff;}
+    .key-card-label.off{color:#333;}
+
+    /* divider */
+    .div{height:1px;background:#111;margin:24px 0;}
+
+    /* footer */
+    .footer{margin-top:28px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#222;display:flex;align-items:center;justify-content:space-between;width:100%;max-width:460px;}
+
+    /* spinner */
+    .spin{width:13px;height:13px;border:2px solid #222;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="logo">
+    <div class="logo-mark">N</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="logo-text">NestEgg</span>
+      <span class="logo-badge">Admin</span>
+    </div>
+  </div>
+
+  <!-- ── LOGIN ─────────────────────────────────────── -->
+  <div class="panel" id="p-login">
+    <p class="panel-title">Sign in</p>
+    <p class="panel-sub">Private admin console. Your friends never see this page.</p>
+    <div class="field">
+      <label>Admin Password</label>
+      <input type="password" id="pw" placeholder="Enter your password…"
+             onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="btn" id="login-btn" onclick="login()">Sign In →</button>
+    <div class="msg" id="login-msg"></div>
+  </div>
+
+  <!-- ── ADMIN ─────────────────────────────────────── -->
+  <div class="panel" id="p-admin" style="display:none">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;">
+      <div>
+        <p class="panel-title">API Keys</p>
+        <p class="panel-sub" style="margin-bottom:0">Manage the keys used by all users of your app.</p>
+      </div>
+      <button class="btn-out" onclick="logout()">Sign out</button>
+    </div>
+
+    <!-- key status cards -->
+    <div class="keys-grid" id="key-cards">
+      <div class="key-card">
+        <div class="key-card-name">Zerion API</div>
+        <div class="key-card-status">
+          <div class="key-dot off" id="dot-zer"></div>
+          <span class="key-card-label off" id="lbl-zer">Not set</span>
+        </div>
+      </div>
+      <div class="key-card">
+        <div class="key-card-name">Anthropic AI</div>
+        <div class="key-card-status">
+          <div class="key-dot off" id="dot-ant"></div>
+          <span class="key-card-label off" id="lbl-ant">Not set</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="div"></div>
+
+    <!-- paste new keys -->
+    <div class="field">
+      <label>Zerion API Key</label>
+      <input type="password" id="zer" placeholder="zk_dev_… (leave blank to keep existing)" autocomplete="off">
+      <p class="field-hint">Free at <a href="https://developers.zerion.io" target="_blank">developers.zerion.io</a> → Sign Up → API Keys</p>
+    </div>
+
+    <div class="field">
+      <label>Anthropic API Key</label>
+      <input type="password" id="ant" placeholder="sk-ant-api03-… (leave blank to keep existing)" autocomplete="off">
+      <p class="field-hint">Free at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys</p>
+    </div>
+
+    <button class="btn" id="save-btn" onclick="saveKeys()">Save Keys →</button>
+    <div class="msg" id="save-msg"></div>
+
+    <div class="div"></div>
+
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#2a2a2a;line-height:1.9;">
+      <div style="color:#333;margin-bottom:6px;">Tip: for maximum security, set keys as Vercel env vars instead:</div>
+      <div>· Vercel → your project → Settings → Environment Variables</div>
+      <div>· Add <span style="color:#1a3a2a">ZERION_API_KEY</span>, <span style="color:#1a3a2a">ANTHROPIC_API_KEY</span>, <span style="color:#1a3a2a">ADMIN_PASSWORD</span></div>
+      <div>· Redeploy → env var keys always take priority over session keys</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span>NestEgg Portfolio Tracker</span>
+  <a href="/">← Back to app</a>
+</div>
+
+<script>
+const TK = 'nestegg_admin_token';
+let token = localStorage.getItem(TK) || '';
+
+// ── helpers ──────────────────────────────────────────────
+function showMsg(id, type, html) {
+  const el = document.getElementById(id);
+  el.className = `msg msg-${type} show`;
+  el.innerHTML = html;
+}
+function clearMsg(id) {
+  const el = document.getElementById(id);
+  el.className = 'msg';
+  el.innerHTML = '';
+}
+
+function setKeyStatus(zerSet, antSet) {
+  document.getElementById('dot-zer').className = 'key-dot ' + (zerSet ? 'on' : 'off');
+  document.getElementById('lbl-zer').className = 'key-card-label ' + (zerSet ? 'on' : 'off');
+  document.getElementById('lbl-zer').textContent = zerSet ? 'Configured ✓' : 'Not set';
+  document.getElementById('dot-ant').className = 'key-dot ' + (antSet ? 'on' : 'off');
+  document.getElementById('lbl-ant').className = 'key-card-label ' + (antSet ? 'on' : 'off');
+  document.getElementById('lbl-ant').textContent = antSet ? 'Configured ✓' : 'Not set';
+}
+
+function showAdmin(data) {
+  document.getElementById('p-login').style.display = 'none';
+  document.getElementById('p-admin').style.display = 'block';
+  setKeyStatus(data.zerionKeySet, data.anthropicKeySet);
+  if (data.note) showMsg('save-msg', 'info', data.note);
+}
+
+// ── login ─────────────────────────────────────────────────
+async function login() {
+  const pw = document.getElementById('pw').value;
+  if (!pw) { showMsg('login-msg', 'err', 'Enter your password.'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Signing in…';
+  clearMsg('login-msg');
+  try {
+    const r = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', password: pw }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      showMsg('login-msg', 'err', d.error || 'Wrong password.');
+      btn.disabled = false; btn.textContent = 'Sign In →';
+      return;
+    }
+    token = d.token;
+    localStorage.setItem(TK, token);
+    document.getElementById('pw').value = '';
+    showAdmin(d);
+  } catch (e) {
+    showMsg('login-msg', 'err', 'Network error: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Sign In →';
+  }
+}
+
+// ── save keys ─────────────────────────────────────────────
+async function saveKeys() {
+  const zerVal = document.getElementById('zer').value.trim();
+  const antVal = document.getElementById('ant').value.trim();
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Saving…';
+  clearMsg('save-msg');
+  try {
+    const r = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save', token, zerionKey: zerVal, anthropicKey: antVal }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      showMsg('save-msg', 'err', d.error || 'Save failed.');
+      btn.disabled = false; btn.textContent = 'Save Keys →';
+      return;
+    }
+    token = d.token;
+    localStorage.setItem(TK, token);
+    document.getElementById('zer').value = '';
+    document.getElementById('ant').value = '';
+    setKeyStatus(d.zerionKeySet, d.anthropicKeySet);
+    showMsg('save-msg', 'ok', '✓ Keys saved and activated. Your friends\' sessions will now use these keys via the proxy.');
+  } catch (e) {
+    showMsg('save-msg', 'err', 'Error: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Save Keys →';
+}
+
+// ── logout ────────────────────────────────────────────────
+function logout() {
+  token = '';
+  localStorage.removeItem(TK);
+  document.getElementById('p-admin').style.display = 'none';
+  document.getElementById('p-login').style.display = 'block';
+  clearMsg('login-msg');
+}
+
+// ── auto-restore session on load ─────────────────────────
+async function init() {
+  if (!token) return;
+  try {
+    const r = await fetch('/api/admin?action=check&token=' + encodeURIComponent(token));
+    const d = await r.json();
+    if (!d.ok) { localStorage.removeItem(TK); token = ''; return; }
+    // Session valid — decode payload to get key status (no need to re-login)
+    const [b64] = token.split('.');
+    const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
+    showAdmin({
+      zerionKeySet:    !!payload.zerionKey,
+      anthropicKeySet: !!payload.anthropicKey,
+      note: 'Session restored.',
+    });
+  } catch { /* silently show login */ }
+}
+init();
+</script>
+</body>
+</html>
