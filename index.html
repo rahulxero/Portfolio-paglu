@@ -421,14 +421,7 @@
 <main class="main">
 
   <!-- Notices -->
-  <div class="notice" id="n-zerion" style="display:none">
-    <p>Add your free <strong>Zerion API key</strong> in ⚙ Settings to fetch all EVM tokens (USDT, USDC, PEPE, WBTC…) across 40+ chains in one call.</p>
-    <button class="btn btn-p btn-xs" onclick="openSettings()" style="flex-shrink:0">Add Key</button>
-  </div>
-  <div class="notice" id="n-stocks" style="display:none">
-    <p>Add your <strong>Anthropic API key</strong> in ⚙ Settings to enable live Indian &amp; US stock prices via AI web search.</p>
-    <button class="btn btn-p btn-xs" onclick="openSettings()" style="flex-shrink:0">Add Key</button>
-  </div>
+  <!-- No key notices for users — keys managed at /admin -->
 
   <!-- Status bar -->
   <div class="status" id="status"><span>Click Refresh to load live data</span></div>
@@ -504,8 +497,8 @@
   <div class="mc">
     <div class="mc-header">
       <div>
-        <p class="mc-title">Settings</p>
-        <p class="mc-sub">Keys stored locally in your browser only.</p>
+        <p class="mc-title">About</p>
+        <p class="mc-sub">NestEgg Portfolio Tracker — all your assets in one place.</p>
       </div>
       <button class="btn btn-icon" onclick="closeSettings()">✕</button>
     </div>
@@ -515,66 +508,42 @@
     <div class="src-row">
       <div class="lft">
         <div class="ico">⛓</div>
-        <div><h4>Zerion API</h4><p>All tokens + DeFi positions across 40+ chains in one call.</p></div>
+        <div><h4>Zerion</h4><p>All tokens + DeFi positions across 40+ EVM chains + Solana</p></div>
       </div>
-      <span class="pill-free">Free</span>
+      <span class="pill-free">Live</span>
     </div>
     <div class="src-row">
       <div class="lft">
         <div class="ico">₿</div>
-        <div><h4>Blockstream</h4><p>Bitcoin balance lookup</p></div>
+        <div><h4>Blockstream</h4><p>Bitcoin balance</p></div>
       </div>
-      <span class="pill-free">No key</span>
+      <span class="pill-free">Live</span>
     </div>
     <div class="src-row">
       <div class="lft">
         <div class="ico">📈</div>
-        <div><h4>CoinGecko</h4><p>Crypto prices + 24h change enrichment</p></div>
+        <div><h4>CoinGecko</h4><p>Crypto prices + 24h change</p></div>
       </div>
-      <span class="pill-free">No key</span>
+      <span class="pill-free">Live</span>
     </div>
     <div class="src-row">
       <div class="lft">
         <div class="ico">🤖</div>
-        <div><h4>Anthropic AI</h4><p>Live NSE/BSE + NASDAQ/NYSE stock prices via web search</p></div>
+        <div><h4>Anthropic AI</h4><p>NSE/BSE + NASDAQ/NYSE live stock prices via web search</p></div>
       </div>
-      <span class="pill-opt">Optional</span>
+      <span class="pill-free">Live</span>
     </div>
     <div class="src-row">
       <div class="lft">
         <div class="ico">📊</div>
         <div><h4>MFApi.in</h4><p>Indian mutual fund NAVs</p></div>
       </div>
-      <span class="pill-free">No key</span>
-    </div>
-
-    <div class="divider"></div>
-
-    <p class="sect-title">API Keys</p>
-    <p style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;line-height:1.8;margin-bottom:18px;">
-      Keys are saved to your browser's localStorage and sent securely to the Vercel proxy.<br>
-      Alternatively, set <code style="color:#5cba8a">ZERION_API_KEY</code> / <code style="color:#5cba8a">ANTHROPIC_API_KEY</code> as Vercel Environment Variables — those take priority.
-    </p>
-
-    <div class="field">
-      <label>Zerion API Key <span style="color:#5cba8a;text-transform:none;letter-spacing:0;font-size:10px;">★ Required for full ERC-20 token support</span></label>
-      <input type="password" id="s-zer" placeholder="zk_dev_…" autocomplete="off">
-      <p class="field-note">
-        Free at <a href="https://developers.zerion.io" target="_blank">developers.zerion.io</a> → Sign Up → API Keys (no credit card).<br>
-        Fetches every token — ETH, USDT, USDC, PEPE, WBTC, LP positions — across 40+ chains in one call.
-      </p>
-    </div>
-
-    <div class="field">
-      <label>Anthropic API Key <span style="color:#555;text-transform:none;letter-spacing:0;font-size:10px;">— for live NSE/BSE + NASDAQ stock prices</span></label>
-      <input type="password" id="s-ant" placeholder="sk-ant-api03-…" autocomplete="off">
-      <p class="field-note">Free at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Powers live Indian &amp; US stock prices via AI web search.</p>
+      <span class="pill-free">Live</span>
     </div>
 
     <div class="divider"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn" onclick="closeSettings()">Cancel</button>
-      <button class="btn btn-p" onclick="saveSettings()">Save Keys</button>
+      <button class="btn btn-p" onclick="closeSettings()">Close</button>
     </div>
   </div>
 </div>
@@ -585,10 +554,9 @@
 // ══════════════════════════════════════════════════════════
 let USD_INR=84, activeTab='crypto', addOpen=false;
 let perfInst=null, pieInst=null, curTF='7d', loading=false;
-// Keys stored in localStorage — sent to Vercel proxy as request headers
-// Vercel env vars (ZERION_API_KEY / ANTHROPIC_API_KEY) take priority if set
-let S={zerKey:'',antKey:''};
-try{const s=localStorage.getItem('nestegg_s5');if(s)S={...S,...JSON.parse(s)};}catch(e){}
+// Session token set by admin at /admin — carries signed keys server-side
+// Regular users have no token and no API keys visible to them
+const SESSION_TOKEN = localStorage.getItem('nestegg_admin_token') || '';
 
 const GECKO={
   ETH:'ethereum',BTC:'bitcoin',SOL:'solana',MATIC:'matic-network',BNB:'binancecoin',
@@ -635,10 +603,9 @@ async function zerionGetPositions(address){
   };
 
   while(nextPath){
-    // Build proxy URL: /api/zerion?path=...&param=val&...
     const qs=new URLSearchParams({path:nextPath,...baseParams}).toString();
     const headers={'Content-Type':'application/json'};
-    if(S.zerKey) headers['x-zerion-key']=S.zerKey; // fallback if no Vercel env var
+    if(SESSION_TOKEN) headers['x-session-token']=SESSION_TOKEN;
     const r=await fetch(`/api/zerion?${qs}`,{headers,signal:AbortSignal.timeout(25000)});
 
     if(r.status===202){
@@ -757,7 +724,7 @@ async function fetchStocks(){
   const iS=D.indian.map(s=>s.symbol), xS=D.intl.map(s=>s.symbol);
   if(!iS.length&&!xS.length) return;
   const headers={'Content-Type':'application/json'};
-  if(S.antKey) headers['x-anthropic-key']=S.antKey; // fallback if no Vercel env var
+  if(SESSION_TOKEN) headers['x-session-token']=SESSION_TOKEN;
   const resp=await fetch('/api/stocks',{
     method:'POST',
     headers,
@@ -934,6 +901,7 @@ function renderHoldings(){
         ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#444"> scanning…</span>`:''}
         <span class="w-total">${tot>0?fI(tot):(w.fetching?'':'—')}</span>
         <button class="btn btn-ghost" onclick="refreshWallet(${w.id})" style="margin-left:8px">↻</button>
+        <button class="btn btn-ghost" onclick="delWallet(${w.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove wallet">✕</button>
       </div>`;
       if(w.fetching){
         rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> ${'Zerion scanning 40+ chains for all token positions…'}</div>`;
@@ -961,6 +929,7 @@ function renderHoldings(){
         <span class="badge">BTC</span><span>${addr}</span>
         <span class="w-total">${val?fI(val):'—'}</span>
         <button class="btn btn-ghost" onclick="refreshBTC(${a.id})" style="margin-left:8px">↻</button>
+        <button class="btn btn-ghost" onclick="delBTC(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove wallet">✕</button>
       </div>
       <div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
         <div class="tok-logo" style="font-size:10px">₿</div>
@@ -974,25 +943,25 @@ function renderHoldings(){
     if(!rows) rows=`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No wallets yet — click + Add to get started.</div>`;
 
   }else if(activeTab==='indian'){
-    head.style.cssText=`display:grid;${COLS_STK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span>Stock</span><span>Exch</span><span>Qty</span><span>Value</span><span>24h</span><span>P&L</span>';
+    head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.innerHTML='<span>Stock</span><span>Exch</span><span>Qty</span><span>Value</span><span>24h</span><span>P&L</span><span></span>';
     D.indian.forEach(a=>{
       const val=a.price&&a.qty?a.qty*a.price:null,pl=val?a.qty*(a.price-a.avgCost):null;
-      rows+=`<div class="trow" style="display:grid;${COLS_STK};gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='intl'){
-    head.style.cssText=`display:grid;${COLS_STK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (₹)</span><span>24h</span><span>P&L (₹)</span>';
+    head.style.cssText=`display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.innerHTML='<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (₹)</span><span>24h</span><span>P&L (₹)</span><span></span>';
     D.intl.forEach(a=>{
       const val=a.price&&a.qty?a.qty*a.price*USD_INR:null,pl=val?a.qty*(a.price-a.avgCost)*USD_INR:null;
-      rows+=`<div class="trow" style="display:grid;${COLS_STK};gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='mf'){
-    head.style.cssText=`display:grid;${COLS_MF};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span>Fund</span><span>Units</span><span>NAV</span><span>Value</span><span>1d</span><span>Gain/Loss</span>';
+    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.innerHTML='<span>Fund</span><span>Units</span><span>NAV</span><span>Value</span><span>1d</span><span>Gain/Loss</span><span></span>';
     D.mf.forEach(a=>{
       const val=a.nav&&a.units?a.units*a.nav:null,pl=val&&a.navBought?a.units*(a.nav-a.navBought):null;
-      rows+=`<div class="trow" style="display:grid;${COLS_MF};gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }
   list.innerHTML=rows||`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No holdings yet.</div>`;
@@ -1010,6 +979,33 @@ async function refreshBTC(id){
   catch(e){alert('BTC refresh failed:\n'+e.message);}
 }
 
+// ── DELETE ────────────────────────────────────────────────
+function delWallet(id){
+  if(!confirm('Remove this EVM wallet from your portfolio?')) return;
+  D.wallets=D.wallets.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+function delBTC(id){
+  if(!confirm('Remove this Bitcoin wallet from your portfolio?')) return;
+  D.btc=D.btc.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+function delIndian(id){
+  if(!confirm('Remove this stock from your portfolio?')) return;
+  D.indian=D.indian.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+function delIntl(id){
+  if(!confirm('Remove this stock from your portfolio?')) return;
+  D.intl=D.intl.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+function delMF(id){
+  if(!confirm('Remove this mutual fund from your portfolio?')) return;
+  D.mf=D.mf.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+
 // ── TABS & ADD FORM ───────────────────────────────────────
 function sw(tab,btn){activeTab=tab;document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(addOpen){addOpen=false;document.getElementById('add-panel').classList.remove('open');}renderHoldings();}
 function toggleAdd(){addOpen=!addOpen;const p=document.getElementById('add-panel');if(addOpen){p.classList.add('open');renderAddForm();}else p.classList.remove('open');}
@@ -1024,7 +1020,7 @@ function renderAddForm(){
       <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x…  /  bc1…"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box ${S.zerKey?'info-ok':''}">${S.zerKey?'✓ Zerion key set — will fetch every token + DeFi position across 40+ chains.':'⚠ No Zerion key — only native ETH shown. <a href="#" onclick="openSettings();return false">Add your free Zerion key</a> in Settings.'}</div>
+    <div class="info-box info-ok">✓ Zerion proxy active — fetches every token + DeFi position across 40+ chains automatically.</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -1075,28 +1071,12 @@ function doAddStock(){const sym=(document.getElementById('f-sym').value||'').toU
 function doAddIntl(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.intl.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
 function doAddMF(){const name=(document.getElementById('f-fn').value||'').trim();const code=(document.getElementById('f-code').value||'').trim();const units=+document.getElementById('f-units').value,navB=+document.getElementById('f-pnav').value;if(!name||!units||!navB){alert('Fill all fields');return;}D.mf.push({id:Date.now(),name,code:code||'CUSTOM',units,navBought:navB,nav:null,ch24:null});toggleAdd();save();renderHoldings();if(code)fetchMF().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
 
-// ── SETTINGS ──────────────────────────────────────────────
-function openSettings(){
-  document.getElementById('s-zer').value=S.zerKey||'';
-  document.getElementById('s-ant').value=S.antKey||'';
-  document.getElementById('smo').classList.add('open');
-}
+// ── SETTINGS (about modal only — no keys for users) ───────
+function openSettings(){document.getElementById('smo').classList.add('open');}
 function closeSettings(){document.getElementById('smo').classList.remove('open');}
-function saveSettings(){
-  S.zerKey=document.getElementById('s-zer').value.trim();
-  S.antKey=document.getElementById('s-ant').value.trim();
-  try{localStorage.setItem('nestegg_s5',JSON.stringify(S));}catch(e){}
-  // Hide notices if keys now present
-  if(S.zerKey) document.getElementById('n-zerion').style.display='none';
-  if(S.antKey) document.getElementById('n-stocks').style.display='none';
-  closeSettings();
-}
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
 
 // ── INIT ──────────────────────────────────────────────────
-// Show notices if keys missing
-if(!S.zerKey) document.getElementById('n-zerion').style.display='flex';
-if(!S.antKey) document.getElementById('n-stocks').style.display='flex';
 renderHoldings(); updateSummary(); buildPerf();
 </script>
 </body>
