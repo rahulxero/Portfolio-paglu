@@ -455,6 +455,7 @@
     <div class="card"><p class="card-lbl">Indian Equity</p><p class="card-val" id="i-val">—</p><p class="card-chg" id="i-chg">—</p></div>
     <div class="card"><p class="card-lbl">International</p><p class="card-val" id="x-val">—</p><p class="card-chg" id="x-chg">—</p></div>
     <div class="card"><p class="card-lbl">Mutual Funds</p><p class="card-val" id="m-val">—</p><p class="card-chg" id="m-chg">—</p></div>
+    <div class="card"><p class="card-lbl">Bank & Cash</p><p class="card-val" id="b-val">—</p><p class="card-chg" id="b-chg" style="font-size:10px">—</p></div>
   </div>
 
   <!-- Charts -->
@@ -493,6 +494,7 @@
         <button class="tab" onclick="sw('indian',this)">India</button>
         <button class="tab" onclick="sw('intl',this)">Global</button>
         <button class="tab" onclick="sw('mf',this)">Mutual Funds</button>
+        <button class="tab" onclick="sw('banks',this)">Bank & Cash</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="src-tag" id="src-tag">demo</span>
@@ -609,6 +611,10 @@ let D={
     {id:50,name:'Mirae Asset Large Cap Fund',code:'119598',units:450.234,navBought:82.5,nav:null,ch24:null},
     {id:51,name:'Parag Parikh Flexi Cap Fund',code:'122639',units:320.15,navBought:55.2,nav:null,ch24:null},
     {id:52,name:'Axis Small Cap Fund',code:'120503',units:280.5,navBought:68.4,nav:null,ch24:null},
+  ],
+  banks:[
+    // balance: manual INR amount, updatedAt: epoch ms of last manual update
+    // type: savings | current | fd | rd | ppf | nps | other
   ]
 };
 try{const p=localStorage.getItem('nestegg_d4');if(p)D=JSON.parse(p);}catch(e){}
@@ -879,13 +885,16 @@ function fI(n){return'₹'+Math.round(n).toLocaleString('en-IN');}
 function fP(n){if(n==null)return'—';return(n>=0?'▲ +':'▼ ')+Math.abs(n).toFixed(2)+'%';}
 function pc(n){return n==null?'':n>=0?'pos':'neg';}
 const lc=()=>'<span class="lv">—</span>';
+function ageLbl(ms){const m=Math.floor(ms/60000);if(m<2)return'just now';if(m<60)return`${m}m ago`;const h=Math.floor(m/60);if(h<24)return`${h}h ago`;const d=Math.floor(h/24);if(d<30)return`${d}d ago`;const mo=Math.floor(d/30);return`${mo}mo ago`;}
+function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed Deposit',rd:'Recurring Deposit',ppf:'PPF',nps:'NPS',wallet:'Digital Wallet',other:'Other'}[t]||'Savings';}
 function walletINR(w){return w.positions.reduce((s,p)=>s+p.valueINR,0);}
 function vals(){
   const c=D.wallets.reduce((s,w)=>s+walletINR(w),0)+D.btc.reduce((s,a)=>s+(a.priceINR&&a.balance?a.balance*a.priceINR:0),0);
   const i=D.indian.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0);
   const x=D.intl.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price*USD_INR:0),0);
   const m=D.mf.reduce((s,a)=>s+(a.nav&&a.units?a.units*a.nav:0),0);
-  return{c,i,x,m,tot:c+i+x+m};
+  const b=D.banks.reduce((s,a)=>s+(a.balance||0),0);
+  return{c,i,x,m,b,tot:c+i+x+m+b};
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
@@ -905,23 +914,32 @@ function updateSummary(){
   const iC=wAvg(D.indian,a=>a.price&&a.qty?a.qty*a.price:0,a=>a.ch24);
   const xC=wAvg(D.intl,a=>a.price&&a.qty?a.qty*a.price*USD_INR:0,a=>a.ch24);
   const mC=wAvg(D.mf,a=>a.nav&&a.units?a.units*a.nav:0,a=>a.ch24);
-  const segs=[{v:v.c,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC}].filter(s=>s.v>0);
-  const tC=segs.length?wAvg(segs,s=>s.v,s=>s.ch):null;
+  const segs=[{v:v.c,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC},{v:v.b,ch:null}].filter(s=>s.v>0);
+  const tC=segs.length?wAvg(segs.filter(s=>s.ch!=null),s=>s.v,s=>s.ch):null;
   document.getElementById('tot-chg').innerHTML=tC!=null?`<span class="${pc(tC)}">${fP(tC)}</span> <span class="muted sm"> · weighted 24h return</span>`:'<span class="muted">—</span>';
   function uc(vi,ci,val,chg){document.getElementById(vi).textContent=val>0?fI(val):'—';const el=document.getElementById(ci);el.textContent=fP(chg);el.className='card-chg '+(chg!=null?pc(chg):'muted');}
   uc('c-val','c-chg',v.c,cC);uc('i-val','i-chg',v.i,iC);uc('x-val','x-chg',v.x,xC);uc('m-val','m-chg',v.m,mC);
+  // Bank card — show staleness instead of 24h change
+  document.getElementById('b-val').textContent=v.b>0?fI(v.b):'—';
+  const bChgEl=document.getElementById('b-chg');
+  if(D.banks.length===0){bChgEl.textContent='No accounts added';bChgEl.className='card-chg muted';}
+  else{
+    const stale=D.banks.filter(a=>a.updatedAt&&(Date.now()-a.updatedAt)>7*86400000);
+    if(stale.length>0){bChgEl.innerHTML=`<span style="color:var(--amber)">⚠ ${stale.length} account${stale.length>1?'s':''} overdue update</span>`;bChgEl.className='card-chg';}
+    else{const oldest=Math.max(...D.banks.filter(a=>a.updatedAt).map(a=>a.updatedAt));const lbl=oldest?ageLbl(Date.now()-oldest):'never';bChgEl.textContent=`Updated ${lbl}`;bChgEl.className='card-chg muted';}
+  }
 }
 
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#888888','#444444','#222222'];
-const PIE_LABELS=['Crypto','Indian Equity','International','Mutual Funds'];
+const PIE_COLORS=['#ffffff','#888888','#444444','#222222','#555555'];
+const PIE_LABELS=['Crypto','Indian Equity','International','Mutual Funds','Bank & Cash'];
 
 function buildPie(){
   const v=vals(); if(!v.tot) return;
   const ctx=document.getElementById('pieC').getContext('2d');
-  const raw=[v.c,v.i,v.x,v.m];
+  const raw=[v.c,v.i,v.x,v.m,v.b];
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0);
   document.getElementById('pie-leg').innerHTML=slices.map(s=>`
     <span style="display:flex;align-items:center;justify-content:space-between;">
@@ -1056,8 +1074,76 @@ function renderHoldings(){
       const val=a.nav&&a.units?a.units*a.nav:null,pl=val&&a.navBought?a.units*(a.nav-a.navBought):null;
       rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
+
+  }else if(activeTab==='banks'){
+    const COLS_BNK='grid-template-columns:2fr 1fr 1fr 1fr 28px 28px';
+    head.style.cssText=`display:grid;${COLS_BNK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.innerHTML='<span>Account</span><span>Type</span><span>Balance</span><span>Last Updated</span><span></span><span></span>';
+
+    // Staleness nudge banner
+    const staleAccounts=D.banks.filter(a=>a.updatedAt&&(Date.now()-a.updatedAt)>7*86400000);
+    const neverUpdated=D.banks.filter(a=>!a.updatedAt);
+    if(staleAccounts.length||neverUpdated.length){
+      const count=staleAccounts.length+neverUpdated.length;
+      rows+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 8px;background:#0d0800;border-bottom:1px solid #2a1a00;font-size:11px;font-family:'JetBrains Mono',monospace;">
+        <span style="color:var(--amber)">⚠ ${count} account${count>1?'s':''} need${count===1?'s':''} balance update</span>
+        <span style="color:#555;font-size:10px">Click ✎ on each row to update</span>
+      </div>`;
+    }
+
+    if(!D.banks.length){
+      rows+=`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No bank accounts yet — click + Add to get started.</div>`;
+    }else{
+      D.banks.forEach(a=>{
+        const age=a.updatedAt?Date.now()-a.updatedAt:null;
+        const isStale=age===null||(age>7*86400000);
+        const ageStr=a.updatedAt?ageLbl(age):'Never updated';
+        rows+=`<div id="bank-row-${a.id}" class="trow" style="display:grid;${COLS_BNK};gap:8px;align-items:center;${isStale?'border-left:2px solid #2a1a00;':''}">
+          <div><span class="an">${a.name}</span><div class="as">${a.bank||''}</div></div>
+          <span class="badge" style="font-size:9px">${bankTypeLabel(a.type)}</span>
+          <span class="mv">${a.balance!=null?fI(a.balance):lc()}</span>
+          <span class="mv" style="font-size:10px;${isStale?'color:var(--amber)':'color:#555'}">${ageStr}</span>
+          <button class="btn btn-ghost" onclick="editBank(${a.id})" style="padding:2px 6px;font-size:11px" title="Update balance">✎</button>
+          <button class="btn btn-ghost" onclick="delBank(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button>
+        </div>`;
+      });
+    }
   }
   list.innerHTML=rows||`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No holdings yet.</div>`;
+}
+
+// ── BANK INLINE EDIT ──────────────────────────────────────
+// Opens inline edit row to update balance
+function editBank(id){
+  const a=D.banks.find(x=>x.id===id); if(!a) return;
+  const row=document.getElementById('bank-row-'+id); if(!row) return;
+  row.innerHTML=`
+    <div style="display:grid;grid-template-columns:2fr 1fr 28px;gap:8px;align-items:center;padding:8px;">
+      <div style="font-size:12px;font-weight:600">${a.name} <span style="font-size:10px;color:#555;font-weight:400">${bankTypeLabel(a.type)}</span></div>
+      <input type="number" id="edit-bal-${id}" value="${a.balance||''}" placeholder="Current balance (₹)" style="font-size:12px;padding:6px 10px;background:#000;border:1px solid #fff;color:#fff;font-family:'JetBrains Mono',monospace;width:100%" step="1" onkeydown="if(event.key==='Enter')saveBank(${id})">
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-ghost" onclick="saveBank(${id})" style="padding:3px 8px;font-size:10px;color:#00e676;border-color:#1a3a2a">✓</button>
+        <button class="btn btn-ghost" onclick="renderHoldings()" style="padding:3px 6px;font-size:10px">✕</button>
+      </div>
+    </div>`;
+  setTimeout(()=>document.getElementById('edit-bal-'+id)?.focus(),50);
+}
+
+function saveBank(id){
+  const a=D.banks.find(x=>x.id===id); if(!a) return;
+  const inp=document.getElementById('edit-bal-'+id);
+  const val=parseFloat(inp?.value);
+  if(isNaN(val)||val<0){inp?.focus();return;}
+  a.balance=val;
+  a.updatedAt=Date.now();
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+
+function delBank(id){
+  if(!confirm('Remove this account from your portfolio?')) return;
+  D.banks=D.banks.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
 }
 
 // ── PER-ITEM REFRESH ──────────────────────────────────────
@@ -1129,6 +1215,29 @@ function renderAddForm(){
     <div class="fg fg3"><div><label>Fund Name</label><input type="text" id="f-fn" placeholder="Axis Bluechip Fund"></div><div><label>AMFI Code</label><input type="text" id="f-code" placeholder="120503"></div><div><label>Units Held</label><input type="number" id="f-units" placeholder="0.000" step="any"></div></div>
     <div class="fg" style="grid-template-columns:220px"><div><label>Purchase NAV (₹)</label><input type="number" id="f-pnav" placeholder="0.00" step="any"></div></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddMF()">Add Fund</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+  }else if(activeTab==='banks'){
+    h=`<p class="add-panel-title">Add Bank / Cash Account</p>
+    <div class="fg fg4">
+      <div><label>Account Name</label><input type="text" id="f-bname" placeholder="e.g. HDFC Savings"></div>
+      <div><label>Bank / Institution</label><input type="text" id="f-bbank" placeholder="e.g. HDFC Bank"></div>
+      <div><label>Account Type</label>
+        <select id="f-btype">
+          <option value="savings">Savings Account</option>
+          <option value="current">Current Account</option>
+          <option value="fd">Fixed Deposit (FD)</option>
+          <option value="rd">Recurring Deposit (RD)</option>
+          <option value="ppf">PPF</option>
+          <option value="nps">NPS</option>
+          <option value="wallet">Digital Wallet</option>
+          <option value="other">Other / Cash</option>
+        </select>
+      </div>
+      <div><label>Current Balance (₹)</label><input type="number" id="f-bbal" placeholder="0" step="1" min="0"></div>
+    </div>
+    <div class="info-box" style="font-size:11px;color:#555;margin-bottom:12px;">
+      Balance is entered manually. A <span style="color:var(--amber)">⚠ nudge</span> appears after 7 days reminding you to update it. Click ✎ on any row to update the balance at any time.
+    </div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddBank()">Add Account</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }
   p.innerHTML=h;
 }
@@ -1163,6 +1272,17 @@ async function doAddWallet(){
 function doAddStock(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.indian.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
 function doAddIntl(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.intl.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
 function doAddMF(){const name=(document.getElementById('f-fn').value||'').trim();const code=(document.getElementById('f-code').value||'').trim();const units=+document.getElementById('f-units').value,navB=+document.getElementById('f-pnav').value;if(!name||!units||!navB){alert('Fill all fields');return;}D.mf.push({id:Date.now(),name,code:code||'CUSTOM',units,navBought:navB,nav:null,ch24:null});toggleAdd();save();renderHoldings();if(code)fetchMF().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
+
+function doAddBank(){
+  const name=(document.getElementById('f-bname').value||'').trim();
+  const bank=(document.getElementById('f-bbank').value||'').trim();
+  const type=document.getElementById('f-btype').value;
+  const bal=parseFloat(document.getElementById('f-bbal').value);
+  if(!name){alert('Enter an account name');return;}
+  if(isNaN(bal)||bal<0){alert('Enter a valid balance');return;}
+  D.banks.push({id:Date.now(),name,bank,type,balance:bal,updatedAt:Date.now()});
+  toggleAdd();save();renderHoldings();updateSummary();buildPie();
+}
 
 // ── SETTINGS (about modal only — no keys for users) ───────
 function openSettings(){document.getElementById('smo').classList.add('open');}
