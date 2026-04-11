@@ -1076,26 +1076,33 @@ async function fetchMF(){
   }));
 }
 
-// ── STOCKS via /api/stocks proxy ──────────────────────────
+// ── STOCKS via /api/quotes (yfinance — real-time NSE/BSE/NASDAQ/NYSE) ──
 async function fetchStocks(){
   const iS=D.indian.map(s=>s.symbol), xS=D.intl.map(s=>s.symbol);
   if(!iS.length&&!xS.length) return;
+  const exchanges={};
+  D.indian.forEach(s=>{ exchanges[s.symbol]=s.exchange||'NSE'; });
   const headers={'Content-Type':'application/json'};
   if(SESSION_TOKEN) headers['x-session-token']=SESSION_TOKEN;
-  const resp=await fetch('/api/stocks',{
-    method:'POST',
-    headers,
-    body:JSON.stringify({indianSymbols:iS, intlSymbols:xS}),
-    signal:makeSig(),
+  const resp=await fetch('/api/quotes',{
+    method:'POST', headers,
+    body:JSON.stringify({indianSymbols:iS, intlSymbols:xS, exchanges}),
+    signal:makeSig(50000),
   });
   if(!resp.ok){
     const e=await resp.json().catch(()=>({}));
-    throw new Error(e.error||'Stocks proxy error '+resp.status);
+    throw new Error(e.error||'Quotes error '+resp.status);
   }
   const pr=await resp.json();
   if(pr.USD_INR) USD_INR=+pr.USD_INR;
-  D.indian.forEach(s=>{if(pr[s.symbol]!=null)s.price=+pr[s.symbol];});
-  D.intl.forEach(s=>{if(pr[s.symbol]!=null)s.price=+pr[s.symbol];});
+  D.indian.forEach(s=>{
+    if(pr[s.symbol]!=null) s.price=+pr[s.symbol];
+    if(pr[`${s.symbol}_ch24`]!=null) s.ch24=+pr[`${s.symbol}_ch24`];
+  });
+  D.intl.forEach(s=>{
+    if(pr[s.symbol]!=null) s.price=+pr[s.symbol];
+    if(pr[`${s.symbol}_ch24`]!=null) s.ch24=+pr[`${s.symbol}_ch24`];
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1134,32 +1141,42 @@ async function refreshAll(){
   loading=false; btn.disabled=false; btn.textContent='⟳ Refresh';
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   if(errs.length) setStatus('warn',`Partial · ${ts} · ${errs[0]}${errs.length>1?` +${errs.length-1} more`:''}`);
-  else setStatus('ok',`Live · Updated at ${ts} · 1 USD = ${fI(USD_INR).replace(/[,\s]/g,'')}`);
+  else{ const cfg=CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR; const rate=liveRates[cfg.gecko]||cfg.perUSD; setStatus('ok',`Live · Updated at ${ts} · 1 USD = ${cfg.sym}${rate.toLocaleString('en-US',{maximumFractionDigits:2})}`); }
 }
 
 // ══════════════════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════════════════
-function fI(inrAmount) {
+// fC — format an amount in USD into the active display currency
+function fI(usdAmount) {
   const cfg = CURRENCY_CONFIG[activeCurrency] || CURRENCY_CONFIG.INR;
-  const amount = fromINR(inrAmount);
+  const rate = liveRates[cfg.gecko] || cfg.perUSD;
+  const amount = usdAmount * rate;
   const dec = cfg.decimals;
   const locale = activeCurrency === 'INR' ? 'en-IN' : 'en-US';
   return cfg.sym + amount.toLocaleString(locale, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+// inrToDisp — convert stored INR value to display currency
+function inrToDisp(inr) {
+  const usd = inr / (liveRates.inr || USD_INR || 84);
+  return fI(usd);
 }
 function fP(n){if(n==null)return'—';return(n>=0?'▲ +':'▼ ')+Math.abs(n).toFixed(2)+'%';}
 function pc(n){return n==null?'':n>=0?'pos':'neg';}
 const lc=()=>'<span class="lv">—</span>';
 function ageLbl(ms){const m=Math.floor(ms/60000);if(m<2)return'just now';if(m<60)return`${m}m ago`;const h=Math.floor(m/60);if(h<24)return`${h}h ago`;const d=Math.floor(h/24);if(d<30)return`${d}d ago`;const mo=Math.floor(d/30);return`${mo}mo ago`;}
 function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed Deposit',rd:'Recurring Deposit',ppf:'PPF',nps:'NPS',wallet:'Digital Wallet',other:'Other'}[t]||'Savings';}
-function walletINR(w){return w.positions.reduce((s,p)=>s+p.valueINR,0);}
+// walletUSD — total USD value of a wallet's positions (Zerion gives USD natively)
+function walletUSD(w){return w.positions.reduce((s,p)=>s+(p.valueUSD||0),0);}
 function vals(){
-  const c=D.wallets.reduce((s,w)=>s+walletINR(w),0)+D.btc.reduce((s,a)=>s+(a.priceINR&&a.balance?a.balance*a.priceINR:0),0);
-  const i=D.indian.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0);
-  const x=D.intl.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price*USD_INR:0),0);
-  const m=D.mf.reduce((s,a)=>s+(a.nav&&a.units?a.units*a.nav:0),0);
-  const b=D.banks.reduce((s,a)=>s+(a.balance||0),0);
-  return{c,i,x,m,b,tot:c+i+x+m+b};
+  const inrToUSD = v => v / (liveRates.inr || USD_INR || 84);
+  const c = D.wallets.reduce((s,w)=>s+walletUSD(w),0)
+          + D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0);
+  const i = inrToUSD(D.indian.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0));
+  const x = D.intl.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0); // already USD
+  const m = inrToUSD(D.mf.reduce((s,a)=>s+(a.nav&&a.units?a.units*a.nav:0),0));
+  const b = inrToUSD(D.banks.reduce((s,a)=>s+(a.balance||0),0));
+  return{c,i,x,m,b,tot:c+i+x+m+b}; // all in USD
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
@@ -1173,18 +1190,23 @@ function setStatus(type,msg){
 
 function updateSummary(){
   const v=vals();
+  const inrToUSD = n => n / (liveRates.inr || USD_INR || 84);
   document.getElementById('tot-val').textContent=v.tot>0?fI(v.tot):'—';
-  const allCrypto=[...D.wallets.flatMap(w=>w.positions.map(p=>({v:p.valueINR,ch:p.ch24}))),...D.btc.map(a=>({v:(a.priceINR||0)*(a.balance||0),ch:a.ch24}))].filter(x=>x.v>0);
+  // All wAvg values use USD base now
+  const allCrypto=[
+    ...D.wallets.flatMap(w=>w.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}))),
+    ...D.btc.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24}))
+  ].filter(x=>x.v>0);
   const cC=wAvg(allCrypto,x=>x.v,x=>x.ch);
-  const iC=wAvg(D.indian,a=>a.price&&a.qty?a.qty*a.price:0,a=>a.ch24);
-  const xC=wAvg(D.intl,a=>a.price&&a.qty?a.qty*a.price*USD_INR:0,a=>a.ch24);
-  const mC=wAvg(D.mf,a=>a.nav&&a.units?a.units*a.nav:0,a=>a.ch24);
+  const iC=wAvg(D.indian,a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
+  const xC=wAvg(D.intl,a=>a.price&&a.qty?a.qty*a.price:0,a=>a.ch24);
+  const mC=wAvg(D.mf,a=>a.nav&&a.units?inrToUSD(a.units*a.nav):0,a=>a.ch24);
   const segs=[{v:v.c,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC},{v:v.b,ch:null}].filter(s=>s.v>0);
   const tC=segs.length?wAvg(segs.filter(s=>s.ch!=null),s=>s.v,s=>s.ch):null;
   document.getElementById('tot-chg').innerHTML=tC!=null?`<span class="${pc(tC)}">${fP(tC)}</span> <span class="muted sm"> · weighted 24h return</span>`:'<span class="muted">—</span>';
   function uc(vi,ci,val,chg){document.getElementById(vi).textContent=val>0?fI(val):'—';const el=document.getElementById(ci);el.textContent=fP(chg);el.className='card-chg '+(chg!=null?pc(chg):'muted');}
   uc('c-val','c-chg',v.c,cC);uc('i-val','i-chg',v.i,iC);uc('x-val','x-chg',v.x,xC);uc('m-val','m-chg',v.m,mC);
-  // Bank card — show staleness instead of 24h change
+  // Bank card
   document.getElementById('b-val').textContent=v.b>0?fI(v.b):'—';
   const bChgEl=document.getElementById('b-chg');
   if(D.banks.length===0){bChgEl.textContent='No accounts added';bChgEl.className='card-chg muted';}
@@ -1264,11 +1286,12 @@ function renderHoldings(){
   let rows='';
 
   if(activeTab==='crypto'){
+    const curSym = (CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     head.style.cssText=`display:grid;${COLS_TOK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span></span><span>Token</span><span>Balance</span><span>Price (₹)</span><span>Value (₹)</span><span>24h</span>';
+    head.innerHTML=`<span></span><span>Token</span><span>Balance</span><span>Price (${curSym})</span><span>Value (${curSym})</span><span>24h</span>`;
 
     D.wallets.forEach(w=>{
-      const tot=walletINR(w);
+      const tot=walletUSD(w);
       const addr=w.address.slice(0,6)+'…'+w.address.slice(-4);
       rows+=`<div class="w-grp">
         <span class="badge">EVM</span>
@@ -1280,18 +1303,18 @@ function renderHoldings(){
         <button class="btn btn-ghost" onclick="delWallet(${w.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove wallet">✕</button>
       </div>`;
       if(w.fetching){
-        rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> ${'Zerion scanning 40+ chains for all token positions…'}</div>`;
+        rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Zerion scanning 40+ chains for all token positions…</div>`;
       }else if(!w.positions.length){
         rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px">${w._zerionError?`Zerion error: ${w._zerionError} — showing ETH only`:'No token positions found (check ZERION_API_KEY in Vercel env vars)'}</div>`;
       }else{
-        [...w.positions].sort((a,b)=>b.valueINR-a.valueINR).forEach(p=>{
+        [...w.positions].sort((a,b)=>(b.valueUSD||0)-(a.valueUSD||0)).forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
           rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
             <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${p.symbol.slice(0,2)}`}</div>
             <div><span class="an">${p.symbol}</span>${chainPill(p.chain)}<div class="as">${p.name}</div></div>
             <span class="mv">${balFmt}</span>
-            <span class="mv">${p.priceINR>0?fI(p.priceINR):lc()}</span>
-            <span class="mv">${p.valueINR>0.01?fI(p.valueINR):lc()}</span>
+            <span class="mv">${p.priceUSD>0?fI(p.priceUSD):lc()}</span>
+            <span class="mv">${(p.valueUSD||0)>0.01?fI(p.valueUSD):lc()}</span>
             <span class="mv sm ${pc(p.ch24)}">${fP(p.ch24)}</span>
           </div>`;
         });
@@ -1299,11 +1322,11 @@ function renderHoldings(){
     });
 
     D.btc.forEach(a=>{
-      const val=a.priceINR&&a.balance!=null?a.balance*a.priceINR:null;
+      const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
       const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
       rows+=`<div class="w-grp">
         <span class="badge">BTC</span><span>${addr}</span>
-        <span class="w-total">${val?fI(val):'—'}</span>
+        <span class="w-total">${valUSD?fI(valUSD):'—'}</span>
         <button class="btn btn-ghost" onclick="refreshBTC(${a.id})" style="margin-left:8px">↻</button>
         <button class="btn btn-ghost" onclick="delBTC(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove wallet">✕</button>
       </div>
@@ -1311,33 +1334,42 @@ function renderHoldings(){
         <div class="tok-logo" style="font-size:10px">₿</div>
         <div><span class="an">BTC</span>${chainPill('bitcoin')}<div class="as">Bitcoin</div></div>
         <span class="mv">${a.balance!=null?a.balance.toFixed(8):lc()}</span>
-        <span class="mv">${a.priceINR?fI(a.priceINR):lc()}</span>
-        <span class="mv">${val?fI(val):lc()}</span>
+        <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
+        <span class="mv">${valUSD?fI(valUSD):lc()}</span>
         <span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span>
       </div>`;
     });
     if(!rows) rows=`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No wallets yet — click + Add to get started.</div>`;
 
   }else if(activeTab==='indian'){
+    const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span>Stock</span><span>Exch</span><span>Qty</span><span>Value</span><span>24h</span><span>P&L</span><span></span>';
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.indian.forEach(a=>{
-      const val=a.price&&a.qty?a.qty*a.price:null,pl=val?a.qty*(a.price-a.avgCost):null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      // price is in INR — convert to display currency
+      const valUSD=a.price&&a.qty?a.qty*a.price/(liveRates.inr||USD_INR):null;
+      const plUSD=valUSD!=null?a.qty*(a.price-a.avgCost)/(liveRates.inr||USD_INR):null;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='intl'){
+    const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     head.style.cssText=`display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (₹)</span><span>24h</span><span>P&L (₹)</span><span></span>';
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.intl.forEach(a=>{
-      const val=a.price&&a.qty?a.qty*a.price*USD_INR:null,pl=val?a.qty*(a.price-a.avgCost)*USD_INR:null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      // price is already in USD
+      const valUSD=a.price&&a.qty?a.qty*a.price:null;
+      const plUSD=valUSD!=null?a.qty*(a.price-a.avgCost):null;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='mf'){
+    const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     head.style.cssText=`display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
-    head.innerHTML='<span>Fund</span><span>Units</span><span>NAV</span><span>Value</span><span>1d</span><span>Gain/Loss</span><span></span>';
+    head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span><span>Value (${curSym})</span><span>1d</span><span>Gain/Loss (${curSym})</span><span></span>`;
     D.mf.forEach(a=>{
-      const val=a.nav&&a.units?a.units*a.nav:null,pl=val&&a.navBought?a.units*(a.nav-a.navBought):null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${val?fI(val):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${pl!=null?pc(pl):''}">${pl!=null?(pl>=0?'+':'')+fI(Math.abs(pl)):lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      // nav is in INR
+      const valUSD=a.nav&&a.units?a.units*a.nav/(liveRates.inr||USD_INR):null;
+      const plUSD=valUSD!=null&&a.navBought?a.units*(a.nav-a.navBought)/(liveRates.inr||USD_INR):null;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">₹${a.nav?a.nav.toFixed(2):'—'}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -1366,7 +1398,7 @@ function renderHoldings(){
         rows+=`<div id="bank-row-${a.id}" class="trow" style="display:grid;${COLS_BNK};gap:8px;align-items:center;${isStale?'border-left:2px solid #2a1a00;':''}">
           <div><span class="an">${a.name}</span><div class="as">${a.bank||''}</div></div>
           <span class="badge" style="font-size:9px">${bankTypeLabel(a.type)}</span>
-          <span class="mv">${a.balance!=null?fI(a.balance):lc()}</span>
+          <span class="mv">${a.balance!=null?fI(a.balance/(liveRates.inr||USD_INR)):lc()}</span>
           <span class="mv" style="font-size:10px;${isStale?'color:var(--amber)':'color:#555'}">${ageStr}</span>
           <button class="btn btn-ghost" onclick="editBank(${a.id})" style="padding:2px 6px;font-size:11px" title="Update balance">✎</button>
           <button class="btn btn-ghost" onclick="delBank(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button>
