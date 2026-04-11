@@ -566,6 +566,17 @@
       <div class="avatar" id="user-avatar">?</div>
       <span id="user-name">Guest</span>
     </div>
+    <select id="currency-sel" onchange="setCurrency(this.value)" style="background:#000;border:1px solid #333;color:#999;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;cursor:pointer;letter-spacing:.04em;">
+      <option value="INR">₹ INR</option>
+      <option value="USD">$ USD</option>
+      <option value="EUR">€ EUR</option>
+      <option value="GBP">£ GBP</option>
+      <option value="JPY">¥ JPY</option>
+      <option value="CNY">¥ CNY</option>
+      <option value="SGD">S$ SGD</option>
+      <option value="AED">د AED</option>
+      <option value="AUD">A$ AUD</option>
+    </select>
     <button class="btn" id="ref-btn" onclick="refreshAll()">⟳ Refresh</button>
     <button class="btn btn-icon" onclick="openSettings()" title="About">⚙</button>
   </div>
@@ -667,7 +678,7 @@
     <div class="hc-hdr">
       <div class="tab-grp" id="main-tabs">
         <button class="tab on" onclick="sw('crypto',this)">Crypto</button>
-        <button class="tab" onclick="sw('indian',this)">India</button>
+        <button class="tab" onclick="sw('indian',this)">Indian Stocks</button>
         <button class="tab" onclick="sw('intl',this)">Global</button>
         <button class="tab" onclick="sw('mf',this)">Mutual Funds</button>
         <button class="tab" onclick="sw('banks',this)">Bank & Cash</button>
@@ -748,6 +759,44 @@
 // ══════════════════════════════════════════════════════════
 let USD_INR=84, activeTab='crypto', addOpen=false;
 let perfInst=null, pieInst=null, curTF='7d', loading=false;
+
+// ── CURRENCY SYSTEM ───────────────────────────────────────
+// Exchange rates vs USD (updated from CoinGecko on each refresh)
+const CURRENCY_CONFIG = {
+  INR: { sym:'₹', name:'INR', gecko:'inr',  decimals:0,  perUSD:84   },
+  USD: { sym:'$', name:'USD', gecko:'usd',  decimals:2,  perUSD:1    },
+  EUR: { sym:'€', name:'EUR', gecko:'eur',  decimals:2,  perUSD:0.92 },
+  GBP: { sym:'£', name:'GBP', gecko:'gbp',  decimals:2,  perUSD:0.79 },
+  JPY: { sym:'¥', name:'JPY', gecko:'jpy',  decimals:0,  perUSD:150  },
+  CNY: { sym:'¥', name:'CNY', gecko:'cny',  decimals:2,  perUSD:7.24 },
+  SGD: { sym:'S$',name:'SGD', gecko:'sgd',  decimals:2,  perUSD:1.34 },
+  AED: { sym:'د', name:'AED', gecko:'aed',  decimals:2,  perUSD:3.67 },
+  AUD: { sym:'A$',name:'AUD', gecko:'aud',  decimals:2,  perUSD:1.53 },
+};
+let activeCurrency = localStorage.getItem('nestegg_currency') || 'INR';
+// Live rates fetched from CoinGecko (USD base)
+let liveRates = {}; // { inr: 84, eur: 0.92, ... }
+
+function setCurrency(code) {
+  activeCurrency = code;
+  try { localStorage.setItem('nestegg_currency', code); } catch(e) {}
+  document.getElementById('currency-sel').value = code;
+  updateSummary(); buildPie(); buildPerf(); renderHoldings();
+}
+
+// Convert a USD amount to active currency
+function fromUSD(usd) {
+  const cfg = CURRENCY_CONFIG[activeCurrency] || CURRENCY_CONFIG.INR;
+  const rate = liveRates[cfg.gecko] || cfg.perUSD;
+  return usd * rate;
+}
+
+// Convert INR amount to active currency (legacy path — most data stored as INR internally)
+function fromINR(inr) {
+  if (activeCurrency === 'INR') return inr;
+  const usd = inr / (liveRates.inr || USD_INR);
+  return fromUSD(usd);
+}
 // Session token set by admin at /admin — carries signed keys server-side
 // Regular users have no token and no API keys visible to them
 const SESSION_TOKEN = localStorage.getItem('nestegg_admin_token') || '';
@@ -970,10 +1019,35 @@ async function fetchWalletPositions(wallet){
 // ── COINGECKO ─────────────────────────────────────────────
 async function enrichCoinGecko(){
   const ids=['bitcoin','ethereum','solana',...Object.values(GECKO)];
-  const r=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${[...new Set(ids)].join(',')}&vs_currencies=inr,usd&include_24hr_change=true`,{signal:makeSig()});
-  if(!r.ok) throw new Error('CoinGecko '+r.status);
-  const prices=await r.json();
-  if(prices.bitcoin?.inr&&prices.bitcoin?.usd) USD_INR=Math.round(prices.bitcoin.inr/prices.bitcoin.usd);
+  // Fetch all currencies at once so we can convert to any selected currency
+  const allCurrencies = Object.values(CURRENCY_CONFIG).map(c=>c.gecko).join(',');
+  let prices = null;
+  // Retry up to 3 times with backoff (handles rate limiting)
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const r=await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${[...new Set(ids)].join(',')}&vs_currencies=${allCurrencies}&include_24hr_change=true`,
+        {signal:makeSig()}
+      );
+      if(r.status===429){await new Promise(res=>setTimeout(res,2000*(attempt+1)));continue;}
+      if(!r.ok) throw new Error('CoinGecko '+r.status);
+      prices=await r.json();
+      break;
+    }catch(e){
+      if(attempt===2) throw e;
+      await new Promise(res=>setTimeout(res,1500));
+    }
+  }
+  if(!prices) throw new Error('CoinGecko failed after retries');
+
+  // Update live exchange rates from bitcoin prices (most accurate cross-rate)
+  if(prices.bitcoin){
+    Object.values(CURRENCY_CONFIG).forEach(cfg=>{
+      if(prices.bitcoin[cfg.gecko]) liveRates[cfg.gecko]=prices.bitcoin[cfg.gecko];
+    });
+    if(liveRates.inr) USD_INR=Math.round(liveRates.inr);
+  }
+
   D.wallets.forEach(w=>w.positions.forEach(p=>{
     const gid=GECKO[p.symbol];
     if(gid&&prices[gid]){
@@ -1060,13 +1134,19 @@ async function refreshAll(){
   loading=false; btn.disabled=false; btn.textContent='⟳ Refresh';
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   if(errs.length) setStatus('warn',`Partial · ${ts} · ${errs[0]}${errs.length>1?` +${errs.length-1} more`:''}`);
-  else setStatus('ok',`Live · Updated at ${ts} · USD/INR ≈ ${USD_INR}`);
+  else setStatus('ok',`Live · Updated at ${ts} · 1 USD = ${fI(USD_INR).replace(/[,\s]/g,'')}`);
 }
 
 // ══════════════════════════════════════════════════════════
 //  HELPERS
 // ══════════════════════════════════════════════════════════
-function fI(n){return'₹'+Math.round(n).toLocaleString('en-IN');}
+function fI(inrAmount) {
+  const cfg = CURRENCY_CONFIG[activeCurrency] || CURRENCY_CONFIG.INR;
+  const amount = fromINR(inrAmount);
+  const dec = cfg.decimals;
+  const locale = activeCurrency === 'INR' ? 'en-IN' : 'en-US';
+  return cfg.sym + amount.toLocaleString(locale, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
 function fP(n){if(n==null)return'—';return(n>=0?'▲ +':'▼ ')+Math.abs(n).toFixed(2)+'%';}
 function pc(n){return n==null?'':n>=0?'pos':'neg';}
 const lc=()=>'<span class="lv">—</span>';
@@ -1574,11 +1654,27 @@ function handleUserPill() {
 //  LIVE TICKER — top 10 crypto + top 10 NASDAQ
 // ══════════════════════════════════════════════════════════
 // Coins to skip (stables, wrapped, LSDs)
+// Comprehensive skip list — ALL stablecoins, wrapped tokens, LSDs, receipt tokens, algo-pegged
 const TICKER_SKIP = new Set([
-  'tether','usd-coin','dai','binance-usd','true-usd','first-digital-usd',
-  'usdd','frax','pax-dollar','gemini-dollar','terrausd','neutrino',
-  'wrapped-bitcoin','wrapped-ethereum','wrapped-steth','staked-ether',
-  'wrapped-bnb','wbtc','rocket-pool-eth',
+  // USD stablecoins
+  'tether','usd-coin','dai','binance-usd','true-usd','first-digital-usd','usdd','frax',
+  'pax-dollar','gemini-dollar','terrausd','neutrino','fei-usd','magic-internet-money',
+  'liquity-usd','alchemix-usd','dollar-on-chain','rai','nusd','susd','crvusd',
+  'paypal-usd','usds','usde','ethena-usde','usual-usd','resolv-usd','pyusd',
+  // Wrapped / bridged tokens
+  'wrapped-bitcoin','wrapped-ethereum','wrapped-steth','wrapped-bnb',
+  'wbtc','weth','wbnb','wmatic','wavax','wsol',
+  'rocket-pool-eth','coinbase-wrapped-staked-eth','mantle-staked-ether',
+  'staked-frax-ether','sfrxeth','ankr-staked-eth','stakewise-staked-eth2',
+  'figr-heloc','figment',
+  // Liquid staking / yield-bearing
+  'staked-ether','lido-staked-matic','staked-frax-ether',
+  // Bridged/synthetic
+  'renbtc','hbtc','sbtc','obtc','multibtc',
+  // Pegged assets
+  'pax-gold','tether-gold','digix-gold',
+  // Yield/receipt tokens (Compound, Aave etc)
+  'cdai','cusdc','cusdt','aave-dai','aave-usdc',
 ]);
 
 // Top NASDAQ/NYSE stocks to show
@@ -1587,13 +1683,36 @@ const NASDAQ_TICKERS = ['AAPL','MSFT','NVDA','AMZN','META','GOOGL','TSLA','NFLX'
 let tickerData = []; // array of { sym, price, chg, type:'crypto'|'stock' }
 
 async function fetchTickerCrypto() {
-  // Fetch top 30 by market cap, filter out stables/wrapped, take top 10
-  const r = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=30&page=1&price_change_percentage=24h', { signal: makeSig() });
-  if (!r.ok) return [];
-  const coins = await r.json();
+  // Fetch top 60 by market cap so we have enough after filtering, take top 15 real coins
+  let coins = [];
+  // Try with retry on rate limit
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1&price_change_percentage=24h',
+        { signal: makeSig() }
+      );
+      if (r.status === 429) { await new Promise(res => setTimeout(res, 2000 * (attempt + 1))); continue; }
+      if (!r.ok) break;
+      coins = await r.json();
+      break;
+    } catch(e) { if (attempt === 2) return []; await new Promise(res => setTimeout(res, 1500)); }
+  }
+  if (!coins.length) return [];
   return coins
-    .filter(c => !TICKER_SKIP.has(c.id))
-    .slice(0, 10)
+    .filter(c => {
+      if (TICKER_SKIP.has(c.id)) return false;
+      const sym = (c.symbol || '').toLowerCase();
+      const name = (c.name || '').toLowerCase();
+      // Skip anything that looks like a stable, wrapped, or pegged token by symbol/name patterns
+      if (/^(usd|eur|gbp|jpy|cny|aud|cad|chf|krw|inr|brl|mxn|sgd|nzd|hkd|sek|nok|dkk|czk|pln|huf|try|zar|ils|php|idr|myr|thb|vnd|pkr)/.test(sym)) return false;
+      if (sym.startsWith('w') && sym.length <= 5) return false; // wbtc, weth, wbnb etc
+      if (name.includes('wrapped') || name.includes('staked') || name.includes('bridged')) return false;
+      if (name.includes('usd') || name.includes('dollar') || name.includes('tether')) return false;
+      if (name.includes('yield') || name.includes('receipt') || name.includes('vault')) return false;
+      return true;
+    })
+    .slice(0, 15)
     .map(c => ({
       sym:   c.symbol.toUpperCase(),
       price: c.current_price,
@@ -1688,6 +1807,8 @@ document.getElementById('login-mo').addEventListener('click',e=>{if(e.target===d
 // ── INIT — smart cache-aware startup ─────────────────────
 (function init(){
   loadAuth();          // restore login session
+  // Restore saved currency
+  document.getElementById('currency-sel').value = activeCurrency;
   refreshTicker();     // load ticker immediately
   setInterval(refreshTicker, 90000); // refresh ticker every 90s
 
