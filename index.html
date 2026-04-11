@@ -411,6 +411,147 @@
     .main > *:nth-child(4){animation-delay:.2s}
     .main > *:nth-child(5){animation-delay:.25s}
     .main > *:nth-child(6){animation-delay:.3s}
+
+    /* ── MARQUEE TICKER ──────────────────────────────────── */
+    .ticker-bar {
+      height: 34px;
+      background: #000;
+      border-bottom: var(--border-thin);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      position: relative;
+      cursor: default;
+    }
+    .ticker-bar::before,
+    .ticker-bar::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 40px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .ticker-bar::before { left: 0;  background: linear-gradient(to right,  #000, transparent); }
+    .ticker-bar::after  { right: 0; background: linear-gradient(to left,   #000, transparent); }
+    .ticker-track {
+      display: flex;
+      gap: 0;
+      white-space: nowrap;
+      animation: marquee 60s linear infinite;
+      will-change: transform;
+    }
+    .ticker-track:hover { animation-play-state: paused; }
+    @keyframes marquee {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .tick-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 20px;
+      height: 34px;
+      font-family: var(--mono);
+      font-size: 11px;
+      border-right: var(--border-thin);
+      flex-shrink: 0;
+    }
+    .tick-sep {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 18px;
+      height: 34px;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #333;
+      border-right: var(--border-thin);
+      flex-shrink: 0;
+    }
+    .tick-sym { color: #fff; font-weight: 500; }
+    .tick-price { color: #666; }
+    .tick-chg.pos { color: var(--green); }
+    .tick-chg.neg { color: var(--red); }
+    .tick-chg.flat { color: #444; }
+
+    /* ── LOGIN MODAL ─────────────────────────────────────── */
+    .login-mo {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.9);
+      backdrop-filter: blur(8px);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-mo.open { display: flex; }
+    .login-card {
+      background: #000;
+      border: 1px solid #333;
+      padding: 36px;
+      width: 100%;
+      max-width: 400px;
+      animation: fadeUp .2s ease both;
+    }
+    .login-card .eyebrow {
+      font-size: 9px; font-family: var(--mono);
+      text-transform: uppercase; letter-spacing: .12em;
+      color: #444; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .login-card .eyebrow::before {
+      content: ''; display: block; width: 16px; height: 1px; background: #333;
+    }
+    .login-card h2 {
+      font-size: 22px; font-weight: 700;
+      letter-spacing: -.03em; margin-bottom: 6px;
+    }
+    .login-card p {
+      font-size: 12px; font-family: var(--mono);
+      color: #555; margin-bottom: 28px; line-height: 1.6;
+    }
+    .login-field { margin-bottom: 18px; }
+    .login-field label {
+      font-size: 9px; font-family: var(--mono);
+      text-transform: uppercase; letter-spacing: .1em;
+      color: #444; display: block; margin-bottom: 7px;
+    }
+    .login-field input {
+      background: #000; border: 1px solid #222;
+      padding: 11px 14px; color: #fff; width: 100%;
+      font-family: var(--mono); font-size: 13px;
+      transition: border-color .12s;
+    }
+    .login-field input:focus { outline: none; border-color: #fff; }
+    .login-field input::placeholder { color: #2a2a2a; }
+    .login-err {
+      font-size: 11px; font-family: var(--mono);
+      color: var(--red); margin-top: 10px; min-height: 16px;
+    }
+    .login-foot {
+      margin-top: 20px;
+      font-size: 10px; font-family: var(--mono);
+      color: #2a2a2a; line-height: 1.8;
+    }
+    /* user avatar pill in header */
+    .user-pill {
+      display: flex; align-items: center; gap: 7px;
+      padding: 4px 12px;
+      border: var(--border-rule);
+      font-size: 11px; font-family: var(--mono);
+      color: #666; cursor: pointer; transition: all .12s;
+    }
+    .user-pill:hover { background: #111; color: #fff; }
+    .user-pill .avatar {
+      width: 18px; height: 18px;
+      background: #fff; color: #000;
+      font-size: 9px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -422,10 +563,46 @@
     <span class="logo-text">NestEgg</span>
   </div>
   <div class="hdr-r">
+    <div class="user-pill" id="user-pill" onclick="handleUserPill()" style="display:none">
+      <div class="avatar" id="user-avatar">?</div>
+      <span id="user-name">Guest</span>
+    </div>
     <button class="btn" id="ref-btn" onclick="refreshAll()">⟳ Refresh</button>
-    <button class="btn btn-icon" onclick="openSettings()" title="Settings">⚙</button>
+    <button class="btn btn-icon" onclick="openSettings()" title="About">⚙</button>
   </div>
 </header>
+
+<!-- ── TICKER BAR ────────────────────────────────────────────────── -->
+<div class="ticker-bar" id="ticker-bar">
+  <div class="ticker-track" id="ticker-track">
+    <span class="tick-item"><span class="tick-sym">Loading…</span></span>
+  </div>
+</div>
+
+<!-- ── LOGIN MODAL ───────────────────────────────────────────────── -->
+<div class="login-mo" id="login-mo">
+  <div class="login-card">
+    <div class="eyebrow">NestEgg</div>
+    <h2>Sign in</h2>
+    <p>Enter your name and a 4–12 digit PIN to identify yourself across sessions.</p>
+    <div class="login-field">
+      <label>Your Name</label>
+      <input type="text" id="li-name" placeholder="e.g. Rohit" maxlength="24"
+             onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()">
+    </div>
+    <div class="login-field">
+      <label>PIN <span style="color:#333;text-transform:none;letter-spacing:0">(4–12 digits)</span></label>
+      <input type="password" id="li-pin" placeholder="••••" inputmode="numeric" maxlength="12"
+             onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-err" id="li-err"></div>
+    <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="doLogin()">Sign In →</button>
+    <div class="login-foot">
+      Your PIN is hashed and stored locally in your browser.<br>
+      No data leaves your device — this is purely for identifying your session.
+    </div>
+  </div>
+</div>
 
 <!-- ── MAIN ────────────────────────────────────────────────────── -->
 <main class="main">
@@ -1284,13 +1461,209 @@ function doAddBank(){
   toggleAdd();save();renderHoldings();updateSummary();buildPie();
 }
 
+// ══════════════════════════════════════════════════════════
+//  AUTH — simple PIN login, stored in localStorage
+// ══════════════════════════════════════════════════════════
+const AUTH_KEY = 'nestegg_auth_v1';
+let currentUser = null; // { name, pinHash }
+
+function hashPin(pin) {
+  // Simple non-crypto hash — good enough for local auth
+  let h = 0x811c9dc5;
+  for (let i = 0; i < pin.length; i++) {
+    h ^= pin.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16);
+}
+
+function loadAuth() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (raw) { currentUser = JSON.parse(raw); updateUserUI(); }
+  } catch(e) {}
+}
+
+function saveAuth(user) {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); } catch(e) {}
+}
+
+function updateUserUI() {
+  const pill = document.getElementById('user-pill');
+  if (currentUser) {
+    pill.style.display = 'flex';
+    document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
+    document.getElementById('user-name').textContent = currentUser.name;
+  } else {
+    pill.style.display = 'none';
+  }
+}
+
+function requireLogin(cb) {
+  if (currentUser) { cb(); return; }
+  // Show login modal — after login, call cb
+  pendingAction = cb;
+  document.getElementById('login-mo').classList.add('open');
+  setTimeout(() => document.getElementById('li-name').focus(), 100);
+}
+
+let pendingAction = null;
+
+function doLogin() {
+  const name = (document.getElementById('li-name').value || '').trim();
+  const pin  = (document.getElementById('li-pin').value || '').trim();
+  const err  = document.getElementById('li-err');
+  if (!name) { err.textContent = 'Enter your name.'; return; }
+  if (!/^\d{4,12}$/.test(pin)) { err.textContent = 'PIN must be 4–12 digits.'; return; }
+  err.textContent = '';
+  // Check if this name+pin combo exists in localStorage, or create new
+  const existing = localStorage.getItem(AUTH_KEY);
+  if (existing) {
+    const stored = JSON.parse(existing);
+    if (stored.name.toLowerCase() === name.toLowerCase()) {
+      if (stored.pinHash !== hashPin(pin)) { err.textContent = 'Wrong PIN for this name.'; return; }
+      currentUser = stored;
+    } else {
+      // Different name — new user or guest on shared device
+      currentUser = { name, pinHash: hashPin(pin) };
+    }
+  } else {
+    currentUser = { name, pinHash: hashPin(pin) };
+  }
+  saveAuth(currentUser);
+  updateUserUI();
+  document.getElementById('li-name').value = '';
+  document.getElementById('li-pin').value = '';
+  document.getElementById('login-mo').classList.remove('open');
+  if (pendingAction) { const cb = pendingAction; pendingAction = null; cb(); }
+}
+
+function doLogout() {
+  currentUser = null;
+  try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+  updateUserUI();
+}
+
+function handleUserPill() {
+  if (currentUser && confirm(`Sign out, ${currentUser.name}?`)) doLogout();
+}
+
+// ══════════════════════════════════════════════════════════
+//  LIVE TICKER — top 10 crypto + top 10 NASDAQ
+// ══════════════════════════════════════════════════════════
+// Coins to skip (stables, wrapped, LSDs)
+const TICKER_SKIP = new Set([
+  'tether','usd-coin','dai','binance-usd','true-usd','first-digital-usd',
+  'usdd','frax','pax-dollar','gemini-dollar','terrausd','neutrino',
+  'wrapped-bitcoin','wrapped-ethereum','wrapped-steth','staked-ether',
+  'wrapped-bnb','wbtc','rocket-pool-eth',
+]);
+
+// Top NASDAQ/NYSE stocks to show
+const NASDAQ_TICKERS = ['AAPL','MSFT','NVDA','AMZN','META','GOOGL','TSLA','NFLX','AMD','INTC'];
+
+let tickerData = []; // array of { sym, price, chg, type:'crypto'|'stock' }
+
+async function fetchTickerCrypto() {
+  // Fetch top 30 by market cap, filter out stables/wrapped, take top 10
+  const r = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=30&page=1&price_change_percentage=24h', { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return [];
+  const coins = await r.json();
+  return coins
+    .filter(c => !TICKER_SKIP.has(c.id))
+    .slice(0, 10)
+    .map(c => ({
+      sym:   c.symbol.toUpperCase(),
+      price: c.current_price,
+      chg:   c.price_change_percentage_24h || 0,
+      type:  'crypto',
+    }));
+}
+
+async function fetchTickerStocks() {
+  // Use /api/stocks proxy to get latest prices for NASDAQ tickers
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (SESSION_TOKEN) headers['x-session-token'] = SESSION_TOKEN;
+    const r = await fetch('/api/stocks', {
+      method: 'POST', headers,
+      body: JSON.stringify({ indianSymbols: [], intlSymbols: NASDAQ_TICKERS }),
+      signal: AbortSignal.timeout(40000),
+    });
+    if (!r.ok) return [];
+    const prices = await r.json();
+    return NASDAQ_TICKERS
+      .filter(t => prices[t] != null)
+      .map(t => ({ sym: t, price: prices[t], chg: null, type: 'stock' }));
+  } catch(e) { return []; }
+}
+
+function fmtTickerPrice(price, type) {
+  if (type === 'crypto') {
+    if (price >= 1000) return '$' + price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    if (price >= 1)    return '$' + price.toFixed(2);
+    return '$' + price.toPrecision(4);
+  }
+  return '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderTicker() {
+  if (!tickerData.length) return;
+  const cryptos = tickerData.filter(t => t.type === 'crypto');
+  const stocks  = tickerData.filter(t => t.type === 'stock');
+
+  let html = '';
+  const buildItem = t => {
+    const chgCls = t.chg == null ? 'flat' : t.chg >= 0 ? 'pos' : 'neg';
+    const chgStr = t.chg == null ? '' : (t.chg >= 0 ? '▲' : '▼') + Math.abs(t.chg).toFixed(2) + '%';
+    return `<span class="tick-item">
+      <span class="tick-sym">${t.sym}</span>
+      <span class="tick-price">${fmtTickerPrice(t.price, t.type)}</span>
+      ${chgStr ? `<span class="tick-chg ${chgCls}">${chgStr}</span>` : ''}
+    </span>`;
+  };
+
+  cryptos.forEach(t => { html += buildItem(t); });
+  if (stocks.length) {
+    html += `<span class="tick-sep">NASDAQ</span>`;
+    stocks.forEach(t => { html += buildItem(t); });
+  }
+  // Double for seamless loop
+  const full = html + html;
+  const track = document.getElementById('ticker-track');
+  if (track) track.innerHTML = full;
+}
+
+async function refreshTicker() {
+  try {
+    const [crypto, stocks] = await Promise.all([fetchTickerCrypto(), fetchTickerStocks()]);
+    tickerData = [...crypto, ...stocks];
+    renderTicker();
+  } catch(e) { console.warn('Ticker refresh failed:', e.message); }
+}
+
+// Gate toggleAdd behind login
+const _origToggleAdd = toggleAdd;
+function toggleAdd() {
+  if (!currentUser && !addOpen) {
+    requireLogin(() => { _origToggleAdd(); });
+    return;
+  }
+  _origToggleAdd();
+}
+
 // ── SETTINGS (about modal only — no keys for users) ───────
 function openSettings(){document.getElementById('smo').classList.add('open');}
 function closeSettings(){document.getElementById('smo').classList.remove('open');}
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
+document.getElementById('login-mo').addEventListener('click',e=>{if(e.target===document.getElementById('login-mo')){document.getElementById('login-mo').classList.remove('open');pendingAction=null;}});
 
 // ── INIT — smart cache-aware startup ─────────────────────
 (function init(){
+  loadAuth();          // restore login session
+  refreshTicker();     // load ticker immediately
+  setInterval(refreshTicker, 90000); // refresh ticker every 90s
+
   const hasCachedPrices = loadPriceCache();
 
   // Always render structure immediately (fast, from localStorage)
