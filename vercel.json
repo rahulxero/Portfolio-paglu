@@ -2,5 +2,10 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
-  ]
+  ],
+  "functions": {
+    "api/quotes.py": {
+      "runtime": "python3.9"
+    }
+  }
 }

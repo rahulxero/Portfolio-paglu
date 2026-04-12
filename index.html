@@ -1761,20 +1761,25 @@ async function fetchTickerCrypto() {
 }
 
 async function fetchTickerStocks() {
-  // Use /api/stocks proxy to get latest prices for NASDAQ tickers
+  // Use yfinance /api/quotes for NASDAQ ticker prices (fast, no AI key needed)
   try {
     const headers = { 'Content-Type': 'application/json' };
     if (SESSION_TOKEN) headers['x-session-token'] = SESSION_TOKEN;
-    const r = await fetch('/api/stocks', {
+    const r = await fetch('/api/quotes', {
       method: 'POST', headers,
-      body: JSON.stringify({ indianSymbols: [], intlSymbols: NASDAQ_TICKERS }),
-      signal: makeSig(),
+      body: JSON.stringify({ indianSymbols: [], intlSymbols: NASDAQ_TICKERS, exchanges: {} }),
+      signal: makeSig(20000),
     });
     if (!r.ok) return [];
     const prices = await r.json();
     return NASDAQ_TICKERS
       .filter(t => prices[t] != null)
-      .map(t => ({ sym: t, price: prices[t], chg: null, type: 'stock' }));
+      .map(t => ({
+        sym:   t,
+        price: prices[t],
+        chg:   prices[t + '_ch24'] ?? null,
+        type:  'stock',
+      }));
   } catch(e) { return []; }
 }
 
