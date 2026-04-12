@@ -775,7 +775,7 @@ const CURRENCY_CONFIG = {
 };
 let activeCurrency = localStorage.getItem('nestegg_currency') || 'INR';
 // Live rates fetched from CoinGecko (USD base)
-let liveRates = {}; // { inr: 84, eur: 0.92, ... }
+let liveRates = { usd:1, inr:84, eur:0.92, gbp:0.79, jpy:150, cny:7.24, sgd:1.34, aed:3.67, aud:1.53 };
 
 function setCurrency(code) {
   activeCurrency = code;
@@ -1040,12 +1040,19 @@ async function enrichCoinGecko(){
   }
   if(!prices) throw new Error('CoinGecko failed after retries');
 
-  // Update live exchange rates from bitcoin prices (most accurate cross-rate)
+  // Update live exchange rates from bitcoin prices
+  // CoinGecko returns bitcoin's price in each currency — divide by BTC/USD to get the forex rate
   if(prices.bitcoin){
+    const btcUSD = prices.bitcoin.usd || 94000; // BTC price in USD
     Object.values(CURRENCY_CONFIG).forEach(cfg=>{
-      if(prices.bitcoin[cfg.gecko]) liveRates[cfg.gecko]=prices.bitcoin[cfg.gecko];
+      if(cfg.gecko === 'usd'){
+        liveRates['usd'] = 1; // USD rate is always 1
+      } else if(prices.bitcoin[cfg.gecko]){
+        // rate = BTC price in that currency / BTC price in USD = how many units per 1 USD
+        liveRates[cfg.gecko] = prices.bitcoin[cfg.gecko] / btcUSD;
+      }
     });
-    if(liveRates.inr) USD_INR=Math.round(liveRates.inr);
+    if(liveRates.inr) USD_INR = Math.round(liveRates.inr);
   }
 
   D.wallets.forEach(w=>w.positions.forEach(p=>{
@@ -1058,7 +1065,7 @@ async function enrichCoinGecko(){
     }
     p.valueINR=p.valueUSD*USD_INR;
   }));
-  D.btc.forEach(a=>{const p=prices.bitcoin;if(p){a.priceINR=p.inr;a.priceUSD=p.usd;a.ch24=p.inr_24h_change;}});
+  D.btc.forEach(a=>{const p=prices.bitcoin;if(p){a.priceINR=p.inr;a.priceUSD=p.usd;a.ch24=p.usd_24h_change||p.inr_24h_change||null;}});
 }
 
 // ── MUTUAL FUNDS ──────────────────────────────────────────
