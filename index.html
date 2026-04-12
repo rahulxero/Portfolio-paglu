@@ -1424,23 +1424,39 @@ function renderHoldings(){
     D.wallets.forEach(w=>{
       const tot=walletUSD(w);
       const addr=w.address.slice(0,6)+'…'+w.address.slice(-4);
+
+      // Apply hide filter to positions
+      const visiblePositions = w.fetching ? [] :
+        [...w.positions]
+          .sort((a,b)=>(b.valueUSD||0)-(a.valueUSD||0))
+          .filter(p => !hideSmall || (p.valueUSD||0) >= 1);
+
+      // Hide entire wallet group if hideSmall and nothing visible
+      if(hideSmall && !w.fetching && w.positions.length && !visiblePositions.length) return;
+
       rows+=`<div class="w-grp">
         <span class="badge">EVM</span>
         <span>${addr}</span>
-        <span style="color:#555">${w.label}</span>
-        ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#444"> scanning…</span>`:''}
+        <span style="color:#888">${w.label}</span>
+        ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
+        ${w._refreshErr?`<span style="color:#ff8800;font-size:10px;margin-left:4px">⚠ ${w._refreshErr}</span>`:''}
         <span class="w-total">${tot>0?fI(tot):(w.fetching?'':'—')}</span>
         <button class="btn btn-ghost" onclick="refreshWallet(${w.id})" style="margin-left:8px">↻</button>
         <button class="btn btn-ghost" onclick="delWallet(${w.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove wallet">✕</button>
       </div>`;
+
       if(w.fetching){
-        rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Zerion scanning 40+ chains for all token positions…</div>`;
+        rows+=`<div class="trow" style="color:#555;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Zerion scanning 40+ chains…</div>`;
       }else if(!w.positions.length){
-        rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:16px 8px">${w._zerionError&&w._zerionError.includes('not configured')?`⚠ Zerion API key not set. Go to <a href="/admin" target="_blank" style="color:#fff">/admin</a> → paste your free Zerion key from <a href="https://developers.zerion.io" target="_blank" style="color:#fff">developers.zerion.io</a>`:(w._zerionError?`Zerion error: ${w._zerionError}`:'No token positions found')}</div>`;
+        rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:14px 8px">${
+          w._zerionError
+            ? (w._zerionError.includes('not configured')
+                ? `⚠ Zerion API key not set. Visit <a href="/admin" target="_blank" style="color:#fff">/admin</a> to add your free key.`
+                : `⚠ ${w._zerionError}`)
+            : 'No token positions found'
+        }</div>`;
       }else{
-        [...w.positions].sort((a,b)=>(b.valueUSD||0)-(a.valueUSD||0))
-          .filter(p => !hideSmall || (p.valueUSD||0) >= 1)
-          .forEach(p=>{
+        visiblePositions.forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
           rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
             <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${p.symbol.slice(0,2)}`}</div>
@@ -1451,11 +1467,16 @@ function renderHoldings(){
             <span class="mv sm ${pc(p.ch24)}">${fP(p.ch24)}</span>
           </div>`;
         });
+        if(hideSmall && w.positions.length > visiblePositions.length){
+          const hidden = w.positions.length - visiblePositions.length;
+          rows+=`<div class="trow" style="color:#555;font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px 8px">${hidden} position${hidden>1?'s':''} under $1 hidden</div>`;
+        }
       }
     });
 
     D.btc.forEach(a=>{
       const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
+      if(hideSmall && valUSD!=null && valUSD < 1) return; // hide small BTC
       const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
       rows+=`<div class="w-grp">
         <span class="badge">BTC</span><span>${addr}</span>
@@ -1479,6 +1500,7 @@ function renderHoldings(){
   const COIN_SYM={sol:'SOL',xrp:'XRP',ada:'ADA',trx:'TRX'};
   D.others.forEach(a=>{
     const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
+    if(hideSmall && valUSD!=null && valUSD < 1) return; // hide small others
     const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
     const sym=COIN_SYM[a.type]||a.type.toUpperCase();
     rows+=`<div class="w-grp">
@@ -1612,14 +1634,28 @@ function delBank(id){
 
 // ── PER-ITEM REFRESH ──────────────────────────────────────
 async function refreshWallet(id){
-  const w=D.wallets.find(x=>x.id===id);if(!w)return;
-  try{await fetchWalletPositions(w);await enrichCoinGecko();save();renderHoldings();updateSummary();buildPie();}
-  catch(e){alert('Wallet refresh failed:\n'+e.message);w.fetching=false;renderHoldings();}
+  const w=D.wallets.find(x=>x.id===id); if(!w) return;
+  w._refreshErr=null;
+  try{
+    await fetchWalletPositions(w);
+    await enrichCoinGecko();
+    save(); renderHoldings(); updateSummary(); buildPie();
+  }catch(e){
+    w._refreshErr=e.message.length>80?e.message.slice(0,80)+'…':e.message;
+    w.fetching=false;
+    renderHoldings();
+    setStatus('warn','Wallet refresh failed: '+w._refreshErr);
+  }
 }
 async function refreshBTC(id){
-  const a=D.btc.find(x=>x.id===id);if(!a)return;
-  try{a.balance=await fetchBTC(a.address);await enrichCoinGecko();save();renderHoldings();updateSummary();}
-  catch(e){alert('BTC refresh failed:\n'+e.message);}
+  const a=D.btc.find(x=>x.id===id); if(!a) return;
+  try{
+    a.balance=await fetchBTC(a.address);
+    await enrichCoinGecko();
+    save(); renderHoldings(); updateSummary();
+  }catch(e){
+    setStatus('warn','BTC refresh failed: '+e.message);
+  }
 }
 
 // ── DELETE ────────────────────────────────────────────────
@@ -1642,8 +1678,13 @@ function delOther(id){
 }
 async function refreshOther(id){
   const a=D.others.find(x=>x.id===id); if(!a) return;
-  try{await fetchOtherWallet(a);await enrichCoinGecko();save();renderHoldings();updateSummary();}
-  catch(e){alert(`Refresh failed: ${e.message}`);}
+  try{
+    await fetchOtherWallet(a);
+    await enrichCoinGecko();
+    save(); renderHoldings(); updateSummary();
+  }catch(e){
+    setStatus('warn',`${a.type.toUpperCase()} refresh failed: ${e.message}`);
+  }
 }
 function delIndian(id){
   if(!confirm('Remove this stock from your portfolio?')) return;
