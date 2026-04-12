@@ -1197,12 +1197,14 @@ async function fetchStocks(){
   const pr=await resp.json();
   if(pr.USD_INR) USD_INR=+pr.USD_INR;
   D.indian.forEach(s=>{
-    if(pr[s.symbol]!=null) s.price=+pr[s.symbol];
+    if(pr[s.symbol]!=null){ s.price=+pr[s.symbol]; s._err=null; }
     if(pr[`${s.symbol}_ch24`]!=null) s.ch24=+pr[`${s.symbol}_ch24`];
+    if(pr[`${s.symbol}_err`]) s._err=pr[`${s.symbol}_err`];
   });
   D.intl.forEach(s=>{
-    if(pr[s.symbol]!=null) s.price=+pr[s.symbol];
+    if(pr[s.symbol]!=null){ s.price=+pr[s.symbol]; s._err=null; }
     if(pr[`${s.symbol}_ch24`]!=null) s.ch24=+pr[`${s.symbol}_ch24`];
+    if(pr[`${s.symbol}_err`]) s._err=pr[`${s.symbol}_err`];
   });
 }
 
@@ -1476,13 +1478,13 @@ function renderHoldings(){
     head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.indian.forEach(a=>{
-      // price is in INR — convert total value to display currency for Value column
-      const valINR=a.price&&a.qty?a.qty*a.price:null;
-      const valUSD=valINR!=null?valINR/(liveRates.inr||USD_INR):null;
-      // P&L stays in INR (both price and avgCost are INR), then convert for display
-      const plINR=valINR!=null?a.qty*(a.price-a.avgCost):null;
-      const plUSD=plINR!=null?plINR/(liveRates.inr||USD_INR):null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      // price and avgCost are both in INR from yfinance
+      const valINR = a.price && a.qty ? a.qty * a.price : null;
+      const valUSD = valINR != null ? valINR / (liveRates.inr || USD_INR) : null;
+      // P&L in INR — display using inrToDisp() which converts INR→display currency
+      const plINR = valINR != null ? a.qty * (a.price - (a.avgCost || 0)) : null;
+      const plDisp = plINR != null ? (plINR >= 0 ? '+' : '') + inrToDisp(Math.abs(plINR)) : null;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null?pc(plINR):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -1666,8 +1668,9 @@ function renderAddForm(){
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
-    h=`<p class="add-panel-title">Add Indian Stock <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· price via AI web search</span></p>
+    h=`<p class="add-panel-title">Add Indian Stock <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· live price via yfinance</span></p>
     <div class="fg fg4"><div><label>NSE/BSE Symbol</label><input type="text" id="f-sym" placeholder="RELIANCE"></div><div><label>Exchange</label><select id="f-ex"><option>NSE</option><option>BSE</option></select></div><div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div><div><label>Avg Cost (₹)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div></div>
+    <div class="info-box" style="font-size:11px;color:#888;margin-bottom:12px;">Use the exact NSE ticker symbol. Examples: <strong style="color:#fff">RELIANCE</strong>, <strong style="color:#fff">SBIN</strong> (not SBI), <strong style="color:#fff">HDFCBANK</strong>, <strong style="color:#fff">INFY</strong>, <strong style="color:#fff">WAAREEENER</strong> (Waree Energies)</div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddStock()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='intl'){
     h=`<p class="add-panel-title">Add International Stock <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· USD via AI, converted to ₹</span></p>
