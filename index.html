@@ -753,6 +753,9 @@
     </div>
     <div class="src-row">
       <div class="lft">
+        <div class="ico">🤖</div>
+        <div><h4>Anthropic AI</h4><p>NSE/BSE + NASDAQ/NYSE live stock prices via web search</p></div>
+      </div>
       <span class="pill-free">Live</span>
     </div>
     <div class="src-row">
@@ -1407,7 +1410,7 @@ function renderHoldings(){
       if(w.fetching){
         rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Zerion scanning 40+ chains for all token positions…</div>`;
       }else if(!w.positions.length){
-        rows+=`<div class="trow" style="color:#444;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px">${w._zerionError?`Zerion error: ${w._zerionError} — showing ETH only`:'No token positions found (check ZERION_API_KEY in Vercel env vars)'}</div>`;
+        rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:16px 8px">${w._zerionError&&w._zerionError.includes('not configured')?`⚠ Zerion API key not set. Go to <a href="/admin" target="_blank" style="color:#fff">/admin</a> → paste your free Zerion key from <a href="https://developers.zerion.io" target="_blank" style="color:#fff">developers.zerion.io</a>`:(w._zerionError?`Zerion error: ${w._zerionError}`:'No token positions found')}</div>`;
       }else{
         [...w.positions].sort((a,b)=>(b.valueUSD||0)-(a.valueUSD||0)).forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
@@ -1473,9 +1476,12 @@ function renderHoldings(){
     head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.indian.forEach(a=>{
-      // price is in INR — convert to display currency
-      const valUSD=a.price&&a.qty?a.qty*a.price/(liveRates.inr||USD_INR):null;
-      const plUSD=valUSD!=null?a.qty*(a.price-a.avgCost)/(liveRates.inr||USD_INR):null;
+      // price is in INR — convert total value to display currency for Value column
+      const valINR=a.price&&a.qty?a.qty*a.price:null;
+      const valUSD=valINR!=null?valINR/(liveRates.inr||USD_INR):null;
+      // P&L stays in INR (both price and avgCost are INR), then convert for display
+      const plINR=valINR!=null?a.qty*(a.price-a.avgCost):null;
+      const plUSD=plINR!=null?plINR/(liveRates.inr||USD_INR):null;
       rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='intl'){
