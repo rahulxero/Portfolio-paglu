@@ -590,7 +590,7 @@
 </div>
 
 <!-- ── LOGIN MODAL ───────────────────────────────────────────────── -->
-<div class="login-mo" id="login-mo">
+<div class="login-mo open" id="login-mo">
   <div class="login-card">
     <div class="eyebrow">Portfolio Tracker</div>
     <h2>Welcome</h2>
@@ -615,13 +615,24 @@
 
 <!-- ── ONBOARDING TOOLTIP ─────────────────────────────────────────── -->
 <div id="onboard-tip" style="display:none;position:fixed;z-index:200;pointer-events:none;">
-  <div style="background:#fff;color:#000;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
-              letter-spacing:.04em;padding:10px 16px;white-space:nowrap;
-              animation:fadeUp .4s ease both;">
-    ← Start here, add your first holding
+  <div style="
+    background:#fff; color:#000;
+    font-family:'Syne',sans-serif; font-size:12px; font-weight:700;
+    letter-spacing:.04em; text-transform:uppercase;
+    padding:10px 18px; white-space:nowrap;
+    animation: onboardPulse 1.5s ease-in-out infinite, fadeUp .3s ease both;
+    box-shadow: 0 0 0 0 rgba(255,255,255,.4);
+  ">
+    ← Add your first holding here
   </div>
-  <div style="width:0;height:0;border-top:8px solid #fff;border-left:8px solid transparent;border-right:8px solid transparent;margin-left:20px;"></div>
+  <div style="width:0;height:0;border-top:7px solid #fff;border-left:7px solid transparent;border-right:7px solid transparent;margin-left:24px;"></div>
 </div>
+<style>
+@keyframes onboardPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,.5); transform: scale(1); }
+  50%      { box-shadow: 0 0 0 8px rgba(255,255,255,0); transform: scale(1.03); }
+}
+</style>
 
 <!-- ── MAIN ────────────────────────────────────────────────────── -->
 <main class="main">
@@ -822,7 +833,7 @@ function makeSig(ms) {
 // ── CACHE CONFIG ──────────────────────────────────────────
 // Portfolio structure (wallets/stocks/MF list) stored in nestegg_d4
 // Price cache stored separately so structure changes don't wipe prices
-const CACHE_KEY   = 'nestegg_prices_v1';
+const CACHE_KEY   = 'nestegg_prices_v2';
 const CACHE_TTL   = 5 * 60 * 1000;   // 5 minutes — auto-refresh if stale
 const CACHE_MAX   = 30 * 60 * 1000;  // 30 minutes — show stale banner after this
 
@@ -839,7 +850,32 @@ const GECKO={
 let D={
   wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[]
 };
-try{const p=localStorage.getItem('nestegg_d4');if(p)D=JSON.parse(p);}catch(e){}
+
+// ── Load portfolio structure ──────────────────────────────
+// Use nestegg_d5 — bumped from d4 to drop old demo data
+(function loadPortfolio(){
+  try{
+    const raw=localStorage.getItem('nestegg_d5');
+    if(raw){ D=JSON.parse(raw); return; }
+    // First run on d5 — try migrating from d4 but strip known demo data
+    const old=localStorage.getItem('nestegg_d4');
+    if(old){
+      const o=JSON.parse(old);
+      // Known demo addresses/ids to strip
+      const demoWallets=new Set(['0x742d35cc6634c0532925a3b844bc454e4438f44e']);
+      const demoBTC=new Set(['bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh']);
+      const demoIds=new Set([1,10,30,31,32,40,41,50,51,52]);
+      D.wallets=(o.wallets||[]).filter(w=>!demoWallets.has(w.address?.toLowerCase())&&!demoIds.has(w.id));
+      D.btc=(o.btc||[]).filter(a=>!demoBTC.has(a.address)&&!demoIds.has(a.id));
+      D.indian=(o.indian||[]).filter(a=>!demoIds.has(a.id));
+      D.intl=(o.intl||[]).filter(a=>!demoIds.has(a.id));
+      D.mf=(o.mf||[]).filter(a=>!demoIds.has(a.id));
+      D.banks=o.banks||[];
+      // Save clean data to new key
+      localStorage.setItem('nestegg_d5',JSON.stringify(D));
+    }
+  }catch(e){}
+})();
 
 // Restore cached prices into D on load
 function loadPriceCache(){
@@ -892,7 +928,7 @@ function showCacheBar(stale, label){
 function hideCacheBar(){
   document.getElementById('cache-bar').className = 'cache-bar';
 }
-function save(){try{localStorage.setItem('nestegg_d4',JSON.stringify(D));}catch(e){}}
+function save(){try{localStorage.setItem('nestegg_d5',JSON.stringify(D));}catch(e){}}
 
 function cacheAge(){
   if(!lastFetchedAt) return Infinity;
@@ -1609,7 +1645,13 @@ function hashPin(pin) {
 function loadAuth() {
   try {
     const raw = localStorage.getItem(AUTH_KEY);
-    if (raw) { currentUser = JSON.parse(raw); updateUserUI(); }
+    if (raw) {
+      currentUser = JSON.parse(raw);
+      updateUserUI();
+      // Already logged in — close the modal
+      document.getElementById('login-mo').classList.remove('open');
+    }
+    // If no session, modal stays open (it's open by default in HTML)
   } catch(e) {}
 }
 
@@ -1851,16 +1893,16 @@ document.getElementById('smo').addEventListener('click',e=>{if(e.target===docume
 // ── ONBOARDING ARROW ─────────────────────────────────────
 function showOnboardingTip(){
   const btn = document.getElementById('add-btn-main');
-  if(!btn) return;
   const tip = document.getElementById('onboard-tip');
-  if(!tip) return;
+  if(!btn || !tip) return;
   const rect = btn.getBoundingClientRect();
   tip.style.display = 'block';
-  tip.style.top  = (rect.bottom + 8) + 'px';
-  tip.style.left = (rect.left - 40) + 'px';
-  // Hide after 5 seconds or when + Add is clicked
-  setTimeout(() => { tip.style.display = 'none'; }, 6000);
-  btn.addEventListener('click', () => { tip.style.display = 'none'; }, {once:true});
+  tip.style.top  = (rect.bottom + 10) + 'px';
+  tip.style.left = Math.max(8, rect.left - 60) + 'px';
+  // Auto-hide after 7 seconds or when + Add is clicked
+  const hide = () => { tip.style.display = 'none'; };
+  const timer = setTimeout(hide, 7000);
+  btn.addEventListener('click', () => { clearTimeout(timer); hide(); }, {once:true});
 }
 
 // ── INIT — smart cache-aware startup ─────────────────────
