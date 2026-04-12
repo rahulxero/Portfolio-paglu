@@ -396,7 +396,24 @@
     .pill-free { font-size: 9px; padding: 2px 8px; background: #001208; color: var(--green); border: 1px solid #1a3a2a; font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
     .pill-opt  { font-size: 9px; padding: 2px 8px; background: #111; color: var(--ghost); border: var(--border-dim); font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
 
-    /* ── PIE LEGEND ──────────────────────────────────────── */
+    /* ── AUTOCOMPLETE ────────────────────────────────────── */
+    .ac-wrap { position: relative; }
+    .ac-drop {
+      position: absolute; top: 100%; left: 0; right: 0; z-index: 500;
+      background: #111; border: 1px solid #444; max-height: 200px;
+      overflow-y: auto; display: none;
+    }
+    .ac-drop.open { display: block; }
+    .ac-item {
+      padding: 8px 12px; cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .ac-item:hover { background: #222; }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-sym { color: #fff; font-weight: 600; }
+    .ac-name { color: #666; font-size: 10px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #pie-leg { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; font-size: 11px; font-family: var(--mono); }
 
     /* ── LOAD ANIMATION ──────────────────────────────────── */
@@ -704,6 +721,10 @@
         <button class="tab" onclick="sw('banks',this)">Bank & Cash</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;cursor:pointer;user-select:none;" title="Hide positions worth less than $1">
+          <input type="checkbox" id="hide-small" onchange="renderHoldings()" style="width:12px;height:12px;accent-color:#fff;cursor:pointer;">
+          Hide &lt;$1
+        </label>
         <span class="src-tag" id="src-tag">demo</span>
         <button class="btn btn-ghost" id="add-btn-main" onclick="toggleAdd()">+ Add</button>
       </div>
@@ -896,6 +917,7 @@ function loadPriceCache(){
       });
     }
     if(cache.btc) D.btc.forEach(a=>{const c=cache.btc.find(x=>x.id===a.id);if(c){a.balance=c.balance;a.priceINR=c.priceINR;a.priceUSD=c.priceUSD;a.ch24=c.ch24;}});
+    if(cache.others) D.others.forEach(a=>{const c=cache.others.find(x=>x.id===a.id);if(c){a.balance=c.balance;a.priceUSD=c.priceUSD;a.ch24=c.ch24;}});
     if(cache.indian) D.indian.forEach(a=>{const c=cache.indian.find(x=>x.id===a.id);if(c){a.price=c.price;a.ch24=c.ch24;}});
     if(cache.intl) D.intl.forEach(a=>{const c=cache.intl.find(x=>x.id===a.id);if(c){a.price=c.price;a.ch24=c.ch24;}});
     if(cache.mf) D.mf.forEach(a=>{const c=cache.mf.find(x=>x.id===a.id);if(c){a.nav=c.nav;a.ch24=c.ch24;}});
@@ -911,6 +933,7 @@ function savePriceCache(){
       usdInr: USD_INR,
       wallets: D.wallets.map(w=>({id:w.id,positions:w.positions,totalUSD:w.totalUSD})),
       btc:    D.btc.map(a=>({id:a.id,balance:a.balance,priceINR:a.priceINR,priceUSD:a.priceUSD,ch24:a.ch24})),
+      others: D.others.map(a=>({id:a.id,balance:a.balance,priceUSD:a.priceUSD,ch24:a.ch24})),
       indian: D.indian.map(a=>({id:a.id,price:a.price,ch24:a.ch24})),
       intl:   D.intl.map(a=>({id:a.id,price:a.price,ch24:a.ch24})),
       mf:     D.mf.map(a=>({id:a.id,nav:a.nav,ch24:a.ch24})),
@@ -1390,6 +1413,7 @@ function chainPill(chain){
 
 function renderHoldings(){
   const head=document.getElementById('tbl-head'),list=document.getElementById('holdings');
+  const hideSmall = document.getElementById('hide-small')?.checked || false;
   let rows='';
 
   if(activeTab==='crypto'){
@@ -1414,7 +1438,9 @@ function renderHoldings(){
       }else if(!w.positions.length){
         rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:16px 8px">${w._zerionError&&w._zerionError.includes('not configured')?`⚠ Zerion API key not set. Go to <a href="/admin" target="_blank" style="color:#fff">/admin</a> → paste your free Zerion key from <a href="https://developers.zerion.io" target="_blank" style="color:#fff">developers.zerion.io</a>`:(w._zerionError?`Zerion error: ${w._zerionError}`:'No token positions found')}</div>`;
       }else{
-        [...w.positions].sort((a,b)=>(b.valueUSD||0)-(a.valueUSD||0)).forEach(p=>{
+        [...w.positions].sort((a,b)=>(b.valueUSD||0)-(a.valueUSD||0))
+          .filter(p => !hideSmall || (p.valueUSD||0) >= 1)
+          .forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
           rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
             <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${p.symbol.slice(0,2)}`}</div>
@@ -1481,9 +1507,10 @@ function renderHoldings(){
       // price and avgCost are both in INR from yfinance
       const valINR = a.price && a.qty ? a.qty * a.price : null;
       const valUSD = valINR != null ? valINR / (liveRates.inr || USD_INR) : null;
-      // P&L in INR — display using inrToDisp() which converts INR→display currency
-      const plINR = valINR != null ? a.qty * (a.price - (a.avgCost || 0)) : null;
-      const plDisp = plINR != null ? (plINR >= 0 ? '+' : '') + inrToDisp(Math.abs(plINR)) : null;
+      const hasAvgCost = a.avgCost > 0;
+      const plINR = (hasAvgCost && valINR != null) ? a.qty * (a.price - a.avgCost) : null;
+      const plPct  = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
+      const plDisp = plINR != null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
       rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null?pc(plINR):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='intl'){
@@ -1491,20 +1518,26 @@ function renderHoldings(){
     head.style.cssText=`display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.intl.forEach(a=>{
-      // price is already in USD
-      const valUSD=a.price&&a.qty?a.qty*a.price:null;
-      const plUSD=valUSD!=null?a.qty*(a.price-a.avgCost):null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      // price is in USD
+      const valUSD = a.price && a.qty ? a.qty * a.price : null;
+      const hasAvgCost = a.avgCost > 0;
+      const plUSD = (hasAvgCost && valUSD != null) ? a.qty * (a.price - a.avgCost) : null;
+      const plPct = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
+      const plDisp = plUSD != null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     head.style.cssText=`display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span><span>Value (${curSym})</span><span>1d</span><span>Gain/Loss (${curSym})</span><span></span>`;
     D.mf.forEach(a=>{
-      // nav is in INR
-      const valUSD=a.nav&&a.units?a.units*a.nav/(liveRates.inr||USD_INR):null;
-      const plUSD=valUSD!=null&&a.navBought?a.units*(a.nav-a.navBought)/(liveRates.inr||USD_INR):null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">₹${a.nav?a.nav.toFixed(2):'—'}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plUSD!=null?(plUSD>=0?'+':'')+fI(Math.abs(plUSD)):lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      const valUSD = a.nav && a.units ? a.units * a.nav / (liveRates.inr || USD_INR) : null;
+      const hasNavBought = a.navBought > 0;
+      const plINR = (hasNavBought && a.nav) ? a.units * (a.nav - a.navBought) : null;
+      const plUSD = plINR != null ? plINR / (liveRates.inr || USD_INR) : null;
+      const plPct = (hasNavBought && a.nav) ? ((a.nav - a.navBought) / a.navBought * 100) : null;
+      const plDisp = plUSD != null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">₹${a.nav?a.nav.toFixed(2):'—'}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -1669,18 +1702,50 @@ function renderAddForm(){
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
     h=`<p class="add-panel-title">Add Indian Stock <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· live price via yfinance</span></p>
-    <div class="fg fg4"><div><label>NSE/BSE Symbol</label><input type="text" id="f-sym" placeholder="RELIANCE"></div><div><label>Exchange</label><select id="f-ex"><option>NSE</option><option>BSE</option></select></div><div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div><div><label>Avg Cost (₹)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div></div>
-    <div class="info-box" style="font-size:11px;color:#888;margin-bottom:12px;">Use the exact NSE ticker symbol. Examples: <strong style="color:#fff">RELIANCE</strong>, <strong style="color:#fff">SBIN</strong> (not SBI), <strong style="color:#fff">HDFCBANK</strong>, <strong style="color:#fff">INFY</strong>, <strong style="color:#fff">WAAREEENER</strong> (Waree Energies)</div>
+    <div class="fg fg4">
+      <div><label>NSE/BSE Symbol</label>
+        <div class="ac-wrap">
+          <input type="text" id="f-sym" placeholder="Type to search…" autocomplete="off">
+          <div class="ac-drop" id="ac-indian"></div>
+        </div>
+      </div>
+      <div><label>Exchange</label><select id="f-ex"><option>NSE</option><option>BSE</option></select></div>
+      <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div>
+      <div><label>Avg Cost (₹)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div>
+    </div>
+    <div class="info-box" style="font-size:11px;color:#888;margin-bottom:12px;">Use exact NSE ticker. Examples: <strong style="color:#fff">RELIANCE</strong>, <strong style="color:#fff">SBIN</strong> (SBI), <strong style="color:#fff">HDFCBANK</strong>, <strong style="color:#fff">INFY</strong>, <strong style="color:#fff">WAAREEENER</strong></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddStock()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+    setTimeout(()=>setupAutocomplete('f-sym','ac-indian','indian'),50);
   }else if(activeTab==='intl'){
-    h=`<p class="add-panel-title">Add International Stock <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· USD via AI, converted to ₹</span></p>
-    <div class="fg fg4"><div><label>Ticker</label><input type="text" id="f-sym" placeholder="AAPL"></div><div><label>Exchange</label><select id="f-ex"><option>NASDAQ</option><option>NYSE</option><option>LSE</option><option>TSE</option><option>SGX</option></select></div><div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div><div><label>Avg Cost (USD)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div></div>
+    h=`<p class="add-panel-title">Add International Stock <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· USD via yfinance</span></p>
+    <div class="fg fg4">
+      <div><label>Ticker</label>
+        <div class="ac-wrap">
+          <input type="text" id="f-sym" placeholder="Type to search…" autocomplete="off">
+          <div class="ac-drop" id="ac-intl"></div>
+        </div>
+      </div>
+      <div><label>Exchange</label><select id="f-ex"><option>NASDAQ</option><option>NYSE</option><option>LSE</option><option>TSE</option><option>SGX</option></select></div>
+      <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div>
+      <div><label>Avg Cost (USD)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div>
+    </div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddIntl()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+    setTimeout(()=>setupAutocomplete('f-sym','ac-intl','intl'),50);
   }else if(activeTab==='mf'){
     h=`<p class="add-panel-title">Add Mutual Fund <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· NAV from <a href="https://www.mfapi.in" target="_blank">MFApi.in</a></span></p>
-    <div class="fg fg3"><div><label>Fund Name</label><input type="text" id="f-fn" placeholder="Axis Bluechip Fund"></div><div><label>AMFI Code</label><input type="text" id="f-code" placeholder="120503"></div><div><label>Units Held</label><input type="number" id="f-units" placeholder="0.000" step="any"></div></div>
+    <div class="fg fg3">
+      <div><label>Fund Name / AMFI Code</label>
+        <div class="ac-wrap">
+          <input type="text" id="f-fn" placeholder="Type fund name to search…" autocomplete="off">
+          <div class="ac-drop" id="ac-mf"></div>
+        </div>
+      </div>
+      <div><label>AMFI Code</label><input type="text" id="f-code" placeholder="120503"></div>
+      <div><label>Units Held</label><input type="number" id="f-units" placeholder="0.000" step="any"></div>
+    </div>
     <div class="fg" style="grid-template-columns:220px"><div><label>Purchase NAV (₹)</label><input type="number" id="f-pnav" placeholder="0.00" step="any"></div></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddMF()">Add Fund</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+    setTimeout(()=>setupAutocomplete('f-fn','ac-mf','mf'),50);
   }else if(activeTab==='banks'){
     h=`<p class="add-panel-title">Add Bank / Cash Account</p>
     <div class="fg fg4">
@@ -2030,7 +2095,88 @@ async function refreshTicker() {
   } catch(e) { console.warn('Ticker refresh failed:', e.message); }
 }
 
-// ── SETTINGS (about modal only — no keys for users) ───────
+// ══════════════════════════════════════════════════════════
+//  STOCK TICKER AUTOCOMPLETE
+// ══════════════════════════════════════════════════════════
+let acTimer = null;
+
+async function searchTickers(query, type) {
+  // type: 'indian' | 'intl' | 'mf'
+  if (!query || query.length < 2) return [];
+  try {
+    if (type === 'mf') {
+      // MF API search
+      const r = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(query)}`, { signal: makeSig(6000) });
+      if (!r.ok) return [];
+      const d = await r.json();
+      return (d || []).slice(0, 8).map(f => ({ sym: String(f.schemeCode), name: f.schemeName, extra: f.schemeCode }));
+    } else {
+      // Yahoo Finance search — works for both NSE and NASDAQ
+      const suffix = type === 'indian' ? ' NSE' : '';
+      const r = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query + suffix)}&lang=en-US&region=IN&quotesCount=8&newsCount=0`, { signal: makeSig(6000) });
+      if (!r.ok) return [];
+      const d = await r.json();
+      const quotes = (d.quotes || []).filter(q => q.symbol && q.shortname);
+      // For Indian stocks filter to NSE/BSE exchanges
+      const filtered = type === 'indian'
+        ? quotes.filter(q => q.exchange === 'NSI' || q.exchange === 'BSE' || q.symbol?.endsWith('.NS') || q.symbol?.endsWith('.BO'))
+        : quotes.filter(q => !q.symbol?.endsWith('.NS') && !q.symbol?.endsWith('.BO'));
+      return filtered.slice(0, 8).map(q => ({
+        sym:   type === 'indian' ? q.symbol.replace(/\.(NS|BO)$/, '') : q.symbol,
+        name:  q.shortname || q.longname || q.symbol,
+        extra: q.exchange,
+      }));
+    }
+  } catch(e) { return []; }
+}
+
+function setupAutocomplete(inputId, dropId, type) {
+  const input = document.getElementById(inputId);
+  const drop  = document.getElementById(dropId);
+  if (!input || !drop) return;
+
+  input.addEventListener('input', () => {
+    clearTimeout(acTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { drop.classList.remove('open'); return; }
+    acTimer = setTimeout(async () => {
+      const results = await searchTickers(q, type);
+      if (!results.length) { drop.classList.remove('open'); return; }
+      drop.innerHTML = results.map(r =>
+        `<div class="ac-item" onclick="selectTicker('${inputId}','${dropId}','${r.sym.replace(/'/g,"\\'")}','${r.name.replace(/'/g,"\\'").slice(0,40)}','${type}','${r.extra||''}')">
+          <span class="ac-sym">${r.sym}</span>
+          <span class="ac-name">${r.name}</span>
+        </div>`
+      ).join('');
+      drop.classList.add('open');
+    }, 300);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') drop.classList.remove('open');
+  });
+
+  // Close on outside click
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target) && !drop.contains(e.target)) drop.classList.remove('open');
+  }, { capture: true });
+}
+
+function selectTicker(inputId, dropId, sym, name, type, extra) {
+  const input = document.getElementById(inputId);
+  if (input) input.value = sym;
+  document.getElementById(dropId)?.classList.remove('open');
+  // Also fill name field if available
+  const nameField = document.getElementById('f-fn'); // MF name field
+  if (nameField && type === 'mf') nameField.value = name;
+  const codeField = document.getElementById('f-code'); // MF code
+  if (codeField && type === 'mf') codeField.value = sym; // sym is schemeCode for MF
+  // Auto-select exchange for Indian stocks
+  if (type === 'indian' && extra) {
+    const exSel = document.getElementById('f-ex');
+    if (exSel) exSel.value = (extra === 'BSE' || extra === 'BSE') ? 'BSE' : 'NSE';
+  }
+}
 function openSettings(){document.getElementById('smo').classList.add('open');}
 function closeSettings(){document.getElementById('smo').classList.remove('open');}
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
