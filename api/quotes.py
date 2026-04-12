@@ -1,6 +1,14 @@
 from http.server import BaseHTTPRequestHandler
 import json
 
+# Common NSE ticker aliases — maps what users type to actual yfinance ticker
+NSE_ALIASES = {
+    'SBI':    'SBIN',
+    'M&M':    'M%26M',   # URL-encode the &
+    'L&T':    'LT',
+    'BAJAJ':  'BAJAJFINSV',
+}
+
 class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
@@ -35,12 +43,19 @@ class handler(BaseHTTPRequestHandler):
             # ── Indian stocks (NSE / BSE) ──────────────────
             for sym in indian_symbols:
                 exchange = exchanges.get(sym, 'NSE')
-                # Try both exchanges and multiple suffix variants
-                attempts = []
+
+                # Apply alias if exists
+                lookup_sym = NSE_ALIASES.get(sym.upper(), sym)
+
+                # Try both exchanges
                 if exchange == 'BSE':
-                    attempts = [sym + '.BO', sym + '.NS']
+                    attempts = [lookup_sym + '.BO', lookup_sym + '.NS']
                 else:
-                    attempts = [sym + '.NS', sym + '.BO']
+                    attempts = [lookup_sym + '.NS', lookup_sym + '.BO']
+
+                # Also try original sym if alias was used
+                if lookup_sym != sym:
+                    attempts += [sym + '.NS', sym + '.BO']
 
                 fetched = False
                 for ticker_sym in attempts:
@@ -62,7 +77,8 @@ class handler(BaseHTTPRequestHandler):
                         continue
 
                 if not fetched:
-                    result[sym + '_err'] = 'Not found on NSE/BSE'
+                    # Return error info so the UI can show it
+                    result[sym + '_err'] = f'Not found. Try the exact NSE ticker (e.g. SBIN for SBI)'
 
             # ── International stocks (NASDAQ / NYSE) ───────
             for sym in intl_symbols:
@@ -86,7 +102,7 @@ class handler(BaseHTTPRequestHandler):
             self._json(result, 200)
 
         except ImportError:
-            self._json({'error': 'yfinance not installed'}, 500)
+            self._json({'error': 'yfinance not installed — check requirements.txt'}, 500)
         except json.JSONDecodeError:
             self._json({'error': 'Invalid JSON body'}, 400)
         except Exception as e:
@@ -107,4 +123,4 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        pass  # suppress default access logs
+        pass  # suppress access logs
