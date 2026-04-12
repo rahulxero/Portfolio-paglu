@@ -1,5 +1,8 @@
 // api/zerion.js — Zerion API proxy (fixes CORS)
-// Key priority: ZERION_API_KEY env var → x-session-token signed admin token
+// Key priority:
+//   1. ZERION_API_KEY Vercel env var  (set in Vercel dashboard — recommended)
+//   2. x-session-token signed admin token (set via /admin page)
+//   3. x-zerion-key header (direct, for admin users only)
 
 const crypto = require('crypto');
 
@@ -17,16 +20,20 @@ function keyFromToken(token, secret) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token, x-zerion-key');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // Try all key sources in priority order
   const ZERION_KEY =
     process.env.ZERION_API_KEY ||
-    (process.env.ADMIN_PASSWORD && keyFromToken(req.headers['x-session-token'], process.env.ADMIN_PASSWORD));
+    (process.env.ADMIN_PASSWORD && keyFromToken(req.headers['x-session-token'], process.env.ADMIN_PASSWORD)) ||
+    req.headers['x-zerion-key'] || null;
 
-  if (!ZERION_KEY) return res.status(401).json({
-    error: 'Zerion API key not configured. Visit /admin to set it up.'
-  });
+  if (!ZERION_KEY) {
+    return res.status(401).json({
+      error: 'Zerion API key not configured. Add ZERION_API_KEY in Vercel dashboard → Settings → Environment Variables, or visit /admin to set it.'
+    });
+  }
 
   const { path, ...rest } = req.query;
   if (!path) return res.status(400).json({ error: 'Missing path param' });

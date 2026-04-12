@@ -26,36 +26,43 @@ class handler(BaseHTTPRequestHandler):
 
             # ── USD/INR exchange rate ──────────────────────
             try:
-                fx    = yf.Ticker('USDINR=X')
-                rate  = float(fx.fast_info.last_price or 84)
+                fx   = yf.Ticker('USDINR=X')
+                rate = float(fx.fast_info.last_price or 84)
                 result['USD_INR'] = round(rate, 2)
             except Exception:
                 result['USD_INR'] = 84
 
             # ── Indian stocks (NSE / BSE) ──────────────────
             for sym in indian_symbols:
-                exchange   = exchanges.get(sym, 'NSE')
-                suffix     = '.BO' if exchange == 'BSE' else '.NS'
-                try:
-                    t     = yf.Ticker(sym + suffix)
-                    info  = t.fast_info
-                    price = float(info.last_price or 0)
+                exchange = exchanges.get(sym, 'NSE')
+                # Try both exchanges and multiple suffix variants
+                attempts = []
+                if exchange == 'BSE':
+                    attempts = [sym + '.BO', sym + '.NS']
+                else:
+                    attempts = [sym + '.NS', sym + '.BO']
 
-                    # Fallback to other exchange if zero
-                    if price <= 0 and suffix == '.NS':
-                        t2    = yf.Ticker(sym + '.BO')
-                        price = float(t2.fast_info.last_price or 0)
-                    if price <= 0 and suffix == '.BO':
-                        t2    = yf.Ticker(sym + '.NS')
-                        price = float(t2.fast_info.last_price or 0)
+                fetched = False
+                for ticker_sym in attempts:
+                    try:
+                        t     = yf.Ticker(ticker_sym)
+                        info  = t.fast_info
+                        price = float(info.last_price or 0)
+                        if price > 0:
+                            result[sym] = round(price, 2)
+                            try:
+                                prev = float(info.previous_close or 0)
+                                if prev > 0:
+                                    result[sym + '_ch24'] = round((price - prev) / prev * 100, 2)
+                            except Exception:
+                                pass
+                            fetched = True
+                            break
+                    except Exception:
+                        continue
 
-                    if price > 0:
-                        result[sym] = round(price, 2)
-                        prev = float(info.previous_close or 0)
-                        if prev > 0:
-                            result[sym + '_ch24'] = round((price - prev) / prev * 100, 2)
-                except Exception as e:
-                    result[sym + '_err'] = str(e)
+                if not fetched:
+                    result[sym + '_err'] = 'Not found on NSE/BSE'
 
             # ── International stocks (NASDAQ / NYSE) ───────
             for sym in intl_symbols:
@@ -65,22 +72,26 @@ class handler(BaseHTTPRequestHandler):
                     price = float(info.last_price or 0)
                     if price > 0:
                         result[sym] = round(price, 2)
-                        prev = float(info.previous_close or 0)
-                        if prev > 0:
-                            result[sym + '_ch24'] = round((price - prev) / prev * 100, 2)
+                        try:
+                            prev = float(info.previous_close or 0)
+                            if prev > 0:
+                                result[sym + '_ch24'] = round((price - prev) / prev * 100, 2)
+                        except Exception:
+                            pass
+                    else:
+                        result[sym + '_err'] = 'Price unavailable'
                 except Exception as e:
                     result[sym + '_err'] = str(e)
 
             self._json(result, 200)
 
         except ImportError:
-            self._json({'error': 'yfinance not installed — add yfinance to requirements.txt'}, 500)
+            self._json({'error': 'yfinance not installed'}, 500)
         except json.JSONDecodeError:
             self._json({'error': 'Invalid JSON body'}, 400)
         except Exception as e:
             self._json({'error': str(e)}, 500)
 
-    # ── helpers ────────────────────────────────────────────
     def _cors(self):
         self.send_header('Access-Control-Allow-Origin',  '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -94,3 +105,6 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass  # suppress default access logs
