@@ -842,13 +842,15 @@ let lastFetchedAt = 0; // epoch ms of last successful full refresh
 const GECKO={
   ETH:'ethereum',BTC:'bitcoin',SOL:'solana',MATIC:'matic-network',BNB:'binancecoin',
   AVAX:'avalanche-2',OP:'optimism',ARB:'arbitrum',XMR:'monero',DOT:'polkadot',
-  ADA:'cardano',DOGE:'dogecoin',LINK:'chainlink',LTC:'litecoin',
+  ADA:'cardano',DOGE:'dogecoin',LINK:'chainlink',LTC:'litecoin',XRP:'ripple',
+  TRX:'tron',SHIB:'shiba-inu',PEPE:'pepe',UNI:'uniswap',ATOM:'cosmos',NEAR:'near',
   USDT:'tether',USDC:'usd-coin',DAI:'dai',WBTC:'wrapped-bitcoin',
-  SHIB:'shiba-inu',PEPE:'pepe',UNI:'uniswap',ATOM:'cosmos',NEAR:'near',
 };
 
 let D={
-  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[]
+  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[],
+  // Single-chain native wallets: SOL, XRP, ADA, TRX
+  others:[] // [{id, type:'sol'|'xrp'|'ada'|'trx', address, label, balance, priceUSD, ch24}]
 };
 
 // ── Load portfolio structure ──────────────────────────────
@@ -871,6 +873,7 @@ let D={
       D.intl=(o.intl||[]).filter(a=>!demoIds.has(a.id));
       D.mf=(o.mf||[]).filter(a=>!demoIds.has(a.id));
       D.banks=o.banks||[];
+      D.others=o.others||[];
       // Save clean data to new key
       localStorage.setItem('nestegg_d5',JSON.stringify(D));
     }
@@ -946,44 +949,47 @@ function cacheAgeLabel(){
 }
 
 // ══════════════════════════════════════════════════════════
-//  ZERION via /api/zerion proxy (no CORS, key stays server-side)
+//  ZERION via /api/zerion proxy
 // ══════════════════════════════════════════════════════════
 async function zerionGetPositions(address){
-  let all=[], nextPath=`/v1/wallets/${address}/positions/`;
-  const baseParams={
-    'filter[positions]':'only_simple',
-    'filter[trash]':'no_filter',
-    'sort':'value',
-    'currency':'usd',
-    'limit':'100',
+  let all=[];
+  // First request params
+  let reqParams = {
+    path: `/v1/wallets/${address}/positions/`,
+    'filter[positions]': 'only_simple',
+    'filter[trash]': 'no_filter',
+    'sort': 'value',
+    'currency': 'usd',
+    'limit': '100',
   };
 
-  while(nextPath){
-    const qs=new URLSearchParams({path:nextPath,...baseParams}).toString();
-    const headers={'Content-Type':'application/json'};
-    if(SESSION_TOKEN) headers['x-session-token']=SESSION_TOKEN;
-    const r=await fetch(`/api/zerion?${qs}`,{headers,signal:makeSig()});
+  while(true){
+    const qs = new URLSearchParams(reqParams).toString();
+    const headers = {'Content-Type':'application/json'};
+    if(SESSION_TOKEN) headers['x-session-token'] = SESSION_TOKEN;
+
+    let r = await fetch(`/api/zerion?${qs}`, {headers, signal:makeSig(25000)});
 
     if(r.status===202){
-      // Zerion still indexing — wait 3s and retry
       await new Promise(res=>setTimeout(res,3000));
-      const r2=await fetch(`/api/zerion?${qs}`,{headers,signal:makeSig()});
-      if(!r2.ok){
-        const e=await r2.json().catch(()=>({}));
-        throw new Error(e.error||'Zerion indexing wallet — try again in a moment');
-      }
-      const d2=await r2.json(); all.push(...(d2.data||[]));
-      nextPath=d2.links?.next?new URL(d2.links.next).pathname:null;
-      continue;
+      r = await fetch(`/api/zerion?${qs}`, {headers, signal:makeSig(25000)});
     }
     if(!r.ok){
-      const e=await r.json().catch(()=>({}));
-      throw new Error(e.error||'Zerion proxy error '+r.status);
+      const e = await r.json().catch(()=>({}));
+      throw new Error(e.error||'Zerion error '+r.status);
     }
-    const d=await r.json();
+    const d = await r.json();
     all.push(...(d.data||[]));
-    // Zerion next page URL — extract just the path for the next proxy call
-    nextPath=d.links?.next?new URL(d.links.next).pathname:null;
+
+    // Zerion returns absolute next URL like https://api.zerion.io/v1/wallets/.../positions/?cursor=xxx
+    // Extract path + all query params for our proxy
+    const nextUrl = d.links?.next;
+    if(!nextUrl) break;
+    try{
+      const u = new URL(nextUrl);
+      reqParams = { path: u.pathname };
+      u.searchParams.forEach((v,k) => { reqParams[k] = v; });
+    }catch{ break; }
   }
 
   return all.map(p=>{
@@ -1019,6 +1025,60 @@ async function fetchBTC(address){
   const funded=(d.chain_stats?.funded_txo_sum||0)+(d.mempool_stats?.funded_txo_sum||0);
   const spent=(d.chain_stats?.spent_txo_sum||0)+(d.mempool_stats?.spent_txo_sum||0);
   return(funded-spent)/1e8;
+}
+
+async function fetchSOL(address){
+  // Solana — use public mainnet RPC
+  const r=await fetch('https://api.mainnet-beta.solana.com',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getBalance',params:[address]}),
+    signal:makeSig()
+  });
+  if(!r.ok) throw new Error('Solana RPC '+r.status);
+  const d=await r.json();
+  if(d.error) throw new Error(d.error.message);
+  return (d.result?.value||0)/1e9; // lamports → SOL
+}
+
+async function fetchXRP(address){
+  // XRP — XRPL public API
+  const r=await fetch(`https://data.ripple.com/v2/accounts/${address}/balances?currency=XRP`,{signal:makeSig()});
+  if(!r.ok) throw new Error('XRPL API '+r.status);
+  const d=await r.json();
+  const xrp=d.balances?.find(b=>b.currency==='XRP');
+  return parseFloat(xrp?.value||'0');
+}
+
+async function fetchADA(address){
+  // Cardano — Blockfrost public API (no key needed for basic balance)
+  // Use Koios free API instead
+  const r=await fetch('https://api.koios.rest/api/v1/address_info',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','accept':'application/json'},
+    body:JSON.stringify({_addresses:[address]}),
+    signal:makeSig()
+  });
+  if(!r.ok) throw new Error('Koios API '+r.status);
+  const d=await r.json();
+  const lovelace=parseInt(d?.[0]?.balance||'0');
+  return lovelace/1e6; // lovelace → ADA
+}
+
+async function fetchTRX(address){
+  // TRON — TronGrid public API
+  const r=await fetch(`https://apilist.tronscanapi.com/api/accountv2?address=${address}`,{signal:makeSig()});
+  if(!r.ok) throw new Error('TronScan API '+r.status);
+  const d=await r.json();
+  const sun=d.balance||0; // in SUN
+  return sun/1e6; // SUN → TRX
+}
+
+async function fetchOtherWallet(a){
+  if(a.type==='sol')  a.balance=await fetchSOL(a.address);
+  if(a.type==='xrp')  a.balance=await fetchXRP(a.address);
+  if(a.type==='ada')  a.balance=await fetchADA(a.address);
+  if(a.type==='trx')  a.balance=await fetchTRX(a.address);
 }
 
 // ── WALLET FETCH ──────────────────────────────────────────
@@ -1090,6 +1150,16 @@ async function enrichCoinGecko(){
     p.valueINR=p.valueUSD*USD_INR;
   }));
   D.btc.forEach(a=>{const p=prices.bitcoin;if(p){a.priceINR=p.inr;a.priceUSD=p.usd;a.ch24=p.usd_24h_change||p.inr_24h_change||null;}});
+
+  // Enrich SOL/XRP/ADA/TRX wallets
+  const COIN_ID = {sol:'solana',xrp:'ripple',ada:'cardano',trx:'tron'};
+  D.others.forEach(a=>{
+    const gid=COIN_ID[a.type];
+    if(gid&&prices[gid]){
+      a.priceUSD=prices[gid].usd||0;
+      a.ch24=prices[gid].usd_24h_change||null;
+    }
+  });
 }
 
 // ── MUTUAL FUNDS ──────────────────────────────────────────
@@ -1153,6 +1223,8 @@ async function refreshAll(){
   await Promise.all(D.btc.map(a=>
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
+  // Fetch SOL / XRP / ADA / TRX balances
+  await Promise.all(D.others.map(a=>fetchOtherWallet(a).catch(e=>errs.push(`${a.type.toUpperCase()}: ${e.message}`))));
   renderHoldings();
 
   setStatus('loading','Enriching prices from CoinGecko…');
@@ -1202,7 +1274,8 @@ function walletUSD(w){return w.positions.reduce((s,p)=>s+(p.valueUSD||0),0);}
 function vals(){
   const inrToUSD = v => v / (liveRates.inr || USD_INR || 84);
   const c = D.wallets.reduce((s,w)=>s+walletUSD(w),0)
-          + D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0);
+          + D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0)
+          + D.others.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0);
   const i = inrToUSD(D.indian.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0));
   const x = D.intl.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0); // already USD
   const m = inrToUSD(D.mf.reduce((s,a)=>s+(a.nav&&a.units?a.units*a.nav:0),0));
@@ -1226,7 +1299,8 @@ function updateSummary(){
   // All wAvg values use USD base now
   const allCrypto=[
     ...D.wallets.flatMap(w=>w.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}))),
-    ...D.btc.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24}))
+    ...D.btc.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24})),
+    ...D.others.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24})),
   ].filter(x=>x.v>0);
   const cC=wAvg(allCrypto,x=>x.v,x=>x.ch);
   const iC=wAvg(D.indian,a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
@@ -1372,6 +1446,31 @@ function renderHoldings(){
     });
     if(!rows) rows=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
 
+  // Render SOL / XRP / ADA / TRX wallets
+  const COIN_CHAIN={sol:'solana',xrp:'xrp-ledger',ada:'cardano',trx:'tron'};
+  const COIN_SYM={sol:'SOL',xrp:'XRP',ada:'ADA',trx:'TRX'};
+  D.others.forEach(a=>{
+    const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
+    const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
+    const sym=COIN_SYM[a.type]||a.type.toUpperCase();
+    rows+=`<div class="w-grp">
+      <span class="badge">${sym}</span>
+      <span>${addr}</span>
+      <span style="color:#555">${a.label||''}</span>
+      <span class="w-total">${valUSD?fI(valUSD):'—'}</span>
+      <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
+      <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove">✕</button>
+    </div>
+    <div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
+      <div class="tok-logo" style="font-size:10px;font-weight:700">${sym.slice(0,2)}</div>
+      <div><span class="an">${sym}</span>${chainPill(COIN_CHAIN[a.type]||a.type)}<div class="as">${a.label||a.address.slice(0,12)+'…'}</div></div>
+      <span class="mv">${a.balance!=null?a.balance.toLocaleString('en-US',{maximumFractionDigits:4}):lc()}</span>
+      <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
+      <span class="mv">${valUSD?fI(valUSD):lc()}</span>
+      <span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span>
+    </div>`;
+  });
+
   }else if(activeTab==='indian'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
@@ -1496,6 +1595,18 @@ function delBTC(id){
   D.btc=D.btc.filter(x=>x.id!==id);
   save(); renderHoldings(); updateSummary(); buildPie();
 }
+function delOther(id){
+  const a=D.others.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm(`Remove this ${a.type.toUpperCase()} wallet?`)) return;
+  D.others=D.others.filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+async function refreshOther(id){
+  const a=D.others.find(x=>x.id===id); if(!a) return;
+  try{await fetchOtherWallet(a);await enrichCoinGecko();save();renderHoldings();updateSummary();}
+  catch(e){alert(`Refresh failed: ${e.message}`);}
+}
 function delIndian(id){
   if(!confirm('Remove this stock from your portfolio?')) return;
   D.indian=D.indian.filter(x=>x.id!==id);
@@ -1537,11 +1648,18 @@ function renderAddForm(){
   if(activeTab==='crypto'){
     h=`<p class="add-panel-title">Add Wallet</p>
     <div class="fg fg3">
-      <div><label>Type</label><select id="f-wt"><option value="evm">EVM (Ethereum / Polygon / BNB / Arbitrum / Base…)</option><option value="btc">Bitcoin (BTC)</option></select></div>
-      <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x…  /  bc1…"></div>
+      <div><label>Chain</label><select id="f-wt">
+        <option value="evm">EVM — Ethereum, Polygon, BNB, Arbitrum, Base…</option>
+        <option value="btc">Bitcoin (BTC)</option>
+        <option value="sol">Solana (SOL)</option>
+        <option value="xrp">XRP Ledger (XRP)</option>
+        <option value="ada">Cardano (ADA)</option>
+        <option value="trx">TRON (TRX)</option>
+      </select></div>
+      <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok">✓ Zerion proxy active — fetches every token + DeFi position across 40+ chains automatically.</div>
+    <div class="info-box info-ok">✓ EVM wallets use Zerion (40+ chains). SOL/XRP/ADA/TRX use free public APIs — no key needed.</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -1592,23 +1710,46 @@ async function doAddWallet(){
   const lbl=(document.getElementById('f-lbl').value||'').trim()||addr.slice(0,8)+'…';
   if(!addr){alert('Please enter a wallet address');return;}
   const btn=document.getElementById('add-btn');
-  btn.disabled=true;btn.textContent='⟳ Fetching…';
+  btn.disabled=true; btn.textContent='⟳ Fetching…';
+
+  const COIN_LABELS={sol:'Solana',xrp:'XRP',ada:'Cardano',trx:'TRON'};
+  const COIN_FETCH={
+    sol:fetchSOL, xrp:fetchXRP, ada:fetchADA, trx:fetchTRX
+  };
+
   if(wt==='evm'){
     const w={id:Date.now(),address:addr,label:lbl,positions:[],totalUSD:0,fetching:false};
     D.wallets.push(w);
     setFetchSt('loading','Zerion scanning 40+ chains for all tokens…');
     try{
-      await fetchWalletPositions(w); await enrichCoinGecko();
+      await fetchWalletPositions(w);
+      await enrichCoinGecko();
       const chains=[...new Set(w.positions.map(p=>p.chain))];
       setFetchSt('ok',`Found ${w.positions.length} position${w.positions.length!==1?'s':''} across: ${chains.slice(0,5).join(', ')}${chains.length>5?` +${chains.length-5} more`:''}`);
     }catch(e){setFetchSt('err',e.message);D.wallets.pop();btn.disabled=false;btn.textContent='Add Wallet';return;}
-  }else{
+
+  }else if(wt==='btc'){
     setFetchSt('loading','Fetching BTC balance from Blockstream…');
-    try{const bal=await fetchBTC(addr);D.btc.push({id:Date.now(),address:addr,balance:bal,priceINR:null,priceUSD:null,ch24:null});await enrichCoinGecko();setFetchSt('ok',`BTC balance: ${bal.toFixed(8)} BTC`);}
-    catch(e){setFetchSt('err',e.message);btn.disabled=false;btn.textContent='Add Wallet';return;}
+    try{
+      const bal=await fetchBTC(addr);
+      D.btc.push({id:Date.now(),address:addr,label:lbl,balance:bal,priceINR:null,priceUSD:null,ch24:null});
+      await enrichCoinGecko();
+      setFetchSt('ok',`BTC balance: ${bal.toFixed(8)} BTC`);
+    }catch(e){setFetchSt('err',e.message);btn.disabled=false;btn.textContent='Add Wallet';return;}
+
+  }else if(COIN_FETCH[wt]){
+    const coinName=COIN_LABELS[wt];
+    setFetchSt('loading',`Fetching ${coinName} balance…`);
+    try{
+      const bal=await COIN_FETCH[wt](addr);
+      D.others.push({id:Date.now(),type:wt,address:addr,label:lbl,balance:bal,priceUSD:null,ch24:null});
+      await enrichCoinGecko();
+      setFetchSt('ok',`${coinName} balance: ${bal.toFixed(4)} ${wt.toUpperCase()}`);
+    }catch(e){setFetchSt('err',e.message);btn.disabled=false;btn.textContent='Add Wallet';return;}
   }
-  save();renderHoldings();updateSummary();buildPie();
-  setTimeout(()=>toggleAdd(),900);
+
+  save(); renderHoldings(); updateSummary(); buildPie();
+  setTimeout(()=>toggleAdd(), 900);
 }
 
 function doAddStock(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.indian.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
