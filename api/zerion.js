@@ -1,7 +1,7 @@
 // api/zerion.js — Zerion API proxy (fixes CORS)
 // Key priority: ZERION_API_KEY env var → x-session-token signed admin token
 
-import crypto from 'crypto';
+const crypto = require('crypto');
 
 function keyFromToken(token, secret) {
   try {
@@ -14,7 +14,7 @@ function keyFromToken(token, secret) {
   } catch { return null; }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
@@ -46,4 +46,4 @@ export default async function handler(req, res) {
   } catch (err) {
     res.status(502).json({ error: 'Upstream error: ' + err.message });
   }
-}
+};

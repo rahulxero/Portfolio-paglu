@@ -1,7 +1,7 @@
-// api/stocks.js — Anthropic AI stock price proxy (fixes CORS)
+// api/stocks.js — Anthropic AI stock price proxy (CORS fix)
 // Key priority: ANTHROPIC_API_KEY env var → x-session-token signed admin token
 
-import crypto from 'crypto';
+const crypto = require('crypto');
 
 function keyFromToken(token, secret) {
   try {
@@ -14,7 +14,7 @@ function keyFromToken(token, secret) {
   } catch { return null; }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   const prompt = `Search for today's current stock prices. Return ONLY a JSON object, no markdown.
 Indian NSE stocks (INR price): ${indianSymbols.join(', ')}
 US stocks (USD price): ${intlSymbols.join(', ')}
-Also include current USD_INR exchange rate.
+Include USD_INR exchange rate.
 Example: {"RELIANCE":2680,"TCS":4120,"AAPL":192,"NVDA":875,"USD_INR":84}`;
 
   try {
@@ -47,8 +47,7 @@ Example: {"RELIANCE":2680,"TCS":4120,"AAPL":192,"NVDA":875,"USD_INR":84}`;
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
+        model: 'claude-sonnet-4-20250514', max_tokens: 600,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         system: 'You are a financial data API. Respond ONLY with a raw JSON object. No markdown. No backticks.',
         messages: [{ role: 'user', content: prompt }],
@@ -58,7 +57,6 @@ Example: {"RELIANCE":2680,"TCS":4120,"AAPL":192,"NVDA":875,"USD_INR":84}`;
 
     const data = await r.json();
     const txt  = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-
     let prices = null;
     try { prices = JSON.parse(txt.trim()); } catch {}
     if (!prices) { const m = txt.match(/\{[\s\S]*?\}/); if (m) try { prices = JSON.parse(m[0]); } catch {} }
@@ -68,4 +66,4 @@ Example: {"RELIANCE":2680,"TCS":4120,"AAPL":192,"NVDA":875,"USD_INR":84}`;
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
-}
+};
