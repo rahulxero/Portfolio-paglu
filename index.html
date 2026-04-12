@@ -14,17 +14,17 @@
       --white: #ffffff;
       --off:   #f5f5f5;
       --dim:   #e0e0e0;
-      --mid:   #999999;
-      --ghost: #555555;
-      --border-thin: 1px solid #1a1a1a;
-      --border-dim:  1px solid #2e2e2e;
-      --border-rule: 1px solid #333333;
+      --mid:   #b0b0b0;
+      --ghost: #888888;
+      --border-thin: 1px solid #2a2a2a;
+      --border-dim:  1px solid #3a3a3a;
+      --border-rule: 1px solid #444444;
       --green:  #00e676;
-      --red:    #ff1744;
-      --amber:  #ff9800;
+      --red:    #ff4444;
+      --amber:  #ffaa00;
       --mono:   'JetBrains Mono', monospace;
       --sans:   'Syne', sans-serif;
-      --r: 0px; /* sharp corners everywhere */
+      --r: 0px;
     }
 
     /* ── RESET ───────────────────────────────────────────── */
@@ -183,7 +183,7 @@
       letter-spacing: .1em; color: var(--ghost);
       font-family: var(--mono); margin-bottom: 10px;
     }
-    .card-val { font-family: var(--mono); font-size: 18px; font-weight: 500; margin-bottom: 5px; }
+    .card-val { font-family: var(--mono); font-size: 18px; font-weight: 500; margin-bottom: 5px; color: #fff; }
     .card-chg { font-family: var(--mono); font-size: 11px; color: var(--ghost); }
 
     /* ── CHARTS ROW ──────────────────────────────────────── */
@@ -238,10 +238,10 @@
     .tab:hover { background: #111; color: var(--white); }
     .tab.on { background: var(--white); color: var(--black); font-weight: 700; }
     .badge {
-      display: inline-block; font-size: 9px; padding: 1px 6px;
-      background: #111; color: var(--ghost);
-      font-family: var(--mono); border: var(--border-dim);
-      letter-spacing: .04em;
+      display: inline-block; font-size: 9px; padding: 2px 7px;
+      background: #1a1a1a; color: var(--mid);
+      font-family: var(--mono); border: var(--border-rule);
+      letter-spacing: .06em;
     }
     .src-tag {
       font-size: 9px; padding: 2px 8px;
@@ -252,33 +252,33 @@
     .src-tag.live { color: var(--green); border-color: #1a3a2a; background: #001a0d; }
     .hbody { padding: 0 20px 20px; }
     .thd {
-      font-size: 9px; text-transform: uppercase;
-      letter-spacing: .1em; color: var(--ghost);
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--mid);
       font-family: var(--mono);
       padding: 10px 8px 8px;
       border-bottom: var(--border-rule);
     }
     .trow {
-      padding: 10px 8px;
-      border-bottom: 1px solid #111;
+      padding: 11px 8px;
+      border-bottom: 1px solid #1a1a1a;
       transition: background .1s;
     }
     .trow:last-child { border-bottom: none; }
-    .trow:hover { background: #080808; }
-    .an { font-weight: 600; font-size: 13px; letter-spacing: -.01em; }
-    .as { font-size: 10px; color: var(--ghost); margin-top: 2px; font-family: var(--mono); }
-    .mv { font-family: var(--mono); font-size: 12px; }
-    .lv { color: #444; }
+    .trow:hover { background: #0d0d0d; }
+    .an { font-weight: 600; font-size: 13px; letter-spacing: -.01em; color: #fff; }
+    .as { font-size: 11px; color: var(--ghost); margin-top: 2px; font-family: var(--mono); }
+    .mv { font-family: var(--mono); font-size: 12px; color: #ccc; }
+    .lv { color: #555; }
 
     /* ── WALLET GROUP ────────────────────────────────────── */
     .w-grp {
-      font-size: 10px; color: var(--ghost);
+      font-size: 11px; color: var(--mid);
       padding: 14px 8px 8px;
       display: flex; align-items: center; gap: 8px;
-      border-bottom: 1px solid #111; flex-wrap: wrap;
+      border-bottom: 1px solid #1a1a1a; flex-wrap: wrap;
       font-family: var(--mono);
     }
-    .w-total { font-family: var(--mono); font-size: 12px; color: var(--white); margin-left: auto; }
+    .w-total { font-family: var(--mono); font-size: 13px; color: var(--white); margin-left: auto; font-weight: 500; }
 
     /* ── ADD PANEL ───────────────────────────────────────── */
     .add-panel {
@@ -593,25 +593,34 @@
 <div class="login-mo" id="login-mo">
   <div class="login-card">
     <div class="eyebrow">Portfolio Tracker</div>
-    <h2>Sign in</h2>
-    <p>Enter your name and a 4–12 digit PIN to identify yourself across sessions.</p>
+    <h2>Welcome</h2>
+    <p>Create your account to start tracking your portfolio. Your data stays in your browser — nothing is stored on any server.</p>
     <div class="login-field">
       <label>Your Name</label>
       <input type="text" id="li-name" placeholder="e.g. Rohit" maxlength="24"
              onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()">
     </div>
     <div class="login-field">
-      <label>PIN <span style="color:#333;text-transform:none;letter-spacing:0">(4–12 digits)</span></label>
+      <label>PIN <span style="color:#555;text-transform:none;letter-spacing:0">(4–12 digits)</span></label>
       <input type="password" id="li-pin" placeholder="••••" inputmode="numeric" maxlength="12"
              onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div class="login-err" id="li-err"></div>
-    <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="doLogin()">Sign In →</button>
+    <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="doLogin()">Get Started →</button>
     <div class="login-foot">
-      Your PIN is hashed and stored locally in your browser.<br>
-      No data leaves your device — this is purely for identifying your session.
+      PIN is hashed locally — never sent anywhere. Use the same name + PIN to restore your session on any device.
     </div>
   </div>
+</div>
+
+<!-- ── ONBOARDING TOOLTIP ─────────────────────────────────────────── -->
+<div id="onboard-tip" style="display:none;position:fixed;z-index:200;pointer-events:none;">
+  <div style="background:#fff;color:#000;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+              letter-spacing:.04em;padding:10px 16px;white-space:nowrap;
+              animation:fadeUp .4s ease both;">
+    ← Start here, add your first holding
+  </div>
+  <div style="width:0;height:0;border-top:8px solid #fff;border-left:8px solid transparent;border-right:8px solid transparent;margin-left:20px;"></div>
 </div>
 
 <!-- ── MAIN ────────────────────────────────────────────────────── -->
@@ -685,7 +694,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="src-tag" id="src-tag">demo</span>
-        <button class="btn btn-ghost" onclick="toggleAdd()">+ Add</button>
+        <button class="btn btn-ghost" id="add-btn-main" onclick="toggleAdd()">+ Add</button>
       </div>
     </div>
     <div class="add-panel" id="add-panel"></div>
@@ -828,28 +837,7 @@ const GECKO={
 };
 
 let D={
-  wallets:[
-    {id:1,address:'0x742d35Cc6634C0532925a3b844Bc454e4438f44e',label:'My ETH Wallet',positions:[],totalUSD:0,fetching:false},
-  ],
-  btc:[{id:10,address:'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',balance:null,priceINR:null,ch24:null}],
-  indian:[
-    {id:30,name:'Reliance Industries',symbol:'RELIANCE',exchange:'NSE',qty:20,avgCost:2450,price:null,ch24:null},
-    {id:31,name:'TCS',symbol:'TCS',exchange:'NSE',qty:10,avgCost:3800,price:null,ch24:null},
-    {id:32,name:'HDFC Bank',symbol:'HDFCBANK',exchange:'NSE',qty:30,avgCost:1580,price:null,ch24:null},
-  ],
-  intl:[
-    {id:40,name:'Apple Inc',symbol:'AAPL',exchange:'NASDAQ',qty:5,avgCost:175,price:null,ch24:null},
-    {id:41,name:'NVIDIA Corp',symbol:'NVDA',exchange:'NASDAQ',qty:3,avgCost:580,price:null,ch24:null},
-  ],
-  mf:[
-    {id:50,name:'Mirae Asset Large Cap Fund',code:'119598',units:450.234,navBought:82.5,nav:null,ch24:null},
-    {id:51,name:'Parag Parikh Flexi Cap Fund',code:'122639',units:320.15,navBought:55.2,nav:null,ch24:null},
-    {id:52,name:'Axis Small Cap Fund',code:'120503',units:280.5,navBought:68.4,nav:null,ch24:null},
-  ],
-  banks:[
-    // balance: manual INR amount, updatedAt: epoch ms of last manual update
-    // type: savings | current | fd | rd | ppf | nps | other
-  ]
+  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[]
 };
 try{const p=localStorage.getItem('nestegg_d4');if(p)D=JSON.parse(p);}catch(e){}
 
@@ -1346,7 +1334,7 @@ function renderHoldings(){
         <span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span>
       </div>`;
     });
-    if(!rows) rows=`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No wallets yet — click + Add to get started.</div>`;
+    if(!rows) rows=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
 
   }else if(activeTab==='indian'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -1396,7 +1384,7 @@ function renderHoldings(){
     }
 
     if(!D.banks.length){
-      rows+=`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No bank accounts yet — click + Add to get started.</div>`;
+      rows+=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No accounts added yet. Click + Add to add a bank account, FD, or PPF.</div>`;
     }else{
       D.banks.forEach(a=>{
         const age=a.updatedAt?Date.now()-a.updatedAt:null;
@@ -1413,7 +1401,7 @@ function renderHoldings(){
       });
     }
   }
-  list.innerHTML=rows||`<div style="padding:32px 8px;color:#333;font-size:12px;font-family:'JetBrains Mono',monospace;">No holdings yet.</div>`;
+  list.innerHTML=rows||`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
 }
 
 // ── BANK INLINE EDIT ──────────────────────────────────────
@@ -1657,7 +1645,7 @@ function doLogin() {
   if (!name) { err.textContent = 'Enter your name.'; return; }
   if (!/^\d{4,12}$/.test(pin)) { err.textContent = 'PIN must be 4–12 digits.'; return; }
   err.textContent = '';
-  // Check if this name+pin combo exists in localStorage, or create new
+
   const existing = localStorage.getItem(AUTH_KEY);
   if (existing) {
     const stored = JSON.parse(existing);
@@ -1665,7 +1653,6 @@ function doLogin() {
       if (stored.pinHash !== hashPin(pin)) { err.textContent = 'Wrong PIN for this name.'; return; }
       currentUser = stored;
     } else {
-      // Different name — new user or guest on shared device
       currentUser = { name, pinHash: hashPin(pin) };
     }
   } else {
@@ -1676,7 +1663,19 @@ function doLogin() {
   document.getElementById('li-name').value = '';
   document.getElementById('li-pin').value = '';
   document.getElementById('login-mo').classList.remove('open');
-  if (pendingAction) { const cb = pendingAction; pendingAction = null; cb(); }
+  if (pendingAction) { const cb = pendingAction; pendingAction = null; cb(); return; }
+
+  // After login — load data or show onboarding
+  const hasCachedPrices = loadPriceCache();
+  renderHoldings(); updateSummary(); buildPerf();
+  const hasAnyHoldings = D.wallets.length||D.btc.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+  if(hasCachedPrices || hasAnyHoldings){
+    setStatus('loading', 'Loading your portfolio…');
+    refreshAll();
+  } else {
+    setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
+    setTimeout(showOnboardingTip, 400);
+  }
 }
 
 function doLogout() {
@@ -1846,53 +1845,75 @@ async function refreshTicker() {
 function openSettings(){document.getElementById('smo').classList.add('open');}
 function closeSettings(){document.getElementById('smo').classList.remove('open');}
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
-document.getElementById('login-mo').addEventListener('click',e=>{if(e.target===document.getElementById('login-mo')){document.getElementById('login-mo').classList.remove('open');pendingAction=null;}});
+// Login modal is NOT closeable by clicking backdrop — user must sign in
+// (backdrop click intentionally does nothing)
+
+// ── ONBOARDING ARROW ─────────────────────────────────────
+function showOnboardingTip(){
+  const btn = document.getElementById('add-btn-main');
+  if(!btn) return;
+  const tip = document.getElementById('onboard-tip');
+  if(!tip) return;
+  const rect = btn.getBoundingClientRect();
+  tip.style.display = 'block';
+  tip.style.top  = (rect.bottom + 8) + 'px';
+  tip.style.left = (rect.left - 40) + 'px';
+  // Hide after 5 seconds or when + Add is clicked
+  setTimeout(() => { tip.style.display = 'none'; }, 6000);
+  btn.addEventListener('click', () => { tip.style.display = 'none'; }, {once:true});
+}
 
 // ── INIT — smart cache-aware startup ─────────────────────
 (function init(){
-  loadAuth();          // restore login session
-  // Restore saved currency
+  loadAuth();
   document.getElementById('currency-sel').value = activeCurrency;
-  refreshTicker();     // load ticker immediately
-  setInterval(refreshTicker, 90000); // refresh ticker every 90s
+  refreshTicker();
+  setInterval(refreshTicker, 90000);
+
+  // Force login if no session — modal cannot be dismissed
+  if(!currentUser){
+    document.getElementById('login-mo').classList.add('open');
+    setTimeout(() => document.getElementById('li-name')?.focus(), 300);
+    // Don't load data until user logs in
+    setStatus('ok', 'Sign in to view your portfolio');
+    return;
+  }
 
   const hasCachedPrices = loadPriceCache();
-
-  // Always render structure immediately (fast, from localStorage)
   renderHoldings(); updateSummary(); buildPerf();
 
   if(hasCachedPrices){
     const age = cacheAge();
     const lbl = cacheAgeLabel();
-
     if(age < CACHE_TTL){
-      // Fresh cache (< 5 min) — show cached data, no auto-refresh needed
       buildPie();
       const t = document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
       showCacheBar(false, lbl);
-      setStatus('ok', `Cached · Last updated ${lbl} · USD/INR ≈ ${USD_INR}`);
-
+      setStatus('ok', `Cached · Last updated ${lbl}`);
     } else if(age < CACHE_MAX){
-      // Stale cache (5–30 min) — show cached data instantly, refresh silently in background
       buildPie();
       showCacheBar(false, lbl);
-      setStatus('loading', `Refreshing prices in background… (last updated ${lbl})`);
+      setStatus('loading', `Refreshing… (last updated ${lbl})`);
       refreshAll();
-
     } else {
-      // Very old cache (> 30 min) — show it with a clear stale warning
       buildPie();
       showCacheBar(true, lbl);
       setStatus('warn', `Data is ${lbl} old — refreshing…`);
       refreshAll();
     }
   } else {
-    // No cache — first visit or cleared storage
-    setStatus('loading', 'Loading live data…');
-    setTimeout(()=>refreshAll(), 100);
+    // Fresh user with no data — show empty state, don't auto-refresh
+    const hasAnyHoldings = D.wallets.length||D.btc.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+    if(hasAnyHoldings){
+      setStatus('loading', 'Loading live data…');
+      setTimeout(()=>refreshAll(), 100);
+    } else {
+      setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
+      // Show onboarding arrow pointing at + Add button
+      setTimeout(showOnboardingTip, 600);
+    }
   }
 
-  // Auto-refresh when tab becomes visible again after being hidden
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'visible' && cacheAge() > CACHE_TTL && !loading){
       setStatus('loading', 'Refreshing prices…');
