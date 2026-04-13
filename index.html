@@ -1994,7 +1994,7 @@ function doAddBank(){
 // ══════════════════════════════════════════════════════════
 //  SUPABASE AUTH + CLOUD SYNC
 // ══════════════════════════════════════════════════════════
-let supabase    = null;
+let _sb    = null;
 let currentUser = null;
 let supaToken   = null;
 let pendingAction = null;
@@ -2029,11 +2029,11 @@ async function loadSupabase(){
 
   const url = window.__SUPA_URL__;
   const key = window.__SUPA_KEY__;
-  if (!url || !key) { supabase = null; return; }
+  if (!url || !key) { _sb = null; return; }
 
   try {
     // window.supabase is the library loaded in <head>
-    supabase = window.supabase.createClient(url, key, {
+    _sb = window.supabase.createClient(url, key, {
       auth: {
         persistSession: true,
         storageKey: 'portfolio_auth',
@@ -2044,7 +2044,7 @@ async function loadSupabase(){
     });
   } catch(e) {
     console.error('Supabase init error:', e.message);
-    supabase = null;
+    _sb = null;
   }
 }
 
@@ -2078,11 +2078,11 @@ async function doLogin(){
   btn.innerHTML = '<span class="spin-sm"></span> Signing in…';
 
   // Wait for Supabase to load (it loads async from /api/config)
-  if (!supabase) {
+  if (!_sb) {
     await loadSupabase();
   }
 
-  if (!supabase) {
+  if (!_sb) {
     // Supabase still not configured — block login, show setup message
     err.textContent = 'Authentication not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to Vercel environment variables.';
     btn.disabled = false;
@@ -2101,7 +2101,7 @@ async function doLogin(){
     if (authMode === 'signup') {
       if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; btn.disabled=false; btn.textContent='Create Account →'; return; }
       const name = (document.getElementById('li-name')?.value||'').trim() || email.split('@')[0];
-      result = await authWithTimeout(supabase.auth.signUp({
+      result = await authWithTimeout(_sb.auth.signUp({
         email, password: pass,
         options: {
           data: { name },
@@ -2117,7 +2117,7 @@ async function doLogin(){
         return;
       }
     } else {
-      result = await authWithTimeout(supabase.auth.signInWithPassword({ email, password: pass }));
+      result = await authWithTimeout(_sb.auth.signInWithPassword({ email, password: pass }));
       if (result.error) throw result.error;
     }
     const session = result.data.session;
@@ -2162,15 +2162,15 @@ async function doForgotPassword(){
     errEl.textContent = 'Enter a valid email address.';
     return;
   }
-  if (!supabase) {
+  if (!_sb) {
     await loadSupabase();
-    if (!supabase) {
+    if (!_sb) {
       errEl.style.color = 'var(--red)';
       errEl.textContent = 'Auth not configured — contact the site owner.';
       return;
     }
   }
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await _sb.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin + '/?reset=1',
   });
   if (error) {
@@ -2218,7 +2218,7 @@ async function loadCloudPortfolio() {
   } catch(e) {}
 
   // Then try to get fresher data from cloud
-  if (!supabase || !supaToken) {
+  if (!_sb || !supaToken) {
     // No cloud — use localStorage only
     loadPriceCache();
     renderHoldings(); updateSummary(); buildPerf();
@@ -2265,7 +2265,7 @@ async function loadCloudPortfolio() {
 }
 
 async function saveCloudPortfolio() {
-  if (!supabase || !supaToken) return; // no-op — local mode only
+  if (!_sb || !supaToken) return; // no-op — local mode only
   try {
     const r = await fetch('/api/user?action=portfolio', {
       method: 'POST',
@@ -2291,7 +2291,7 @@ function save() {
 
 // ── DAILY SNAPSHOT ────────────────────────────────────────
 async function saveSnapshot() {
-  if (!supabase || !supaToken) return;
+  if (!_sb || !supaToken) return;
   const v = vals();
   if (!v.tot) return;
   try {
@@ -2308,7 +2308,7 @@ let historyInst = null;
 async function loadHistory(days, btn) {
   document.querySelectorAll('#history-mo .tf').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
-  if (!supabase || !supaToken) {
+  if (!_sb || !supaToken) {
     document.getElementById('history-stats').innerHTML = '<span style="color:#555">Sign in with Supabase to see history</span>';
     return;
   }
@@ -2484,7 +2484,7 @@ async function deleteAlert(id){
 }
 
 function doLogout() {
-  if(supabase) supabase.auth.signOut();
+  if(_sb) _sb.auth.signOut();
   currentUser = null; supaToken = null;
   D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
   try {
@@ -2542,7 +2542,7 @@ async function loadAuth() {
 
   await loadSupabase();
 
-  if (!supabase) {
+  if (!_sb) {
     // Supabase not configured — use localStorage-only mode
     // Check for existing local session first
     try {
@@ -2570,7 +2570,7 @@ async function loadAuth() {
   }
 
   // Verify with Supabase (handles token refresh automatically)
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: { session }, error } = await _sb.auth.getSession();
 
   if (session && !error) {
     supaToken = session.access_token;
@@ -2582,7 +2582,7 @@ async function loadAuth() {
     document.getElementById('login-mo').classList.remove('open');
     updateUserUI();
 
-    supabase.auth.onAuthStateChange(async (event, newSession) => {
+    _sb.auth.onAuthStateChange(async (event, newSession) => {
       if (event === 'TOKEN_REFRESHED' && newSession) {
         supaToken = newSession.access_token;
       } else if (event === 'SIGNED_OUT') {
@@ -2596,7 +2596,7 @@ async function loadAuth() {
   }
 
   // Session expired — try silent refresh
-  const { data: refreshData } = await supabase.auth.refreshSession();
+  const { data: refreshData } = await _sb.auth.refreshSession();
   if (refreshData?.session) {
     supaToken = refreshData.session.access_token;
     currentUser = {
@@ -2875,8 +2875,8 @@ async function doChangePassword(){
   const pass = document.getElementById('new-pass').value;
   const msg  = document.getElementById('pass-msg');
   if(!pass || pass.length < 8){ msg.style.color='#ff4444'; msg.textContent='Password must be at least 8 characters.'; return; }
-  if(!supabase){ msg.style.color='#ff8800'; msg.textContent='Supabase not configured.'; return; }
-  const { error } = await supabase.auth.updateUser({ password: pass });
+  if(!_sb){ msg.style.color='#ff8800'; msg.textContent='Supabase not configured.'; return; }
+  const { error } = await _sb.auth.updateUser({ password: pass });
   if(error){ msg.style.color='#ff4444'; msg.textContent=error.message; return; }
   msg.style.color='#00e676'; msg.textContent='Password updated successfully!';
   document.getElementById('new-pass').value='';
@@ -2884,8 +2884,8 @@ async function doChangePassword(){
 }
 
 async function doForgotFromSettings(){
-  if(!supabase || !currentUser){ return; }
-  await supabase.auth.resetPasswordForEmail(currentUser.email);
+  if(!_sb || !currentUser){ return; }
+  await _sb.auth.resetPasswordForEmail(currentUser.email);
   const msg = document.getElementById('pass-msg');
   document.getElementById('change-pass-form').style.display='block';
   msg.style.color='#00e676';
@@ -2933,8 +2933,8 @@ function showOnboardingTip(){
     document.getElementById('login-mo').classList.remove('open');
     setTimeout(async () => {
       await loadSupabase();
-      if (supabase) {
-        supabase.auth.onAuthStateChange(async (event, session) => {
+      if (_sb) {
+        _sb.auth.onAuthStateChange(async (event, session) => {
           if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
             supaToken = session?.access_token;
             currentUser = session ? {
@@ -2963,7 +2963,7 @@ function showOnboardingTip(){
   }
 
   // Has session — load portfolio
-  if(hasSession && supabase){
+  if(hasSession && _sb){
     await loadCloudPortfolio();
   } else {
     const hasCachedPrices = loadPriceCache();
