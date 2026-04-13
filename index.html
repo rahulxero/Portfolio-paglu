@@ -2093,21 +2093,26 @@ async function doLogin(){
     return;
   }
 
+  // Wrap Supabase auth in a timeout so it never hangs forever
+  const authWithTimeout = (promise, ms=15000) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out. Check your internet connection.')), ms))
+  ]);
+
   try {
     let result;
     if (authMode === 'signup') {
       if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; btn.disabled=false; btn.textContent='Create Account →'; return; }
       const name = (document.getElementById('li-name')?.value||'').trim() || email.split('@')[0];
-      result = await supabase.auth.signUp({
+      result = await authWithTimeout(supabase.auth.signUp({
         email, password: pass,
         options: {
           data: { name },
           emailRedirectTo: window.location.origin,
         }
-      });
+      }));
       if (result.error) throw result.error;
       if (!result.data.session) {
-        // Email confirmation required
         document.getElementById('login-mo').classList.remove('open');
         document.getElementById('confirm-email').textContent = email;
         document.getElementById('confirm-mo').classList.add('open');
@@ -2115,7 +2120,7 @@ async function doLogin(){
         return;
       }
     } else {
-      result = await supabase.auth.signInWithPassword({ email, password: pass });
+      result = await authWithTimeout(supabase.auth.signInWithPassword({ email, password: pass }));
       if (result.error) throw result.error;
     }
     const session = result.data.session;
