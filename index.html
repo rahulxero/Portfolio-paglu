@@ -643,11 +643,11 @@
 
     <!-- Sign In / Sign Up tabs -->
     <div style="display:flex;gap:0;margin-bottom:24px;border:1px solid #222;">
-      <button id="tab-signin" onclick="switchAuthTab('signin')"
+      <button id="tab-signin"
         style="flex:1;padding:8px;background:#fff;color:#000;border:none;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">
         Sign In
       </button>
-      <button id="tab-signup" onclick="switchAuthTab('signup')"
+      <button id="tab-signup"
         style="flex:1;padding:8px;background:transparent;color:#555;border:none;border-left:1px solid #222;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">
         Create Account
       </button>
@@ -2992,9 +2992,21 @@ function showOnboardingTip(){
 const _origRefreshAll = refreshAll;
 async function refreshAll(){
   await _origRefreshAll.call(this, ...arguments);
-  // Save daily snapshot to Supabase after successful full refresh
   setTimeout(saveSnapshot, 2000);
 }
+
+// ── Wire up tab buttons via event listeners (not onclick attrs) ──
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tab-signin')?.addEventListener('click', () => switchAuthTab('signin'));
+  document.getElementById('tab-signup')?.addEventListener('click', () => switchAuthTab('signup'));
+});
+// Also wire up immediately in case DOMContentLoaded already fired
+(function wireTabButtons(){
+  const si = document.getElementById('tab-signin');
+  const su = document.getElementById('tab-signup');
+  if (si) si.onclick = () => switchAuthTab('signin');
+  if (su) su.onclick = () => switchAuthTab('signup');
+})();
 
 </script>
 </body>
