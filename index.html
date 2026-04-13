@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="supa-url" content="__SUPA_URL__">
+  <meta name="supa-key" content="__SUPA_KEY__">
   <title>Portfolio Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -594,6 +596,9 @@
       <option value="AED">د AED</option>
       <option value="AUD">A$ AUD</option>
     </select>
+    <button class="btn btn-icon" id="history-btn" onclick="openHistory()" title="Portfolio History" style="display:none">📈</button>
+    <button class="btn btn-icon" id="alerts-btn" onclick="openAlerts()" title="Price Alerts" style="display:none">🔔</button>
+    <button class="btn btn-icon" id="share-btn" onclick="openShare()" title="Share Portfolio" style="display:none">🔗</button>
     <button class="btn" id="ref-btn" onclick="refreshAll()">⟳ Refresh</button>
     <button class="btn btn-icon" onclick="openSettings()" title="About">⚙</button>
   </div>
@@ -610,23 +615,62 @@
 <div class="login-mo open" id="login-mo">
   <div class="login-card">
     <div class="eyebrow">Portfolio Tracker</div>
-    <h2>Welcome</h2>
-    <p>Create your account to start tracking your portfolio. Your data stays in your browser — nothing is stored on any server.</p>
-    <div class="login-field">
+    <h2 id="li-title">Welcome back</h2>
+    <p id="li-sub">Sign in to access your portfolio from any device.</p>
+
+    <!-- Sign In / Sign Up tabs -->
+    <div style="display:flex;gap:0;margin-bottom:24px;border:1px solid #222;">
+      <button id="tab-signin" onclick="switchAuthTab('signin')"
+        style="flex:1;padding:8px;background:#fff;color:#000;border:none;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">
+        Sign In
+      </button>
+      <button id="tab-signup" onclick="switchAuthTab('signup')"
+        style="flex:1;padding:8px;background:transparent;color:#555;border:none;border-left:1px solid #222;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">
+        Create Account
+      </button>
+    </div>
+
+    <div class="login-field" id="li-name-field" style="display:none">
       <label>Your Name</label>
-      <input type="text" id="li-name" placeholder="e.g. Rohit" maxlength="24"
-             onkeydown="if(event.key==='Enter')document.getElementById('li-pin').focus()">
+      <input type="text" id="li-name" placeholder="e.g. Rohit" maxlength="40"
+             onkeydown="if(event.key==='Enter')document.getElementById('li-email').focus()">
     </div>
     <div class="login-field">
-      <label>PIN <span style="color:#555;text-transform:none;letter-spacing:0">(4–12 digits)</span></label>
-      <input type="password" id="li-pin" placeholder="••••" inputmode="numeric" maxlength="12"
+      <label>Email</label>
+      <input type="email" id="li-email" placeholder="you@example.com"
+             onkeydown="if(event.key==='Enter')document.getElementById('li-pass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Password <span style="color:#555;text-transform:none;letter-spacing:0;font-size:10px">(min 8 characters)</span></label>
+      <input type="password" id="li-pass" placeholder="••••••••"
              onkeydown="if(event.key==='Enter')doLogin()">
     </div>
     <div class="login-err" id="li-err"></div>
-    <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="doLogin()">Get Started →</button>
-    <div class="login-foot">
-      PIN is hashed locally — never sent anywhere. Use the same name + PIN to restore your session on any device.
+    <button class="btn btn-p" style="width:100%;margin-top:4px" id="li-btn" onclick="doLogin()">Sign In →</button>
+    <div id="li-forgot" style="text-align:center;margin-top:12px;">
+      <a href="#" onclick="doForgotPassword();return false"
+         style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#444;text-decoration:none;">
+        Forgot password?
+      </a>
     </div>
+    <div class="login-foot" id="li-foot">
+      Your portfolio syncs across all your devices. Secured by Supabase.
+    </div>
+  </div>
+</div>
+
+<!-- ── EMAIL CONFIRM NOTICE ───────────────────────────────────────── -->
+<div class="login-mo" id="confirm-mo">
+  <div class="login-card" style="text-align:center;">
+    <div style="font-size:32px;margin-bottom:16px;">📧</div>
+    <h2>Check your email</h2>
+    <p style="margin-bottom:0">We sent a confirmation link to<br><strong id="confirm-email" style="color:#fff"></strong></p>
+    <div class="login-foot" style="margin-top:20px;">
+      Click the link in the email to activate your account, then come back and sign in.
+    </div>
+    <button class="btn" style="width:100%;margin-top:16px" onclick="document.getElementById('confirm-mo').classList.remove('open');document.getElementById('login-mo').classList.add('open')">
+      Back to Sign In
+    </button>
   </div>
 </div>
 
@@ -791,6 +835,50 @@
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button class="btn btn-p" onclick="closeSettings()">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- ── SHARE MODAL ───────────────────────────────────────────────── -->
+<div class="mo" id="share-mo">
+  <div class="mc" style="max-width:480px">
+    <div class="mc-header">
+      <div><p class="mc-title">Share Portfolio</p><p class="mc-sub">Create a read-only link to share your portfolio.</p></div>
+      <button class="btn btn-icon" onclick="closeShare()">✕</button>
+    </div>
+    <div id="share-content">
+      <div style="font-size:13px;color:#888;padding:20px 0;text-align:center"><span class="spin"></span> Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ALERTS MODAL ──────────────────────────────────────────────── -->
+<div class="mo" id="alerts-mo">
+  <div class="mc" style="max-width:520px">
+    <div class="mc-header">
+      <div><p class="mc-title">Price Alerts</p><p class="mc-sub">Get notified when prices hit your targets.</p></div>
+      <button class="btn btn-icon" onclick="closeAlerts()">✕</button>
+    </div>
+    <div id="alerts-content">
+      <div style="font-size:13px;color:#888;padding:20px 0;text-align:center"><span class="spin"></span> Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HISTORY MODAL ─────────────────────────────────────────────── -->
+<div class="mo" id="history-mo">
+  <div class="mc" style="max-width:720px">
+    <div class="mc-header">
+      <div><p class="mc-title">Portfolio History</p><p class="mc-sub">Your net worth over time.</p></div>
+      <button class="btn btn-icon" onclick="document.getElementById('history-mo').classList.remove('open')">✕</button>
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:16px;">
+      <button class="tf on" onclick="loadHistory(30,this)">30D</button>
+      <button class="tf" onclick="loadHistory(90,this)">90D</button>
+      <button class="tf" onclick="loadHistory(180,this)">6M</button>
+      <button class="tf" onclick="loadHistory(365,this)">1Y</button>
+    </div>
+    <div style="position:relative;height:260px;"><canvas id="historyC"></canvas></div>
+    <div id="history-stats" style="display:flex;gap:24px;margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#666;"></div>
   </div>
 </div>
 
@@ -1882,105 +1970,432 @@ function doAddBank(){
 // ══════════════════════════════════════════════════════════
 //  AUTH — simple PIN login, stored in localStorage
 // ══════════════════════════════════════════════════════════
-const AUTH_KEY = 'nestegg_auth_v1';
-let currentUser = null; // { name, pinHash }
+// ══════════════════════════════════════════════════════════
+//  SUPABASE AUTH + CLOUD SYNC
+// ══════════════════════════════════════════════════════════
+const SUPA_URL  = window.__SUPA_URL__  || '';
+const SUPA_KEY  = window.__SUPA_KEY__  || '';
+let supabase    = null;
+let currentUser = null;
+let supaToken   = null;
+let pendingAction = null;
+let authMode = 'signin'; // 'signin' | 'signup'
 
-function hashPin(pin) {
-  // Simple non-crypto hash — good enough for local auth
-  let h = 0x811c9dc5;
-  for (let i = 0; i < pin.length; i++) {
-    h ^= pin.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
+// Load Supabase JS from CDN
+function loadSupabase(){
+  return new Promise((resolve) => {
+    if(window.supabase){ supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY); resolve(); return; }
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.onload=()=>{ supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY); resolve(); };
+    s.onerror=()=>{ supabase=null; resolve(); }; // fall through to localStorage mode
+    document.head.appendChild(s);
+  });
+}
+
+function switchAuthTab(mode){
+  authMode = mode;
+  const isSignup = mode === 'signup';
+  document.getElementById('tab-signin').style.cssText = isSignup
+    ? 'flex:1;padding:8px;background:transparent;color:#555;border:none;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;'
+    : 'flex:1;padding:8px;background:#fff;color:#000;border:none;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;';
+  document.getElementById('tab-signup').style.cssText = isSignup
+    ? 'flex:1;padding:8px;background:#fff;color:#000;border:none;border-left:1px solid #222;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;'
+    : 'flex:1;padding:8px;background:transparent;color:#555;border:none;border-left:1px solid #222;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;';
+  document.getElementById('li-name-field').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('li-btn').textContent = isSignup ? 'Create Account →' : 'Sign In →';
+  document.getElementById('li-forgot').style.display = isSignup ? 'none' : 'block';
+  document.getElementById('li-err').textContent = '';
+}
+
+async function doLogin(){
+  const err = document.getElementById('li-err');
+  err.textContent = '';
+  const email = (document.getElementById('li-email').value||'').trim();
+  const pass  = (document.getElementById('li-pass').value||'').trim();
+  if (!email || !pass) { err.textContent = 'Enter email and password.'; return; }
+
+  const btn = document.getElementById('li-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin-sm"></span> …';
+
+  if (!supabase) {
+    // Supabase not configured — fall back to localStorage mode
+    currentUser = { id: 'local', email, name: email.split('@')[0] };
+    afterLogin(false);
+    btn.disabled = false; btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
+    return;
   }
-  return h.toString(16);
-}
 
-function loadAuth() {
   try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (raw) {
-      currentUser = JSON.parse(raw);
-      updateUserUI();
-      // Already logged in — close the modal
-      document.getElementById('login-mo').classList.remove('open');
+    let result;
+    if (authMode === 'signup') {
+      const name = (document.getElementById('li-name').value||'').trim() || email.split('@')[0];
+      result = await supabase.auth.signUp({ email, password: pass, options: { data: { name } } });
+      if (result.error) throw result.error;
+      if (!result.data.session) {
+        // Email confirmation required
+        document.getElementById('login-mo').classList.remove('open');
+        document.getElementById('confirm-email').textContent = email;
+        document.getElementById('confirm-mo').classList.add('open');
+        btn.disabled = false; btn.textContent = 'Create Account →';
+        return;
+      }
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (result.error) throw result.error;
     }
-    // If no session, modal stays open (it's open by default in HTML)
-  } catch(e) {}
+    const session = result.data.session;
+    supaToken = session.access_token;
+    currentUser = { id: session.user.id, email: session.user.email, name: session.user.user_metadata?.name || email.split('@')[0] };
+    afterLogin(true);
+  } catch(e) {
+    err.textContent = e.message.includes('Invalid login') ? 'Wrong email or password.' : e.message;
+  }
+  btn.disabled = false; btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
 }
 
-function saveAuth(user) {
-  try { localStorage.setItem(AUTH_KEY, JSON.stringify(user)); } catch(e) {}
+async function doForgotPassword(){
+  const email = (document.getElementById('li-email').value||'').trim();
+  if (!email) { document.getElementById('li-err').textContent = 'Enter your email first.'; return; }
+  if (!supabase) return;
+  await supabase.auth.resetPasswordForEmail(email);
+  document.getElementById('li-err').style.color = '#00e676';
+  document.getElementById('li-err').textContent = 'Password reset email sent!';
 }
 
 function updateUserUI() {
   const pill = document.getElementById('user-pill');
   if (currentUser) {
     pill.style.display = 'flex';
-    document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
+    document.getElementById('user-avatar').textContent = (currentUser.name||'?').charAt(0).toUpperCase();
     document.getElementById('user-name').textContent = currentUser.name;
+    // Show feature buttons
+    ['history-btn','alerts-btn','share-btn'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.style.display='inline-flex';
+    });
   } else {
     pill.style.display = 'none';
+    ['history-btn','alerts-btn','share-btn'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.style.display='none';
+    });
   }
 }
 
-function requireLogin(cb) {
-  if (currentUser) { cb(); return; }
-  // Show login modal — after login, call cb
-  pendingAction = cb;
-  document.getElementById('login-mo').classList.add('open');
-  setTimeout(() => document.getElementById('li-name').focus(), 100);
-}
-
-let pendingAction = null;
-
-function doLogin() {
-  const name = (document.getElementById('li-name').value || '').trim();
-  const pin  = (document.getElementById('li-pin').value || '').trim();
-  const err  = document.getElementById('li-err');
-  if (!name) { err.textContent = 'Enter your name.'; return; }
-  if (!/^\d{4,12}$/.test(pin)) { err.textContent = 'PIN must be 4–12 digits.'; return; }
-  err.textContent = '';
-
-  const existing = localStorage.getItem(AUTH_KEY);
-  if (existing) {
-    const stored = JSON.parse(existing);
-    if (stored.name.toLowerCase() === name.toLowerCase()) {
-      if (stored.pinHash !== hashPin(pin)) { err.textContent = 'Wrong PIN for this name.'; return; }
-      currentUser = stored;
-    } else {
-      currentUser = { name, pinHash: hashPin(pin) };
-    }
-  } else {
-    currentUser = { name, pinHash: hashPin(pin) };
-  }
-  saveAuth(currentUser);
+async function afterLogin(cloudSync) {
   updateUserUI();
-  document.getElementById('li-name').value = '';
-  document.getElementById('li-pin').value = '';
   document.getElementById('login-mo').classList.remove('open');
   if (pendingAction) { const cb = pendingAction; pendingAction = null; cb(); return; }
 
-  // After login — load data or show onboarding
-  const hasCachedPrices = loadPriceCache();
-  renderHoldings(); updateSummary(); buildPerf();
-  const hasAnyHoldings = D.wallets.length||D.btc.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
-  if(hasCachedPrices || hasAnyHoldings){
+  if (cloudSync) {
     setStatus('loading', 'Loading your portfolio…');
-    refreshAll();
+    await loadCloudPortfolio();
   } else {
-    setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
-    setTimeout(showOnboardingTip, 400);
+    const hasCachedPrices = loadPriceCache();
+    renderHoldings(); updateSummary(); buildPerf();
+    const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+    if (hasCachedPrices || hasAny) {
+      setStatus('loading', 'Loading portfolio…');
+      refreshAll();
+    } else {
+      setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
+      setTimeout(showOnboardingTip, 400);
+    }
   }
 }
 
+// ── CLOUD PORTFOLIO SYNC ──────────────────────────────────
+async function loadCloudPortfolio() {
+  if (!supabase || !supaToken) return false;
+  try {
+    const r = await fetch('/api/user?action=portfolio', {
+      headers: { Authorization: `Bearer ${supaToken}` }
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+
+    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], ...data.data };
+    if (data.currency) { activeCurrency = data.currency; document.getElementById('currency-sel').value = data.currency; }
+
+    // Also restore local price cache
+    loadPriceCache();
+    renderHoldings(); updateSummary(); buildPerf();
+
+    const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+    if (hasAny) {
+      refreshAll();
+    } else {
+      setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
+      setTimeout(showOnboardingTip, 400);
+    }
+    return true;
+  } catch(e) {
+    console.warn('Cloud load failed, using local:', e.message);
+    loadPriceCache(); renderHoldings(); updateSummary(); buildPerf();
+    refreshAll();
+    return false;
+  }
+}
+
+async function saveCloudPortfolio() {
+  if (!supabase || !supaToken) return; // no-op in local mode
+  try {
+    await fetch('/api/user?action=portfolio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supaToken}` },
+      body: JSON.stringify({ data: D, currency: activeCurrency }),
+    });
+  } catch(e) { console.warn('Cloud save failed:', e.message); }
+}
+
+// Override save() to also sync to cloud
+const _localSave = () => { try{localStorage.setItem('nestegg_d5',JSON.stringify(D));}catch(e){} };
+function save() {
+  _localSave();
+  saveCloudPortfolio(); // fire and forget
+}
+
+// ── DAILY SNAPSHOT ────────────────────────────────────────
+async function saveSnapshot() {
+  if (!supabase || !supaToken) return;
+  const v = vals();
+  if (!v.tot) return;
+  try {
+    await fetch('/api/user?action=snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supaToken}` },
+      body: JSON.stringify({ value_usd: v.tot, breakdown: { c: v.c, i: v.i, x: v.x, m: v.m, b: v.b } }),
+    });
+  } catch(e) {}
+}
+
+// ── HISTORY CHART ─────────────────────────────────────────
+let historyInst = null;
+async function loadHistory(days, btn) {
+  document.querySelectorAll('#history-mo .tf').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  if (!supabase || !supaToken) {
+    document.getElementById('history-stats').innerHTML = '<span style="color:#555">Sign in with Supabase to see history</span>';
+    return;
+  }
+  try {
+    const r = await fetch(`/api/user?action=snapshots&days=${days}`, {
+      headers: { Authorization: `Bearer ${supaToken}` }
+    });
+    const { snapshots } = await r.json();
+    if (!snapshots?.length) {
+      document.getElementById('history-stats').innerHTML = '<span style="color:#555">No history yet — data builds up daily</span>';
+      return;
+    }
+    const labels = snapshots.map(s=>s.snapped_at.slice(5)); // MM-DD
+    const values = snapshots.map(s=>parseFloat(s.value_usd));
+    const first = values[0], last = values[values.length-1];
+    const change = last - first, pct = (change/first*100);
+
+    if (historyInst) historyInst.destroy();
+    const ctx = document.getElementById('historyC').getContext('2d');
+    historyInst = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{
+        data: values.map(v=>fI(v).replace(/[^\d.]/g,'')),
+        borderColor: change >= 0 ? '#00e676' : '#ff4444',
+        backgroundColor: change >= 0 ? 'rgba(0,230,118,.06)' : 'rgba(255,68,68,.06)',
+        fill: true, tension: .4, pointRadius: 0, borderWidth: 2,
+      }]},
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{
+          backgroundColor:'#111',borderColor:'#333',borderWidth:1,
+          callbacks:{label:c=>fI(parseFloat(c.raw))}
+        }},
+        scales:{
+          x:{ticks:{maxTicksLimit:8,font:{size:10,family:"'JetBrains Mono'"},color:'#555'},grid:{color:'#111'},border:{color:'#222'}},
+          y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:'#555',callback:v=>fI(v)},grid:{color:'#111'},border:{color:'#222'}}
+        }
+      }
+    });
+    const col = change>=0?'#00e676':'#ff4444';
+    document.getElementById('history-stats').innerHTML =
+      `<span>Start: <strong>${fI(first)}</strong></span>
+       <span>Now: <strong>${fI(last)}</strong></span>
+       <span style="color:${col}">Change: ${change>=0?'+':''}${fI(Math.abs(change))} (${change>=0?'+':''}${pct.toFixed(2)}%)</span>`;
+  } catch(e) {
+    document.getElementById('history-stats').innerHTML = `<span style="color:#ff8800">Failed: ${e.message}</span>`;
+  }
+}
+function openHistory(){ document.getElementById('history-mo').classList.add('open'); loadHistory(30); }
+
+// ── SHARE LINKS ───────────────────────────────────────────
+async function openShare(){
+  document.getElementById('share-mo').classList.add('open');
+  const el = document.getElementById('share-content');
+  if (!supabase || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in with Supabase to use share links.</p>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:16px"><span class="spin"></span></div>';
+  try {
+    const r = await fetch('/api/user?action=share_get', { headers:{Authorization:`Bearer ${supaToken}`} });
+    const { link } = await r.json();
+    if (link) {
+      const url = `${location.origin}/p/${link.slug}`;
+      el.innerHTML = `
+        <p style="font-size:12px;color:#888;margin-bottom:16px">Your portfolio is publicly shared at:</p>
+        <div style="background:#111;border:1px solid #333;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#fff;word-break:break-all;margin-bottom:12px">${url}</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <button class="btn btn-p" style="flex:1" onclick="navigator.clipboard.writeText('${url}').then(()=>this.textContent='Copied!')">Copy Link</button>
+          <button class="btn" onclick="deleteShare()">Delete Link</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;font-family:'JetBrains Mono',monospace;cursor:pointer">
+          <input type="checkbox" ${link.show_values?'checked':''} id="share-vals" style="accent-color:#fff">
+          Show portfolio values (uncheck to hide exact amounts)
+        </label>`;
+    } else {
+      el.innerHTML = `
+        <p style="font-size:13px;color:#888;margin-bottom:16px">Share your portfolio with a custom link.</p>
+        <div class="fg" style="grid-template-columns:1fr;margin-bottom:12px">
+          <div><label>Custom slug (yoursite.com/p/<strong>your-slug</strong>)</label>
+          <input type="text" id="share-slug" placeholder="e.g. rohit-portfolio" style="text-transform:lowercase"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;font-family:'JetBrains Mono',monospace;cursor:pointer;margin-bottom:16px">
+          <input type="checkbox" id="share-vals" checked style="accent-color:#fff">
+          Show portfolio values publicly
+        </label>
+        <button class="btn btn-p" style="width:100%" onclick="createShare()">Create Share Link →</button>
+        <div id="share-err" style="font-size:11px;color:#ff8800;margin-top:8px"></div>`;
+    }
+  } catch(e) { el.innerHTML=`<p style="color:#ff8800">${e.message}</p>`; }
+}
+function closeShare(){ document.getElementById('share-mo').classList.remove('open'); }
+
+async function createShare(){
+  const slug = (document.getElementById('share-slug').value||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'-');
+  const show = document.getElementById('share-vals')?.checked !== false;
+  if (!slug) { document.getElementById('share-err').textContent='Enter a slug.'; return; }
+  const r = await fetch('/api/user?action=share_create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${supaToken}`},body:JSON.stringify({slug,show_values:show})});
+  const d = await r.json();
+  if (!r.ok) { document.getElementById('share-err').textContent = d.error||'Failed'; return; }
+  openShare(); // reload
+}
+async function deleteShare(){
+  if(!confirm('Delete share link?')) return;
+  await fetch('/api/user?action=share_delete',{method:'DELETE',headers:{Authorization:`Bearer ${supaToken}`}});
+  openShare();
+}
+
+// ── ALERTS ────────────────────────────────────────────────
+async function openAlerts(){
+  document.getElementById('alerts-mo').classList.add('open');
+  const el = document.getElementById('alerts-content');
+  if (!supabase || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in with Supabase to set alerts.</p>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:16px"><span class="spin"></span></div>';
+  try {
+    const r = await fetch('/api/user?action=alerts',{headers:{Authorization:`Bearer ${supaToken}`}});
+    const {alerts=[]} = await r.json();
+    const alertRows = alerts.map(a=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #1a1a1a;margin-bottom:6px;background:#080808;">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#fff">${a.asset} ${a.type==='price_below'?'↓':'↑'} $${Number(a.threshold).toLocaleString()}</span>
+          <span style="font-size:10px;color:#555;margin-left:8px">${a.channel}</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${a.active?'#00e676':'#555'}">${a.active?'ON':'OFF'}</span>
+          <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px" onclick="toggleAlert('${a.id}',${!a.active})">${a.active?'Pause':'Resume'}</button>
+          <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;color:#ff4444;border-color:#2a0000" onclick="deleteAlert('${a.id}')">✕</button>
+        </div>
+      </div>`).join('') || '<p style="color:#555;font-size:12px;font-family:\'JetBrains Mono\',monospace;margin-bottom:16px">No alerts yet.</p>';
+
+    el.innerHTML = `
+      ${alertRows}
+      <div class="divider"></div>
+      <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;color:#888">New Alert</p>
+      <div class="fg fg4" style="margin-bottom:12px">
+        <div><label>Asset</label><input type="text" id="al-asset" placeholder="BTC" style="text-transform:uppercase"></div>
+        <div><label>Type</label><select id="al-type"><option value="price_below">Price Below ↓</option><option value="price_above">Price Above ↑</option></select></div>
+        <div><label>Target ($)</label><input type="number" id="al-threshold" placeholder="80000" step="any"></div>
+        <div><label>Notify via</label><select id="al-channel"><option value="email">Email</option><option value="telegram">Telegram</option></select></div>
+      </div>
+      <div id="al-tg" style="display:none;margin-bottom:12px">
+        <label style="font-size:9px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:#555;display:block;margin-bottom:6px">
+          Telegram Chat ID <span style="text-transform:none;color:#444">— get it from @userinfobot</span>
+        </label>
+        <input type="text" id="al-tg-id" placeholder="123456789">
+      </div>
+      <div id="al-err" style="font-size:11px;color:#ff8800;margin-bottom:8px"></div>
+      <button class="btn btn-p" style="width:100%" onclick="createAlert()">Create Alert →</button>`;
+
+    document.getElementById('al-channel').addEventListener('change', e=>{
+      document.getElementById('al-tg').style.display = e.target.value==='telegram'?'block':'none';
+    });
+  } catch(e) { el.innerHTML=`<p style="color:#ff8800">${e.message}</p>`; }
+}
+function closeAlerts(){ document.getElementById('alerts-mo').classList.remove('open'); }
+
+async function createAlert(){
+  const asset=(document.getElementById('al-asset').value||'').toUpperCase().trim();
+  const type=document.getElementById('al-type').value;
+  const threshold=parseFloat(document.getElementById('al-threshold').value);
+  const channel=document.getElementById('al-channel').value;
+  const tgId=(document.getElementById('al-tg-id')?.value||'').trim();
+  if(!asset||isNaN(threshold)){document.getElementById('al-err').textContent='Fill all fields.';return;}
+  const r=await fetch('/api/user?action=alert_create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${supaToken}`},body:JSON.stringify({type,asset,threshold,channel,telegram_chat_id:tgId||null})});
+  const d=await r.json();
+  if(!r.ok){document.getElementById('al-err').textContent=d.error||'Failed';return;}
+  openAlerts();
+}
+async function toggleAlert(id,active){
+  await fetch('/api/user?action=alert_toggle',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${supaToken}`},body:JSON.stringify({id,active})});
+  openAlerts();
+}
+async function deleteAlert(id){
+  if(!confirm('Delete this alert?')) return;
+  await fetch('/api/user?action=alert_delete',{method:'DELETE',headers:{'Content-Type':'application/json',Authorization:`Bearer ${supaToken}`},body:JSON.stringify({id})});
+  openAlerts();
+}
+
 function doLogout() {
-  currentUser = null;
-  try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+  if(supabase) supabase.auth.signOut();
+  currentUser = null; supaToken = null;
+  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
+  try { localStorage.removeItem('nestegg_d5'); localStorage.removeItem(CACHE_KEY); } catch(e) {}
   updateUserUI();
+  renderHoldings(); updateSummary(); buildPie(); buildPerf();
+  document.getElementById('login-mo').classList.add('open');
+  setTimeout(()=>document.getElementById('li-email')?.focus(), 300);
 }
 
 function handleUserPill() {
   if (currentUser && confirm(`Sign out, ${currentUser.name}?`)) doLogout();
+}
+
+function requireLogin(cb) {
+  if (currentUser) { cb(); return; }
+  pendingAction = cb;
+  document.getElementById('login-mo').classList.add('open');
+  setTimeout(() => document.getElementById('li-email')?.focus(), 100);
+}
+
+async function loadAuth() {
+  await loadSupabase();
+  if (!supabase) {
+    // No Supabase — check for existing local session
+    try {
+      const raw = localStorage.getItem('nestegg_auth_v1');
+      if (raw) {
+        const stored = JSON.parse(raw);
+        currentUser = { id:'local', email: stored.name+'@local', name: stored.name };
+        document.getElementById('login-mo').classList.remove('open');
+        updateUserUI();
+      }
+    } catch(e) {}
+    return;
+  }
+  // Check for existing Supabase session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    supaToken = session.access_token;
+    currentUser = { id: session.user.id, email: session.user.email, name: session.user.user_metadata?.name || session.user.email.split('@')[0] };
+    document.getElementById('login-mo').classList.remove('open');
+    updateUserUI();
+    return true; // has session
+  }
+  return false; // needs login
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2239,53 +2654,42 @@ function showOnboardingTip(){
   btn.addEventListener('click', () => { clearTimeout(timer); hide(); }, {once:true});
 }
 
-// ── INIT — smart cache-aware startup ─────────────────────
-(function init(){
-  loadAuth();
+// ── INIT — async Supabase-aware startup ───────────────────
+(async function init(){
   document.getElementById('currency-sel').value = activeCurrency;
   refreshTicker();
   setInterval(refreshTicker, 90000);
 
-  // Force login if no session — modal cannot be dismissed
+  // Inject Supabase credentials if set via Vercel env vars
+  // (set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel)
+  // They get baked in via the meta tags below, read by window.__SUPA_*
+  const metaUrl = document.querySelector('meta[name="supa-url"]')?.content;
+  const metaKey = document.querySelector('meta[name="supa-key"]')?.content;
+  if(metaUrl && metaUrl !== '__SUPA_URL__') { window.__SUPA_URL__ = metaUrl; }
+  if(metaKey && metaKey !== '__SUPA_KEY__') { window.__SUPA_KEY__ = metaKey; }
+
+  const hasSession = await loadAuth();
+
   if(!currentUser){
-    document.getElementById('login-mo').classList.add('open');
-    setTimeout(() => document.getElementById('li-name')?.focus(), 300);
-    // Don't load data until user logs in
+    // No session — modal is already open by default
     setStatus('ok', 'Sign in to view your portfolio');
+    setTimeout(()=>document.getElementById('li-email')?.focus(), 300);
     return;
   }
 
-  const hasCachedPrices = loadPriceCache();
-  renderHoldings(); updateSummary(); buildPerf();
-
-  if(hasCachedPrices){
-    const age = cacheAge();
-    const lbl = cacheAgeLabel();
-    if(age < CACHE_TTL){
-      buildPie();
-      const t = document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
-      showCacheBar(false, lbl);
-      setStatus('ok', `Cached · Last updated ${lbl}`);
-    } else if(age < CACHE_MAX){
-      buildPie();
-      showCacheBar(false, lbl);
-      setStatus('loading', `Refreshing… (last updated ${lbl})`);
-      refreshAll();
-    } else {
-      buildPie();
-      showCacheBar(true, lbl);
-      setStatus('warn', `Data is ${lbl} old — refreshing…`);
-      refreshAll();
-    }
+  // Has session — load portfolio
+  if(hasSession && supabase){
+    await loadCloudPortfolio();
   } else {
-    // Fresh user with no data — show empty state, don't auto-refresh
-    const hasAnyHoldings = D.wallets.length||D.btc.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
-    if(hasAnyHoldings){
-      setStatus('loading', 'Loading live data…');
-      setTimeout(()=>refreshAll(), 100);
+    const hasCachedPrices = loadPriceCache();
+    renderHoldings(); updateSummary(); buildPerf();
+    const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+    if(hasCachedPrices || hasAny){
+      const age = cacheAge(); const lbl = cacheAgeLabel();
+      if(age < CACHE_TTL){ buildPie(); showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
+      else { buildPie(); showCacheBar(age>CACHE_MAX,lbl); setStatus('loading',`Refreshing… (${lbl})`); refreshAll(); }
     } else {
-      setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
-      // Show onboarding arrow pointing at + Add button
+      setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`);
       setTimeout(showOnboardingTip, 600);
     }
   }
@@ -2297,6 +2701,15 @@ function showOnboardingTip(){
     }
   });
 })();
+
+// ── Save snapshot after each successful refresh ───────────
+const _origRefreshAll = refreshAll;
+async function refreshAll(){
+  await _origRefreshAll.call(this, ...arguments);
+  // Save daily snapshot to Supabase after successful full refresh
+  setTimeout(saveSnapshot, 2000);
+}
+
 </script>
 </body>
 </html>
