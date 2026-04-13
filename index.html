@@ -665,14 +665,13 @@
     </div>
     <div class="login-field">
       <label>Password <span style="color:#555;text-transform:none;letter-spacing:0;font-size:10px">(min 8 characters)</span></label>
-      <input type="password" id="li-pass" placeholder="••••••••"
-             onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="li-pass" placeholder="••••••••">
     </div>
     <div class="login-err" id="li-err"></div>
-    <button class="btn btn-p" style="width:100%;margin-top:4px" id="li-btn" onclick="doLogin()">Sign In →</button>
+    <button class="btn btn-p" style="width:100%;margin-top:4px" id="li-btn">Sign In →</button>
     <div id="li-forgot" style="text-align:center;margin-top:12px;">
-      <a href="#" onclick="doForgotPassword();return false"
-         style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#444;text-decoration:none;">
+      <a href="#" id="li-forgot-link"
+         style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#888;text-decoration:none;">
         Forgot password?
       </a>
     </div>
@@ -691,7 +690,7 @@
     <div class="login-foot" style="margin-top:20px;">
       Click the link in the email to activate your account, then come back and sign in.
     </div>
-    <button class="btn" style="width:100%;margin-top:16px" onclick="document.getElementById('confirm-mo').classList.remove('open');document.getElementById('login-mo').classList.add('open')">
+    <button class="btn" id="confirm-back-btn" style="width:100%;margin-top:16px">
       Back to Sign In
     </button>
   </div>
@@ -2133,7 +2132,7 @@ async function doLogin(){
     // Map Supabase error messages to user-friendly ones
     const msg = e.message || '';
     if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
-      err.textContent = 'Wrong email or password. Try again or reset your password.';
+      err.textContent = 'No account found with this email, or wrong password. Please create an account first.';
     } else if (msg.includes('Email not confirmed')) {
       err.textContent = 'Please confirm your email first. Check your inbox.';
     } else if (msg.includes('User already registered')) {
@@ -2995,17 +2994,32 @@ async function refreshAll(){
   setTimeout(saveSnapshot, 2000);
 }
 
-// ── Wire up tab buttons via event listeners (not onclick attrs) ──
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('tab-signin')?.addEventListener('click', () => switchAuthTab('signin'));
-  document.getElementById('tab-signup')?.addEventListener('click', () => switchAuthTab('signup'));
-});
-// Also wire up immediately in case DOMContentLoaded already fired
-(function wireTabButtons(){
-  const si = document.getElementById('tab-signin');
-  const su = document.getElementById('tab-signup');
-  if (si) si.onclick = () => switchAuthTab('signin');
-  if (su) su.onclick = () => switchAuthTab('signup');
+// ── Wire ALL login modal interactions via JS (no onclick attrs) ──
+(function wireLoginModal(){
+  const $ = id => document.getElementById(id);
+
+  // Tab buttons
+  const si = $('tab-signin'); if(si) si.onclick = () => switchAuthTab('signin');
+  const su = $('tab-signup'); if(su) su.onclick = () => switchAuthTab('signup');
+
+  // Submit button
+  const btn = $('li-btn'); if(btn) btn.onclick = () => doLogin();
+
+  // Enter key shortcuts
+  $('li-name')?.addEventListener('keydown', e => { if(e.key==='Enter') $('li-email')?.focus(); });
+  $('li-email')?.addEventListener('keydown', e => { if(e.key==='Enter') $('li-pass')?.focus(); });
+  $('li-pass')?.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+  // Forgot password
+  const forgot = $('li-forgot-link');
+  if(forgot) forgot.onclick = e => { e.preventDefault(); doForgotPassword(); };
+
+  // Confirm modal back button
+  const back = $('confirm-back-btn');
+  if(back) back.onclick = () => {
+    $('confirm-mo').classList.remove('open');
+    $('login-mo').classList.add('open');
+  };
 })();
 
 </script>
