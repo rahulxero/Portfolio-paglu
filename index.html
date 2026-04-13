@@ -396,7 +396,30 @@
     .pill-free { font-size: 9px; padding: 2px 8px; background: #001208; color: var(--green); border: 1px solid #1a3a2a; font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
     .pill-opt  { font-size: 9px; padding: 2px 8px; background: #111; color: var(--ghost); border: var(--border-dim); font-family: var(--mono); letter-spacing: .04em; text-transform: uppercase; }
 
-    /* ── AUTOCOMPLETE ────────────────────────────────────── */
+    /* ── TOGGLE SWITCH ───────────────────────────────────── */
+    .toggle-wrap {
+      display: flex; align-items: center; gap: 7px;
+      cursor: pointer; user-select: none;
+    }
+    .toggle-wrap input { display: none; }
+    .toggle-track {
+      width: 28px; height: 16px; background: #222;
+      border: 1px solid #444; border-radius: 8px;
+      position: relative; transition: background .2s, border-color .2s;
+      flex-shrink: 0;
+    }
+    .toggle-thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 10px; height: 10px; background: #555;
+      border-radius: 50%; transition: left .2s, background .2s;
+    }
+    .toggle-wrap input:checked + .toggle-track { background: #1a3a2a; border-color: #00e676; }
+    .toggle-wrap input:checked + .toggle-track .toggle-thumb { left: 14px; background: #00e676; }
+    .toggle-lbl {
+      font-size: 10px; font-family: var(--mono);
+      color: #666; letter-spacing: .04em; text-transform: uppercase;
+    }
+    .toggle-wrap:hover .toggle-lbl { color: #999; }
     .ac-wrap { position: relative; }
     .ac-drop {
       position: absolute; top: 100%; left: 0; right: 0; z-index: 500;
@@ -595,10 +618,8 @@
       <option value="AUD">A$ AUD</option>
     </select>
     <button class="btn btn-icon" id="history-btn" onclick="openHistory()" title="Portfolio History" style="display:none">📈</button>
-    <button class="btn btn-icon" id="alerts-btn" onclick="openAlerts()" title="Price Alerts" style="display:none">🔔</button>
-    <button class="btn btn-icon" id="share-btn" onclick="openShare()" title="Share Portfolio" style="display:none">🔗</button>
     <button class="btn" id="ref-btn" onclick="refreshAll()">⟳ Refresh</button>
-    <button class="btn btn-icon" onclick="openSettings()" title="About">⚙</button>
+    <button class="btn btn-icon" onclick="openSettings()" title="Account & Settings">⚙</button>
   </div>
 </header>
 
@@ -762,12 +783,13 @@
         <button class="tab" onclick="sw('mf',this)">Mutual Funds</button>
         <button class="tab" onclick="sw('banks',this)">Bank & Cash</button>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <label style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;cursor:pointer;user-select:none;" title="Hide positions worth less than $1">
-          <input type="checkbox" id="hide-small" onchange="renderHoldings()" style="width:12px;height:12px;accent-color:#fff;cursor:pointer;">
-          Hide &lt;$1
+      <div style="display:flex;gap:10px;align-items:center;">
+        <label class="toggle-wrap" title="Hide positions under $1">
+          <input type="checkbox" id="hide-small" onchange="renderHoldings()">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-lbl">Hide &lt;$1</span>
         </label>
-        <span class="src-tag" id="src-tag">demo</span>
+        <span class="src-tag live" id="src-tag">LIVE</span>
         <button class="btn btn-ghost" id="add-btn-main" onclick="toggleAdd()">+ Add</button>
       </div>
     </div>
@@ -780,57 +802,55 @@
 
 </main>
 
-<!-- ── SETTINGS MODAL ───────────────────────────────────────────── -->
+<!-- ── SETTINGS / ACCOUNT MODAL ──────────────────────────────────── -->
 <div class="mo" id="smo">
   <div class="mc">
     <div class="mc-header">
       <div>
-        <p class="mc-title">About</p>
-        <p class="mc-sub">Portfolio Tracker — all your assets in one place.</p>
+        <p class="mc-title">Account</p>
+        <p class="mc-sub" id="smo-email" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#666"></p>
       </div>
       <button class="btn btn-icon" onclick="closeSettings()">✕</button>
     </div>
 
-    <p class="sect-title">Data Sources</p>
+    <p class="sect-title">Portfolio History</p>
+    <div style="margin-bottom:20px">
+      <button class="btn" style="width:100%;justify-content:flex-start;gap:10px;padding:12px 16px;" onclick="closeSettings();openHistory()">
+        <span>📈</span> <span>View Portfolio History</span>
+      </button>
+    </div>
 
-    <div class="src-row">
-      <div class="lft">
-        <div class="ico">⛓</div>
-        <div><h4>Zerion</h4><p>All tokens + DeFi positions across 40+ EVM chains + Solana</p></div>
+    <p class="sect-title">Security</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+      <button class="btn" id="change-pass-btn" style="width:100%;justify-content:flex-start;gap:10px;padding:12px 16px;" onclick="toggleChangePassword()">
+        <span>🔑</span> <span>Change Password</span>
+      </button>
+      <div id="change-pass-form" style="display:none;padding:14px;background:#0a0a0a;border:1px solid #222;">
+        <div class="login-field" style="margin-bottom:12px">
+          <label>New Password</label>
+          <input type="password" id="new-pass" placeholder="Min 8 characters" style="background:#111;border:1px solid #333;padding:10px 12px;color:#fff;width:100%;font-family:'JetBrains Mono',monospace;font-size:13px;">
+        </div>
+        <div id="pass-msg" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#888;margin-bottom:10px;min-height:14px"></div>
+        <button class="btn btn-p" style="width:100%" onclick="doChangePassword()">Update Password →</button>
       </div>
-      <span class="pill-free">Live</span>
+      <button class="btn" style="width:100%;justify-content:flex-start;gap:10px;padding:12px 16px;" onclick="doForgotFromSettings()">
+        <span>📧</span> <span>Send Password Reset Email</span>
+      </button>
     </div>
-    <div class="src-row">
-      <div class="lft">
-        <div class="ico">₿</div>
-        <div><h4>Blockstream</h4><p>Bitcoin balance</p></div>
-      </div>
-      <span class="pill-free">Live</span>
-    </div>
-    <div class="src-row">
-      <div class="lft">
-        <div class="ico">📈</div>
-        <div><h4>CoinGecko</h4><p>Crypto prices + 24h change</p></div>
-      </div>
-      <span class="pill-free">Live</span>
-    </div>
-    <div class="src-row">
-      <div class="lft">
-        <div class="ico">🤖</div>
-        <div><h4>Anthropic AI</h4><p>NSE/BSE + NASDAQ/NYSE live stock prices via web search</p></div>
-      </div>
-      <span class="pill-free">Live</span>
-    </div>
-    <div class="src-row">
-      <div class="lft">
-        <div class="ico">📊</div>
-        <div><h4>MFApi.in</h4><p>Indian mutual fund NAVs</p></div>
-      </div>
-      <span class="pill-free">Live</span>
+
+    <p class="sect-title">Data Sources</p>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#666;">
+      <div style="display:flex;justify-content:space-between"><span>Crypto prices</span><span style="color:#00e676">CoinGecko</span></div>
+      <div style="display:flex;justify-content:space-between"><span>EVM wallets</span><span style="color:#00e676">Zerion</span></div>
+      <div style="display:flex;justify-content:space-between"><span>BTC balance</span><span style="color:#00e676">Blockstream</span></div>
+      <div style="display:flex;justify-content:space-between"><span>NSE/BSE + NASDAQ</span><span style="color:#00e676">yfinance</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Mutual funds</span><span style="color:#00e676">MFApi.in</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Portfolio sync</span><span style="color:#00e676">Supabase</span></div>
     </div>
 
     <div class="divider"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+      <button class="btn" style="color:#ff4444;border-color:#2a0000;padding:10px 18px" onclick="confirmLogout()">Sign Out</button>
       <button class="btn btn-p" onclick="closeSettings()">Close</button>
     </div>
   </div>
@@ -2079,15 +2099,13 @@ function updateUserUI() {
     pill.style.display = 'flex';
     document.getElementById('user-avatar').textContent = (currentUser.name||'?').charAt(0).toUpperCase();
     document.getElementById('user-name').textContent = currentUser.name;
-    // Show feature buttons
-    ['history-btn','alerts-btn','share-btn'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.style.display='inline-flex';
-    });
+    // Show history button only
+    const hBtn = document.getElementById('history-btn');
+    if(hBtn) hBtn.style.display = 'inline-flex';
   } else {
     pill.style.display = 'none';
-    ['history-btn','alerts-btn','share-btn'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.style.display='none';
-    });
+    const hBtn = document.getElementById('history-btn');
+    if(hBtn) hBtn.style.display = 'none';
   }
 }
 
@@ -2369,10 +2387,6 @@ function doLogout() {
   setTimeout(()=>document.getElementById('li-email')?.focus(), 300);
 }
 
-function handleUserPill() {
-  if (currentUser && confirm(`Sign out, ${currentUser.name}?`)) doLogout();
-}
-
 function requireLogin(cb) {
   if (currentUser) { cb(); return; }
   pendingAction = cb;
@@ -2642,9 +2656,50 @@ function selectTicker(inputId, dropId, sym, name, type, extra) {
     if (exSel) exSel.value = (extra === 'BSE' || extra === 'BSE') ? 'BSE' : 'NSE';
   }
 }
-function openSettings(){document.getElementById('smo').classList.add('open');}
-function closeSettings(){document.getElementById('smo').classList.remove('open');}
+function openSettings(){
+  // Show user email in modal
+  const emailEl = document.getElementById('smo-email');
+  if(emailEl && currentUser) emailEl.textContent = currentUser.email || '';
+  document.getElementById('smo').classList.add('open');
+}
+function closeSettings(){ document.getElementById('smo').classList.remove('open'); }
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
+
+function toggleChangePassword(){
+  const form = document.getElementById('change-pass-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function doChangePassword(){
+  const pass = document.getElementById('new-pass').value;
+  const msg  = document.getElementById('pass-msg');
+  if(!pass || pass.length < 8){ msg.style.color='#ff4444'; msg.textContent='Password must be at least 8 characters.'; return; }
+  if(!supabase){ msg.style.color='#ff8800'; msg.textContent='Supabase not configured.'; return; }
+  const { error } = await supabase.auth.updateUser({ password: pass });
+  if(error){ msg.style.color='#ff4444'; msg.textContent=error.message; return; }
+  msg.style.color='#00e676'; msg.textContent='Password updated successfully!';
+  document.getElementById('new-pass').value='';
+  setTimeout(()=>{ document.getElementById('change-pass-form').style.display='none'; msg.textContent=''; }, 2000);
+}
+
+async function doForgotFromSettings(){
+  if(!supabase || !currentUser){ return; }
+  await supabase.auth.resetPasswordForEmail(currentUser.email);
+  const msg = document.getElementById('pass-msg');
+  document.getElementById('change-pass-form').style.display='block';
+  msg.style.color='#00e676';
+  msg.textContent=`Reset email sent to ${currentUser.email}`;
+}
+
+function confirmLogout(){
+  closeSettings();
+  if(confirm('Sign out of your account?')) doLogout();
+}
+
+// User pill now opens Account modal instead of logout confirm
+function handleUserPill(){
+  openSettings();
+}
 // Login modal is NOT closeable by clicking backdrop — user must sign in
 // (backdrop click intentionally does nothing)
 
@@ -2653,13 +2708,14 @@ function showOnboardingTip(){
   const btn = document.getElementById('add-btn-main');
   const tip = document.getElementById('onboard-tip');
   if(!btn || !tip) return;
+  // Make sure the tip is visible in viewport
   const rect = btn.getBoundingClientRect();
+  if(!rect.width) { setTimeout(showOnboardingTip, 500); return; } // retry if not rendered yet
   tip.style.display = 'block';
-  tip.style.top  = (rect.bottom + 10) + 'px';
-  tip.style.left = Math.max(8, rect.left - 60) + 'px';
-  // Auto-hide after 7 seconds or when + Add is clicked
+  tip.style.top  = (rect.bottom + 12) + 'px';
+  tip.style.left = Math.max(8, rect.right - 200) + 'px';
   const hide = () => { tip.style.display = 'none'; };
-  const timer = setTimeout(hide, 7000);
+  const timer = setTimeout(hide, 8000);
   btn.addEventListener('click', () => { clearTimeout(timer); hide(); }, {once:true});
 }
 
