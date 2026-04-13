@@ -495,7 +495,7 @@
     /* ── LOGIN MODAL ─────────────────────────────────────── */
     .login-mo {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,.9);
+      background: rgba(0,0,0,.95);
       backdrop-filter: blur(8px);
       z-index: 300;
       display: none;
@@ -505,7 +505,7 @@
     }
     .login-mo.open { display: flex; }
     .login-card {
-      background: #000;
+      background: #0a0a0a;
       border: 1px solid #333;
       padding: 36px;
       width: 100%;
@@ -515,42 +515,42 @@
     .login-card .eyebrow {
       font-size: 9px; font-family: var(--mono);
       text-transform: uppercase; letter-spacing: .12em;
-      color: #444; margin-bottom: 8px;
+      color: #666; margin-bottom: 8px;
       display: flex; align-items: center; gap: 8px;
     }
     .login-card .eyebrow::before {
-      content: ''; display: block; width: 16px; height: 1px; background: #333;
+      content: ''; display: block; width: 16px; height: 1px; background: #444;
     }
     .login-card h2 {
-      font-size: 22px; font-weight: 700;
-      letter-spacing: -.03em; margin-bottom: 6px;
+      font-size: 24px; font-weight: 700;
+      letter-spacing: -.03em; margin-bottom: 8px; color: #fff;
     }
     .login-card p {
       font-size: 12px; font-family: var(--mono);
-      color: #555; margin-bottom: 28px; line-height: 1.6;
+      color: #888; margin-bottom: 28px; line-height: 1.7;
     }
-    .login-field { margin-bottom: 18px; }
+    .login-field { margin-bottom: 20px; }
     .login-field label {
-      font-size: 9px; font-family: var(--mono);
+      font-size: 10px; font-family: var(--mono);
       text-transform: uppercase; letter-spacing: .1em;
-      color: #444; display: block; margin-bottom: 7px;
+      color: #888; display: block; margin-bottom: 8px;
     }
     .login-field input {
-      background: #000; border: 1px solid #222;
-      padding: 11px 14px; color: #fff; width: 100%;
-      font-family: var(--mono); font-size: 13px;
+      background: #111; border: 1px solid #333;
+      padding: 12px 14px; color: #fff; width: 100%;
+      font-family: var(--mono); font-size: 14px;
       transition: border-color .12s;
     }
-    .login-field input:focus { outline: none; border-color: #fff; }
-    .login-field input::placeholder { color: #2a2a2a; }
+    .login-field input:focus { outline: none; border-color: #fff; background: #161616; }
+    .login-field input::placeholder { color: #555; }
     .login-err {
       font-size: 11px; font-family: var(--mono);
       color: var(--red); margin-top: 10px; min-height: 16px;
     }
     .login-foot {
       margin-top: 20px;
-      font-size: 10px; font-family: var(--mono);
-      color: #2a2a2a; line-height: 1.8;
+      font-size: 11px; font-family: var(--mono);
+      color: #555; line-height: 1.8;
     }
     /* user avatar pill in header */
     .user-pill {
@@ -630,7 +630,7 @@
 
     <div class="login-field" id="li-name-field" style="display:none">
       <label>Your Name</label>
-      <input type="text" id="li-name" placeholder="e.g. Rohit" maxlength="40"
+      <input type="text" id="li-name" placeholder="Your name" maxlength="40"
              onkeydown="if(event.key==='Enter')document.getElementById('li-email').focus()">
     </div>
     <div class="login-field">
