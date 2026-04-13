@@ -2001,9 +2001,9 @@ let supaToken   = null;
 let pendingAction = null;
 let authMode = 'signin'; // 'signin' | 'signup'
 
-// Load Supabase JS from CDN and fetch config from /api/config
+// Load Supabase JS — already loaded in <head>, just fetch config and init client
 async function loadSupabase(){
-  // Try localStorage cache first (instant — avoids API roundtrip on refresh)
+  // Try localStorage cache first (instant)
   try {
     const cached = localStorage.getItem('supa_cfg');
     if (cached) {
@@ -2028,40 +2028,25 @@ async function loadSupabase(){
     }
   } catch(e) { console.warn('Config fetch:', e.message); }
 
-  return new Promise((resolve) => {
-    const url = window.__SUPA_URL__;
-    const key = window.__SUPA_KEY__;
-    if (!url || !key) { supabase = null; resolve(); return; }
+  const url = window.__SUPA_URL__;
+  const key = window.__SUPA_KEY__;
+  if (!url || !key) { supabase = null; return; }
 
-    const initClient = () => {
-      try {
-        supabase = window.supabase.createClient(url, key, {
-          auth: {
-            persistSession: true,
-            storageKey: 'portfolio_auth',
-            storage: window.localStorage,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-          }
-        });
-      } catch(e) { console.error('Supabase init failed:', e); supabase = null; }
-      resolve();
-    };
-
-    if (window.supabase) { initClient(); return; }
-
-    // Hard timeout — if CDN takes > 8s, give up and proceed without Supabase
-    const cdnTimeout = setTimeout(() => {
-      console.warn('Supabase CDN timeout — proceeding without cloud sync');
-      supabase = null; resolve();
-    }, 8000);
-
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    s.onload = () => { clearTimeout(cdnTimeout); initClient(); };
-    s.onerror = () => { clearTimeout(cdnTimeout); console.error('Supabase CDN failed'); supabase = null; resolve(); };
-    document.head.appendChild(s);
-  });
+  try {
+    // window.supabase is the library loaded in <head>
+    supabase = window.supabase.createClient(url, key, {
+      auth: {
+        persistSession: true,
+        storageKey: 'portfolio_auth',
+        storage: window.localStorage,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      }
+    });
+  } catch(e) {
+    console.error('Supabase init error:', e.message);
+    supabase = null;
+  }
 }
 
 function switchAuthTab(mode){
