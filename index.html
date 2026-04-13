@@ -460,7 +460,9 @@
       overflow: hidden;
       display: flex;
       align-items: center;
-      position: relative;
+      position: sticky;
+      top: 56px; /* sits right below the sticky header */
+      z-index: 90;
       cursor: default;
     }
     .ticker-bar::before,
@@ -2543,41 +2545,43 @@ async function loadAuth() {
 // Coins to skip (stables, wrapped, LSDs)
 // Comprehensive skip list — ALL stablecoins, wrapped tokens, LSDs, receipt tokens, algo-pegged
 const TICKER_SKIP = new Set([
-  // USD stablecoins
+  // Stablecoins — USD
   'tether','usd-coin','dai','binance-usd','true-usd','first-digital-usd','usdd','frax',
   'pax-dollar','gemini-dollar','terrausd','neutrino','fei-usd','magic-internet-money',
-  'liquity-usd','alchemix-usd','dollar-on-chain','rai','nusd','susd','crvusd',
-  'paypal-usd','usds','usde','ethena-usde','usual-usd','resolv-usd','pyusd',
-  // Wrapped / bridged tokens
-  'wrapped-bitcoin','wrapped-ethereum','wrapped-steth','wrapped-bnb',
-  'wbtc','weth','wbnb','wmatic','wavax','wsol',
+  'liquity-usd','alchemix-usd','rai','nusd','susd','crvusd','paypal-usd','usds',
+  'usde','ethena-usde','usual-usd','resolv-usd','pyusd','fdusd','tusd','gusd','usdp',
+  'flex-usd','vai','usdn','tribe','fei-protocol','dola-borrowing-right',
+  // Stablecoins — other pegs
+  'pax-gold','tether-gold','digix-gold','cache-gold','mim','origin-dollar',
+  'euro-coin','stasis-euro','celo-euro','ageur',
+  // Wrapped tokens
+  'wrapped-bitcoin','wrapped-ethereum','wrapped-steth','wrapped-bnb','wrapped-eeth',
+  'wbtc','weth','wbnb','wmatic','wavax','wsol','wftm','wone','wcfx',
+  // Bridged versions
+  'renbtc','hbtc','sbtc','obtc','multibtc','bitcoin-bep2',
+  // Liquid staking / receipt tokens
+  'staked-ether','lido-staked-matic','staked-frax-ether','sfrxeth',
   'rocket-pool-eth','coinbase-wrapped-staked-eth','mantle-staked-ether',
-  'staked-frax-ether','sfrxeth','ankr-staked-eth','stakewise-staked-eth2',
-  'figr-heloc','figment',
-  // Liquid staking / yield-bearing
-  'staked-ether','lido-staked-matic','staked-frax-ether',
-  // Bridged/synthetic
-  'renbtc','hbtc','sbtc','obtc','multibtc',
-  // Pegged assets
-  'pax-gold','tether-gold','digix-gold',
-  // Yield/receipt tokens (Compound, Aave etc)
-  'cdai','cusdc','cusdt','aave-dai','aave-usdc',
+  'ankr-staked-eth','stakewise-staked-eth2','frax-ether',
+  'liquid-staking-eth','stafi-staked-eth','stakehound-staked-ether',
+  // Yield/vault tokens
+  'cdai','cusdc','cusdt','aave-dai','aave-usdc','yvdai','yvusdc',
+  'convex-finance','convex-crv',
 ]);
 
-// Top NASDAQ/NYSE stocks to show
+// Top NASDAQ/NYSE stocks to show in ticker
 const NASDAQ_TICKERS = ['AAPL','MSFT','NVDA','AMZN','META','GOOGL','TSLA','NFLX','AMD','INTC'];
 
-let tickerData = []; // array of { sym, price, chg, type:'crypto'|'stock' }
+let tickerData = [];
 
 async function fetchTickerCrypto() {
-  // Fetch top 60 by market cap so we have enough after filtering, take top 15 real coins
+  // Fetch top 80 by market cap — need enough to get 20 real coins after filtering
   let coins = [];
-  // Try with retry on rate limit
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=60&page=1&price_change_percentage=24h',
-        { signal: makeSig() }
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=80&page=1&price_change_percentage=24h&sparkline=false',
+        { signal: makeSig(15000) }
       );
       if (r.status === 429) { await new Promise(res => setTimeout(res, 2000 * (attempt + 1))); continue; }
       if (!r.ok) break;
@@ -2586,20 +2590,24 @@ async function fetchTickerCrypto() {
     } catch(e) { if (attempt === 2) return []; await new Promise(res => setTimeout(res, 1500)); }
   }
   if (!coins.length) return [];
+
   return coins
     .filter(c => {
       if (TICKER_SKIP.has(c.id)) return false;
-      const sym = (c.symbol || '').toLowerCase();
-      const name = (c.name || '').toLowerCase();
-      // Skip anything that looks like a stable, wrapped, or pegged token by symbol/name patterns
-      if (/^(usd|eur|gbp|jpy|cny|aud|cad|chf|krw|inr|brl|mxn|sgd|nzd|hkd|sek|nok|dkk|czk|pln|huf|try|zar|ils|php|idr|myr|thb|vnd|pkr)/.test(sym)) return false;
-      if (sym.startsWith('w') && sym.length <= 5) return false; // wbtc, weth, wbnb etc
-      if (name.includes('wrapped') || name.includes('staked') || name.includes('bridged')) return false;
-      if (name.includes('usd') || name.includes('dollar') || name.includes('tether')) return false;
-      if (name.includes('yield') || name.includes('receipt') || name.includes('vault')) return false;
+      const sym  = (c.symbol || '').toLowerCase();
+      const name = (c.name   || '').toLowerCase();
+      // Skip stablecoins by symbol pattern (usd*, eur*, etc)
+      if (/^(usd|eur|gbp|jpy|cny|aud|cad|sgd|nzd|hkd|chf|krw|inr|brl)/.test(sym)) return false;
+      // Skip wrapped tokens by symbol (wbtc, weth, wbnb ≤ 5 chars starting with w)
+      if (sym.startsWith('w') && sym.length <= 5) return false;
+      // Skip by name keywords
+      if (/wrapped|staked|bridged|liquid\s*staking|receipt|vault|pegged|synthetic/.test(name)) return false;
+      if (/usd|dollar|tether|stable|euro\s*coin/.test(name)) return false;
+      // Skip if price is exactly $1 ± 2% (likely a stablecoin missed by id)
+      if (c.current_price >= 0.98 && c.current_price <= 1.02) return false;
       return true;
     })
-    .slice(0, 15)
+    .slice(0, 20) // top 20 real coins
     .map(c => ({
       sym:   c.symbol.toUpperCase(),
       price: c.current_price,
