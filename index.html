@@ -1999,34 +1999,51 @@ let authMode = 'signin'; // 'signin' | 'signup'
 
 // Load Supabase JS from CDN and fetch config from /api/config
 async function loadSupabase(){
+  // Try localStorage cache first (instant — avoids API roundtrip on refresh)
   try {
-    // Fetch public config from server (keeps keys out of static HTML)
+    const cached = localStorage.getItem('supa_cfg');
+    if (cached) {
+      const c = JSON.parse(cached);
+      if (c.url && c.key) { window.__SUPA_URL__ = c.url; window.__SUPA_KEY__ = c.key; }
+    }
+  } catch(e) {}
+
+  // Fetch fresh config from server (updates cache)
+  try {
     const cfgRes = await fetch('/api/config');
     if (cfgRes.ok) {
       const cfg = await cfgRes.json();
-      if (cfg.supabaseUrl) window.__SUPA_URL__ = cfg.supabaseUrl;
-      if (cfg.supabaseKey) window.__SUPA_KEY__ = cfg.supabaseKey;
+      if (cfg.supabaseUrl && cfg.supabaseKey) {
+        window.__SUPA_URL__ = cfg.supabaseUrl;
+        window.__SUPA_KEY__ = cfg.supabaseKey;
+        // Cache for next page load
+        localStorage.setItem('supa_cfg', JSON.stringify({ url: cfg.supabaseUrl, key: cfg.supabaseKey }));
+      }
     }
-  } catch(e) { /* config fetch failed — will use localStorage fallback */ }
+  } catch(e) {}
 
   return new Promise((resolve) => {
-    const url  = window.__SUPA_URL__;
-    const key  = window.__SUPA_KEY__;
+    const url = window.__SUPA_URL__;
+    const key = window.__SUPA_KEY__;
     if (!url || !key) { supabase = null; resolve(); return; }
-    if(window.supabase){ 
+
+    const initClient = () => {
       supabase = window.supabase.createClient(url, key, {
-        auth: { persistSession: true, storageKey: 'portfolio_auth', storage: window.localStorage }
-      }); 
-      resolve(); return; 
-    }
+        auth: {
+          persistSession: true,
+          storageKey: 'portfolio_auth',
+          storage: window.localStorage,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        }
+      });
+      resolve();
+    };
+
+    if (window.supabase) { initClient(); return; }
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    s.onload = () => { 
-      supabase = window.supabase.createClient(url, key, {
-        auth: { persistSession: true, storageKey: 'portfolio_auth', storage: window.localStorage }
-      }); 
-      resolve(); 
-    };
+    s.onload = initClient;
     s.onerror = () => { supabase = null; resolve(); };
     document.head.appendChild(s);
   });
@@ -2405,9 +2422,33 @@ function requireLogin(cb) {
 }
 
 async function loadAuth() {
+  // IMMEDIATELY hide login modal if we have any saved session — prevents flash
+  // Supabase saves session to localStorage under 'portfolio_auth'
+  try {
+    const raw = localStorage.getItem('portfolio_auth');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const sess = parsed?.currentSession || parsed;
+      if (sess?.user && sess?.access_token) {
+        const notExpired = !sess.expires_at || (sess.expires_at * 1000 > Date.now() - 60000);
+        if (notExpired) {
+          // Hide modal immediately — don't wait for Supabase to load
+          document.getElementById('login-mo').classList.remove('open');
+          currentUser = {
+            id: sess.user.id,
+            email: sess.user.email,
+            name: sess.user.user_metadata?.name || sess.user.email.split('@')[0]
+          };
+          updateUserUI();
+        }
+      }
+    }
+  } catch(e) {}
+
   await loadSupabase();
+
   if (!supabase) {
-    // No Supabase — check for legacy local session
+    // No Supabase — use legacy local session
     try {
       const raw = localStorage.getItem('nestegg_auth_v1');
       if (raw) {
@@ -2415,45 +2456,57 @@ async function loadAuth() {
         currentUser = { id:'local', email: stored.name+'@local', name: stored.name };
         document.getElementById('login-mo').classList.remove('open');
         updateUserUI();
+        return false;
       }
     } catch(e) {}
     return false;
   }
 
-  // Supabase loaded — check for persisted session
+  // Verify with Supabase (handles token refresh automatically)
   const { data: { session }, error } = await supabase.auth.getSession();
+
   if (session && !error) {
     supaToken = session.access_token;
-    currentUser = { 
-      id: session.user.id, 
-      email: session.user.email, 
-      name: session.user.user_metadata?.name || session.user.email.split('@')[0] 
+    currentUser = {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.user_metadata?.name || session.user.email.split('@')[0]
     };
     document.getElementById('login-mo').classList.remove('open');
     updateUserUI();
-    return true; // has valid session
+
+    supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (event === 'TOKEN_REFRESHED' && newSession) {
+        supaToken = newSession.access_token;
+      } else if (event === 'SIGNED_OUT') {
+        currentUser = null; supaToken = null;
+        updateUserUI();
+        document.getElementById('login-mo').classList.add('open');
+      }
+    });
+
+    return true;
   }
 
-  // No session found — listen for auth state changes (handles email confirmation redirect)
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
-      supaToken = session.access_token;
-      currentUser = { 
-        id: session.user.id, 
-        email: session.user.email, 
-        name: session.user.user_metadata?.name || session.user.email.split('@')[0] 
-      };
-      document.getElementById('login-mo').classList.remove('open');
-      updateUserUI();
-      await loadCloudPortfolio();
-    } else if (event === 'SIGNED_OUT') {
-      currentUser = null; supaToken = null;
-      updateUserUI();
-      document.getElementById('login-mo').classList.add('open');
-    }
-  });
+  // Session expired — try silent refresh
+  const { data: refreshData } = await supabase.auth.refreshSession();
+  if (refreshData?.session) {
+    supaToken = refreshData.session.access_token;
+    currentUser = {
+      id: refreshData.session.user.id,
+      email: refreshData.session.user.email,
+      name: refreshData.session.user.user_metadata?.name || refreshData.session.user.email.split('@')[0]
+    };
+    document.getElementById('login-mo').classList.remove('open');
+    updateUserUI();
+    return true;
+  }
 
-  return false; // no session, needs login
+  // Truly no valid session — show login
+  currentUser = null;
+  updateUserUI();
+  document.getElementById('login-mo').classList.add('open');
+  return false;
 }
 
 // ══════════════════════════════════════════════════════════
