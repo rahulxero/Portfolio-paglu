@@ -2068,29 +2068,43 @@ function switchAuthTab(mode){
 
 async function doLogin(){
   const err = document.getElementById('li-err');
+  err.style.color = 'var(--red)';
   err.textContent = '';
-  const email = (document.getElementById('li-email').value||'').trim();
-  const pass  = (document.getElementById('li-pass').value||'').trim();
-  if (!email || !pass) { err.textContent = 'Enter email and password.'; return; }
+  const email = (document.getElementById('li-email').value||'').trim().toLowerCase();
+  const pass  = (document.getElementById('li-pass').value||'');
+  if (!email) { err.textContent = 'Enter your email address.'; return; }
+  if (!pass)  { err.textContent = 'Enter your password.'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Enter a valid email address.'; return; }
 
   const btn = document.getElementById('li-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin-sm"></span> …';
+  btn.innerHTML = '<span class="spin-sm"></span> Signing in…';
+
+  // Wait for Supabase to load (it loads async from /api/config)
+  if (!supabase) {
+    await loadSupabase();
+  }
 
   if (!supabase) {
-    // Supabase not configured — localStorage-only mode
-    currentUser = { id: 'local', email, name: email.split('@')[0] };
-    try { localStorage.setItem('portfolio_local_session', JSON.stringify(currentUser)); } catch(e) {}
-    afterLogin(false);
-    btn.disabled = false; btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
+    // Supabase still not configured — block login, show setup message
+    err.textContent = 'Authentication not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to Vercel environment variables.';
+    btn.disabled = false;
+    btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
     return;
   }
 
   try {
     let result;
     if (authMode === 'signup') {
-      const name = (document.getElementById('li-name').value||'').trim() || email.split('@')[0];
-      result = await supabase.auth.signUp({ email, password: pass, options: { data: { name } } });
+      if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; btn.disabled=false; btn.textContent='Create Account →'; return; }
+      const name = (document.getElementById('li-name')?.value||'').trim() || email.split('@')[0];
+      result = await supabase.auth.signUp({
+        email, password: pass,
+        options: {
+          data: { name },
+          emailRedirectTo: window.location.origin,
+        }
+      });
       if (result.error) throw result.error;
       if (!result.data.session) {
         // Email confirmation required
@@ -2106,21 +2120,64 @@ async function doLogin(){
     }
     const session = result.data.session;
     supaToken = session.access_token;
-    currentUser = { id: session.user.id, email: session.user.email, name: session.user.user_metadata?.name || email.split('@')[0] };
+    currentUser = {
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.user_metadata?.name || email.split('@')[0]
+    };
     afterLogin(true);
   } catch(e) {
-    err.textContent = e.message.includes('Invalid login') ? 'Wrong email or password.' : e.message;
+    // Map Supabase error messages to user-friendly ones
+    const msg = e.message || '';
+    if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
+      err.textContent = 'Wrong email or password. Try again or reset your password.';
+    } else if (msg.includes('Email not confirmed')) {
+      err.textContent = 'Please confirm your email first. Check your inbox.';
+    } else if (msg.includes('User already registered')) {
+      err.textContent = 'Account already exists. Switch to Sign In tab.';
+    } else if (msg.includes('Password should be')) {
+      err.textContent = 'Password must be at least 8 characters.';
+    } else if (msg.includes('rate limit') || msg.includes('too many')) {
+      err.textContent = 'Too many attempts. Please wait a minute and try again.';
+    } else {
+      err.textContent = msg || 'Something went wrong. Please try again.';
+    }
   }
-  btn.disabled = false; btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
+  btn.disabled = false;
+  btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
 }
 
 async function doForgotPassword(){
-  const email = (document.getElementById('li-email').value||'').trim();
-  if (!email) { document.getElementById('li-err').textContent = 'Enter your email first.'; return; }
-  if (!supabase) return;
-  await supabase.auth.resetPasswordForEmail(email);
-  document.getElementById('li-err').style.color = '#00e676';
-  document.getElementById('li-err').textContent = 'Password reset email sent!';
+  const errEl = document.getElementById('li-err');
+  const email  = (document.getElementById('li-email').value||'').trim().toLowerCase();
+  if (!email) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = 'Enter your email address first, then click Forgot password.';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = 'Enter a valid email address.';
+    return;
+  }
+  if (!supabase) {
+    await loadSupabase();
+    if (!supabase) {
+      errEl.style.color = 'var(--red)';
+      errEl.textContent = 'Auth not configured — contact the site owner.';
+      return;
+    }
+  }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/?reset=1',
+  });
+  if (error) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = error.message;
+  } else {
+    errEl.style.color = '#00e676';
+    errEl.textContent = `✓ Reset link sent to ${email} — check your inbox (and spam folder).`;
+  }
 }
 
 function updateUserUI() {
@@ -2143,73 +2200,91 @@ async function afterLogin(cloudSync) {
   updateUserUI();
   document.getElementById('login-mo').classList.remove('open');
   if (pendingAction) { const cb = pendingAction; pendingAction = null; cb(); return; }
-
-  if (cloudSync) {
-    setStatus('loading', 'Loading your portfolio…');
-    await loadCloudPortfolio();
-  } else {
-    const hasCachedPrices = loadPriceCache();
-    renderHoldings(); updateSummary(); buildPerf();
-    const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
-    if (hasCachedPrices || hasAny) {
-      setStatus('loading', 'Loading portfolio…');
-      refreshAll();
-    } else {
-      setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
-      setTimeout(showOnboardingTip, 400);
-    }
-  }
+  // loadCloudPortfolio handles both cloud + local fallback
+  await loadCloudPortfolio();
 }
 
 // ── CLOUD PORTFOLIO SYNC ──────────────────────────────────
 async function loadCloudPortfolio() {
-  if (!supabase || !supaToken) return false;
+  // Always load from localStorage first for instant render
+  try {
+    const raw = localStorage.getItem('nestegg_d5');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], ...parsed };
+    }
+  } catch(e) {}
+
+  // Then try to get fresher data from cloud
+  if (!supabase || !supaToken) {
+    // No cloud — use localStorage only
+    loadPriceCache();
+    renderHoldings(); updateSummary(); buildPerf();
+    const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+    if (hasAny) { setStatus('loading','Loading prices…'); refreshAll(); }
+    else { setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`); setTimeout(showOnboardingTip,400); }
+    return false;
+  }
+
   try {
     const r = await fetch('/api/user?action=portfolio', {
       headers: { Authorization: `Bearer ${supaToken}` }
     });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error);
+    if (data.error) throw new Error(data.error);
 
+    // Cloud data loaded — merge with empty defaults
     D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], ...data.data };
-    if (data.currency) { activeCurrency = data.currency; document.getElementById('currency-sel').value = data.currency; }
-
-    // Also restore local price cache
-    loadPriceCache();
-    renderHoldings(); updateSummary(); buildPerf();
-
-    const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
-    if (hasAny) {
-      refreshAll();
-    } else {
-      setStatus('ok', `Welcome, ${currentUser.name}! Add your first holding using + Add`);
-      setTimeout(showOnboardingTip, 400);
+    if (data.currency) {
+      activeCurrency = data.currency;
+      document.getElementById('currency-sel').value = data.currency;
     }
-    return true;
+    // Save to localStorage so it's available offline
+    try { localStorage.setItem('nestegg_d5', JSON.stringify(D)); } catch(e) {}
+
   } catch(e) {
-    console.warn('Cloud load failed, using local:', e.message);
-    loadPriceCache(); renderHoldings(); updateSummary(); buildPerf();
-    refreshAll();
-    return false;
+    console.warn('Cloud load failed, using localStorage:', e.message);
+    // D already loaded from localStorage above — just continue
   }
+
+  loadPriceCache();
+  renderHoldings(); updateSummary(); buildPerf();
+  const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
+  if (hasAny) {
+    const age = cacheAge(); const lbl = cacheAgeLabel();
+    if (age < CACHE_TTL && lbl) { buildPie(); showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
+    else { setStatus('loading','Loading live prices…'); refreshAll(); }
+  } else {
+    setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`);
+    setTimeout(showOnboardingTip, 400);
+  }
+  return true;
 }
 
 async function saveCloudPortfolio() {
-  if (!supabase || !supaToken) return; // no-op in local mode
+  if (!supabase || !supaToken) return; // no-op — local mode only
   try {
-    await fetch('/api/user?action=portfolio', {
+    const r = await fetch('/api/user?action=portfolio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supaToken}` },
       body: JSON.stringify({ data: D, currency: activeCurrency }),
     });
-  } catch(e) { console.warn('Cloud save failed:', e.message); }
+    if (!r.ok) {
+      const e = await r.json().catch(()=>({}));
+      console.warn('Cloud save failed:', e.error || r.status);
+    }
+  } catch(e) { console.warn('Cloud save error:', e.message); }
 }
 
-// Override save() to also sync to cloud
-const _localSave = () => { try{localStorage.setItem('nestegg_d5',JSON.stringify(D));}catch(e){} };
+// ── PER-USER STORAGE KEY ─────────────────────────────────
+// Always use nestegg_d5 for local — simple and consistent
+function userStorageKey() { return 'nestegg_d5'; }
+
+// save() — writes to localStorage AND cloud (if Supabase configured)
 function save() {
-  _localSave();
-  saveCloudPortfolio(); // fire and forget
+  try { localStorage.setItem('nestegg_d5', JSON.stringify(D)); } catch(e) {}
+  saveCloudPortfolio(); // async fire-and-forget
 }
 
 // ── DAILY SNAPSHOT ────────────────────────────────────────
@@ -2848,6 +2923,33 @@ function showOnboardingTip(){
   document.getElementById('currency-sel').value = activeCurrency;
   refreshTicker();
   setInterval(refreshTicker, 90000);
+
+  // Handle password reset redirect (?reset=1 from email link)
+  if (window.location.search.includes('reset=1') || window.location.hash.includes('type=recovery')) {
+    // Supabase will fire SIGNED_IN with type=recovery via onAuthStateChange
+    // Show the change password form immediately
+    document.getElementById('login-mo').classList.remove('open');
+    setTimeout(async () => {
+      await loadSupabase();
+      if (supabase) {
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+            supaToken = session?.access_token;
+            currentUser = session ? {
+              id: session.user.id, email: session.user.email,
+              name: session.user.user_metadata?.name || session.user.email.split('@')[0]
+            } : null;
+            updateUserUI();
+            // Open account modal on change password section
+            openSettings();
+            document.getElementById('change-pass-form').style.display = 'block';
+            document.getElementById('pass-msg').style.color = '#00e676';
+            document.getElementById('pass-msg').textContent = 'Enter your new password below.';
+          }
+        });
+      }
+    }, 500);
+  }
 
   const hasSession = await loadAuth();
 
