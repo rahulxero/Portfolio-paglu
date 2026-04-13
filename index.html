@@ -2013,11 +2013,21 @@ async function loadSupabase(){
     const url  = window.__SUPA_URL__;
     const key  = window.__SUPA_KEY__;
     if (!url || !key) { supabase = null; resolve(); return; }
-    if(window.supabase){ supabase=window.supabase.createClient(url, key); resolve(); return; }
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    s.onload=()=>{ supabase=window.supabase.createClient(url, key); resolve(); };
-    s.onerror=()=>{ supabase=null; resolve(); };
+    if(window.supabase){ 
+      supabase = window.supabase.createClient(url, key, {
+        auth: { persistSession: true, storageKey: 'portfolio_auth', storage: window.localStorage }
+      }); 
+      resolve(); return; 
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    s.onload = () => { 
+      supabase = window.supabase.createClient(url, key, {
+        auth: { persistSession: true, storageKey: 'portfolio_auth', storage: window.localStorage }
+      }); 
+      resolve(); 
+    };
+    s.onerror = () => { supabase = null; resolve(); };
     document.head.appendChild(s);
   });
 }
@@ -2397,7 +2407,7 @@ function requireLogin(cb) {
 async function loadAuth() {
   await loadSupabase();
   if (!supabase) {
-    // No Supabase — check for existing local session
+    // No Supabase — check for legacy local session
     try {
       const raw = localStorage.getItem('nestegg_auth_v1');
       if (raw) {
@@ -2407,18 +2417,43 @@ async function loadAuth() {
         updateUserUI();
       }
     } catch(e) {}
-    return;
+    return false;
   }
-  // Check for existing Supabase session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
+
+  // Supabase loaded — check for persisted session
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (session && !error) {
     supaToken = session.access_token;
-    currentUser = { id: session.user.id, email: session.user.email, name: session.user.user_metadata?.name || session.user.email.split('@')[0] };
+    currentUser = { 
+      id: session.user.id, 
+      email: session.user.email, 
+      name: session.user.user_metadata?.name || session.user.email.split('@')[0] 
+    };
     document.getElementById('login-mo').classList.remove('open');
     updateUserUI();
-    return true; // has session
+    return true; // has valid session
   }
-  return false; // needs login
+
+  // No session found — listen for auth state changes (handles email confirmation redirect)
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      supaToken = session.access_token;
+      currentUser = { 
+        id: session.user.id, 
+        email: session.user.email, 
+        name: session.user.user_metadata?.name || session.user.email.split('@')[0] 
+      };
+      document.getElementById('login-mo').classList.remove('open');
+      updateUserUI();
+      await loadCloudPortfolio();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null; supaToken = null;
+      updateUserUI();
+      document.getElementById('login-mo').classList.add('open');
+    }
+  });
+
+  return false; // no session, needs login
 }
 
 // ══════════════════════════════════════════════════════════
