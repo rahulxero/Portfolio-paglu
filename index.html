@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portfolio Tracker</title>
+  <!-- Preload Supabase so it's ready before user clicks Sign In -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -2010,19 +2012,21 @@ async function loadSupabase(){
     }
   } catch(e) {}
 
-  // Fetch fresh config from server (updates cache)
+  // Fetch fresh config from server with 5s timeout
   try {
-    const cfgRes = await fetch('/api/config');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const cfgRes = await fetch('/api/config', { signal: ctrl.signal });
+    clearTimeout(t);
     if (cfgRes.ok) {
       const cfg = await cfgRes.json();
       if (cfg.supabaseUrl && cfg.supabaseKey) {
         window.__SUPA_URL__ = cfg.supabaseUrl;
         window.__SUPA_KEY__ = cfg.supabaseKey;
-        // Cache for next page load
         localStorage.setItem('supa_cfg', JSON.stringify({ url: cfg.supabaseUrl, key: cfg.supabaseKey }));
       }
     }
-  } catch(e) {}
+  } catch(e) { console.warn('Config fetch:', e.message); }
 
   return new Promise((resolve) => {
     const url = window.__SUPA_URL__;
@@ -2030,23 +2034,32 @@ async function loadSupabase(){
     if (!url || !key) { supabase = null; resolve(); return; }
 
     const initClient = () => {
-      supabase = window.supabase.createClient(url, key, {
-        auth: {
-          persistSession: true,
-          storageKey: 'portfolio_auth',
-          storage: window.localStorage,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        }
-      });
+      try {
+        supabase = window.supabase.createClient(url, key, {
+          auth: {
+            persistSession: true,
+            storageKey: 'portfolio_auth',
+            storage: window.localStorage,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          }
+        });
+      } catch(e) { console.error('Supabase init failed:', e); supabase = null; }
       resolve();
     };
 
     if (window.supabase) { initClient(); return; }
+
+    // Hard timeout — if CDN takes > 8s, give up and proceed without Supabase
+    const cdnTimeout = setTimeout(() => {
+      console.warn('Supabase CDN timeout — proceeding without cloud sync');
+      supabase = null; resolve();
+    }, 8000);
+
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    s.onload = initClient;
-    s.onerror = () => { supabase = null; resolve(); };
+    s.onload = () => { clearTimeout(cdnTimeout); initClient(); };
+    s.onerror = () => { clearTimeout(cdnTimeout); console.error('Supabase CDN failed'); supabase = null; resolve(); };
     document.head.appendChild(s);
   });
 }
