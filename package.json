@@ -1,7 +1,11 @@
 {
   "name": "portfolio-tracker",
   "version": "1.0.0",
+  "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

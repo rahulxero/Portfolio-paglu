@@ -3,8 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="supa-url" content="__SUPA_URL__">
-  <meta name="supa-key" content="__SUPA_KEY__">
   <title>Portfolio Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1973,22 +1971,33 @@ function doAddBank(){
 // ══════════════════════════════════════════════════════════
 //  SUPABASE AUTH + CLOUD SYNC
 // ══════════════════════════════════════════════════════════
-const SUPA_URL  = window.__SUPA_URL__  || '';
-const SUPA_KEY  = window.__SUPA_KEY__  || '';
 let supabase    = null;
 let currentUser = null;
 let supaToken   = null;
 let pendingAction = null;
 let authMode = 'signin'; // 'signin' | 'signup'
 
-// Load Supabase JS from CDN
-function loadSupabase(){
+// Load Supabase JS from CDN and fetch config from /api/config
+async function loadSupabase(){
+  try {
+    // Fetch public config from server (keeps keys out of static HTML)
+    const cfgRes = await fetch('/api/config');
+    if (cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      if (cfg.supabaseUrl) window.__SUPA_URL__ = cfg.supabaseUrl;
+      if (cfg.supabaseKey) window.__SUPA_KEY__ = cfg.supabaseKey;
+    }
+  } catch(e) { /* config fetch failed — will use localStorage fallback */ }
+
   return new Promise((resolve) => {
-    if(window.supabase){ supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY); resolve(); return; }
+    const url  = window.__SUPA_URL__;
+    const key  = window.__SUPA_KEY__;
+    if (!url || !key) { supabase = null; resolve(); return; }
+    if(window.supabase){ supabase=window.supabase.createClient(url, key); resolve(); return; }
     const s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    s.onload=()=>{ supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY); resolve(); };
-    s.onerror=()=>{ supabase=null; resolve(); }; // fall through to localStorage mode
+    s.onload=()=>{ supabase=window.supabase.createClient(url, key); resolve(); };
+    s.onerror=()=>{ supabase=null; resolve(); };
     document.head.appendChild(s);
   });
 }
@@ -2659,14 +2668,6 @@ function showOnboardingTip(){
   document.getElementById('currency-sel').value = activeCurrency;
   refreshTicker();
   setInterval(refreshTicker, 90000);
-
-  // Inject Supabase credentials if set via Vercel env vars
-  // (set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel)
-  // They get baked in via the meta tags below, read by window.__SUPA_*
-  const metaUrl = document.querySelector('meta[name="supa-url"]')?.content;
-  const metaKey = document.querySelector('meta[name="supa-key"]')?.content;
-  if(metaUrl && metaUrl !== '__SUPA_URL__') { window.__SUPA_URL__ = metaUrl; }
-  if(metaKey && metaKey !== '__SUPA_KEY__') { window.__SUPA_KEY__ = metaKey; }
 
   const hasSession = await loadAuth();
 
