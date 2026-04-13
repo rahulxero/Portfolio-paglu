@@ -2076,8 +2076,9 @@ async function doLogin(){
   btn.innerHTML = '<span class="spin-sm"></span> …';
 
   if (!supabase) {
-    // Supabase not configured — fall back to localStorage mode
+    // Supabase not configured — localStorage-only mode
     currentUser = { id: 'local', email, name: email.split('@')[0] };
+    try { localStorage.setItem('portfolio_local_session', JSON.stringify(currentUser)); } catch(e) {}
     afterLogin(false);
     btn.disabled = false; btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
     return;
@@ -2407,7 +2408,11 @@ function doLogout() {
   if(supabase) supabase.auth.signOut();
   currentUser = null; supaToken = null;
   D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
-  try { localStorage.removeItem('nestegg_d5'); localStorage.removeItem(CACHE_KEY); } catch(e) {}
+  try {
+    localStorage.removeItem('nestegg_d5');
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem('portfolio_local_session');
+  } catch(e) {}
   updateUserUI();
   renderHoldings(); updateSummary(); buildPie(); buildPerf();
   document.getElementById('login-mo').classList.add('open');
@@ -2423,8 +2428,8 @@ function requireLogin(cb) {
 
 async function loadAuth() {
   // IMMEDIATELY hide login modal if we have any saved session — prevents flash
-  // Supabase saves session to localStorage under 'portfolio_auth'
   try {
+    // Check Supabase session
     const raw = localStorage.getItem('portfolio_auth');
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -2432,7 +2437,6 @@ async function loadAuth() {
       if (sess?.user && sess?.access_token) {
         const notExpired = !sess.expires_at || (sess.expires_at * 1000 > Date.now() - 60000);
         if (notExpired) {
-          // Hide modal immediately — don't wait for Supabase to load
           document.getElementById('login-mo').classList.remove('open');
           currentUser = {
             id: sess.user.id,
@@ -2443,12 +2447,36 @@ async function loadAuth() {
         }
       }
     }
+    // Check local-only session (no Supabase)
+    if (!currentUser) {
+      const localRaw = localStorage.getItem('portfolio_local_session');
+      if (localRaw) {
+        const localUser = JSON.parse(localRaw);
+        if (localUser?.id) {
+          document.getElementById('login-mo').classList.remove('open');
+          currentUser = localUser;
+          updateUserUI();
+        }
+      }
+    }
   } catch(e) {}
 
   await loadSupabase();
 
   if (!supabase) {
-    // No Supabase — use legacy local session
+    // Supabase not configured — use localStorage-only mode
+    // Check for existing local session first
+    try {
+      const raw = localStorage.getItem('portfolio_local_session');
+      if (raw) {
+        const stored = JSON.parse(raw);
+        currentUser = stored;
+        document.getElementById('login-mo').classList.remove('open');
+        updateUserUI();
+        return false;
+      }
+    } catch(e) {}
+    // Also check legacy PIN auth
     try {
       const raw = localStorage.getItem('nestegg_auth_v1');
       if (raw) {
