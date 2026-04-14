@@ -985,29 +985,25 @@ let D={
 };
 
 // ── Load portfolio structure ──────────────────────────────
-// Use nestegg_d6 — bumped from d4 to drop old demo data
+// nestegg_d6 — migrates from d5 and clears bad avgCost values
 (function loadPortfolio(){
   try{
     const raw=localStorage.getItem('nestegg_d6');
-    if(raw){
-      D=JSON.parse(raw);
-      if(!D.others) D.others=[];
-      return;
-    }
-    const old=localStorage.getItem('nestegg_d4');
+    if(raw){ D=JSON.parse(raw); if(!D.others) D.others=[]; return; }
+
+    // Migrate from d5 — zero out all avgCost since they were entered as totals (wrong)
+    const old=localStorage.getItem('nestegg_d5');
     if(old){
       const o=JSON.parse(old);
-      const demoWallets=new Set(['0x742d35cc6634c0532925a3b844bc454e4438f44e']);
-      const demoBTC=new Set(['bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh']);
-      const demoIds=new Set([1,10,30,31,32,40,41,50,51,52]);
-      D.wallets=(o.wallets||[]).filter(w=>!demoWallets.has(w.address?.toLowerCase())&&!demoIds.has(w.id));
-      D.btc=(o.btc||[]).filter(a=>!demoBTC.has(a.address)&&!demoIds.has(a.id));
-      D.indian=(o.indian||[]).filter(a=>!demoIds.has(a.id));
-      D.intl=(o.intl||[]).filter(a=>!demoIds.has(a.id));
-      D.mf=(o.mf||[]).filter(a=>!demoIds.has(a.id));
-      D.banks=o.banks||[];
+      D.wallets=o.wallets||[];
+      D.btc=o.btc||[];
       D.others=o.others||[];
+      D.banks=o.banks||[];
+      D.indian=(o.indian||[]).map(a=>({...a,avgCost:0}));
+      D.intl=(o.intl||[]).map(a=>({...a,avgCost:0}));
+      D.mf=(o.mf||[]).map(a=>({...a,navBought:0}));
       localStorage.setItem('nestegg_d6',JSON.stringify(D));
+      return;
     }
   }catch(e){}
 })();
@@ -2481,16 +2477,13 @@ async function loadCloudPortfolio() {
       document.getElementById('currency-sel').value = data.currency;
     }
 
-    // Fix bad avgCost/navBought immediately (may have been saved incorrectly before)
-    (D.indian||[]).forEach(a => {
-      if (a.avgCost > 100000) a.avgCost = 0;
-    });
-    (D.intl||[]).forEach(a => {
-      if (a.avgCost > 50000) a.avgCost = 0;
-    });
-    (D.mf||[]).forEach(a => {
-      if (a.navBought > 10000) a.navBought = 0;
-    });
+    // Clear bad avgCost — if not yet migrated to d6 clean slate
+    if (!localStorage.getItem('cloud_avgcost_fixed_v6')) {
+      (D.indian||[]).forEach(a => { a.avgCost = 0; });
+      (D.intl||[]).forEach(a => { a.avgCost = 0; });
+      (D.mf||[]).forEach(a => { a.navBought = 0; });
+      localStorage.setItem('cloud_avgcost_fixed_v6', '1');
+    }
 
     // Save to localStorage so it's available offline
     try { localStorage.setItem('nestegg_d6', JSON.stringify(D)); } catch(e) {}
