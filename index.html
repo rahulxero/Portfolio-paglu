@@ -985,36 +985,15 @@ let D={
 };
 
 // ── Load portfolio structure ──────────────────────────────
-// Use nestegg_d5 — bumped from d4 to drop old demo data
+// Use nestegg_d6 — bumped from d4 to drop old demo data
 (function loadPortfolio(){
   try{
-    const raw=localStorage.getItem('nestegg_d5');
+    const raw=localStorage.getItem('nestegg_d6');
     if(raw){
       D=JSON.parse(raw);
-      // Ensure others array exists (for older saved data)
       if(!D.others) D.others=[];
-      // Auto-fix bad avgCost: if avgCost > price*10 it was entered as total not per-share
-      // We can't fix it automatically without price data, so just zero it out
-      // It will show "—" instead of absurd P&L, user can fix via "Fix cost" link
-      D.indian.forEach(a=>{
-        if(a.avgCost>0 && a.price>0 && a.avgCost>a.price*50){
-          // avgCost is clearly total invested — convert to per-share
-          a.avgCost=a.avgCost/a.qty;
-        }
-      });
-      D.intl.forEach(a=>{
-        if(a.avgCost>0 && a.price>0 && a.avgCost>a.price*50){
-          a.avgCost=a.avgCost/a.qty;
-        }
-      });
-      D.mf.forEach(a=>{
-        if(a.navBought>0 && a.nav>0 && a.navBought>a.nav*50){
-          a.navBought=a.navBought/a.units;
-        }
-      });
       return;
     }
-    // First run on d5 — try migrating from d4 but strip known demo data
     const old=localStorage.getItem('nestegg_d4');
     if(old){
       const o=JSON.parse(old);
@@ -1028,9 +1007,45 @@ let D={
       D.mf=(o.mf||[]).filter(a=>!demoIds.has(a.id));
       D.banks=o.banks||[];
       D.others=o.others||[];
-      localStorage.setItem('nestegg_d5',JSON.stringify(D));
+      localStorage.setItem('nestegg_d6',JSON.stringify(D));
     }
   }catch(e){}
+})();
+
+// ── Immediate avgCost sanity fix ──────────────────────────
+// Clear all avgCost/navBought — the new "Total Invested" form
+// stores correct per-share values going forward.
+// This one-time migration zeroes out old bad values.
+(function fixBadAvgCost(){
+  if(localStorage.getItem('avgcost_migrated_v2')) return; // already done
+  let fixed = false;
+  D.indian.forEach(a => {
+    // Indian stock prices are ₹10–₹50,000. If avgCost > 50x current price
+    // or > ₹1,00,000, it was total invested. Reset to 0.
+    if (a.avgCost > 100000 || (a.price > 0 && a.avgCost > a.price * 30)) {
+      a.avgCost = 0; fixed = true;
+    }
+  });
+  D.intl.forEach(a => {
+    // Intl stocks: if avgCost > $50,000 or > 30x price, it was total
+    if (a.avgCost > 50000 || (a.price > 0 && a.avgCost > a.price * 30)) {
+      a.avgCost = 0; fixed = true;
+    }
+  });
+  D.mf.forEach(a => {
+    // MF NAVs are ₹10–₹5,000. If navBought > 10,000 it was total
+    if (a.navBought > 10000 || (a.nav > 0 && a.navBought > a.nav * 30)) {
+      a.navBought = 0; fixed = true;
+    }
+  });
+  if (fixed) {
+    try {
+      localStorage.setItem('nestegg_d6', JSON.stringify(D));
+      localStorage.setItem('avgcost_migrated_v2', '1');
+    } catch(e) {}
+  } else {
+    localStorage.setItem('avgcost_migrated_v2', '1');
+  }
 })();
 
 // Restore cached prices into D on load
@@ -1086,7 +1101,7 @@ function showCacheBar(stale, label){
 function hideCacheBar(){
   document.getElementById('cache-bar').className = 'cache-bar';
 }
-function save(){try{localStorage.setItem('nestegg_d5',JSON.stringify(D));}catch(e){}}
+function save(){try{localStorage.setItem('nestegg_d6',JSON.stringify(D));}catch(e){}}
 
 function cacheAge(){
   if(!lastFetchedAt) return Infinity;
@@ -1377,7 +1392,7 @@ async function refreshAll(){
   setStatus('loading','Enriching prices from CoinGecko…');
   try{await enrichCoinGecko(); const t=document.getElementById('src-tag');t.textContent='live';t.classList.add('live');}
   catch(e){errs.push('CoinGecko: '+e.message);}
-  renderHoldings(); updateSummary();
+  renderHoldings(); updateSummary(); buildPie(); // rebuild pie — liveRates.inr now populated
 
   setStatus('loading','Fetching MF NAVs from MFApi.in…');
   try{await fetchMF();}catch(e){errs.push('MF: '+e.message);}
@@ -2433,7 +2448,7 @@ async function afterLogin(cloudSync) {
 async function loadCloudPortfolio() {
   // Always load from localStorage first for instant render
   try {
-    const raw = localStorage.getItem('nestegg_d5');
+    const raw = localStorage.getItem('nestegg_d6');
     if (raw) {
       const parsed = JSON.parse(raw);
       D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], ...parsed };
@@ -2465,8 +2480,20 @@ async function loadCloudPortfolio() {
       activeCurrency = data.currency;
       document.getElementById('currency-sel').value = data.currency;
     }
+
+    // Fix bad avgCost/navBought immediately (may have been saved incorrectly before)
+    (D.indian||[]).forEach(a => {
+      if (a.avgCost > 100000) a.avgCost = 0;
+    });
+    (D.intl||[]).forEach(a => {
+      if (a.avgCost > 50000) a.avgCost = 0;
+    });
+    (D.mf||[]).forEach(a => {
+      if (a.navBought > 10000) a.navBought = 0;
+    });
+
     // Save to localStorage so it's available offline
-    try { localStorage.setItem('nestegg_d5', JSON.stringify(D)); } catch(e) {}
+    try { localStorage.setItem('nestegg_d6', JSON.stringify(D)); } catch(e) {}
 
   } catch(e) {
     console.warn('Cloud load failed, using localStorage:', e.message);
@@ -2503,12 +2530,12 @@ async function saveCloudPortfolio() {
 }
 
 // ── PER-USER STORAGE KEY ─────────────────────────────────
-// Always use nestegg_d5 for local — simple and consistent
-function userStorageKey() { return 'nestegg_d5'; }
+// Always use nestegg_d6 for local — simple and consistent
+function userStorageKey() { return 'nestegg_d6'; }
 
 // save() — writes to localStorage AND cloud (if Supabase configured)
 function save() {
-  try { localStorage.setItem('nestegg_d5', JSON.stringify(D)); } catch(e) {}
+  try { localStorage.setItem('nestegg_d6', JSON.stringify(D)); } catch(e) {}
   saveCloudPortfolio(); // async fire-and-forget
 }
 
@@ -2711,7 +2738,7 @@ function doLogout() {
   currentUser = null; supaToken = null;
   D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
   try {
-    localStorage.removeItem('nestegg_d5');
+    localStorage.removeItem('nestegg_d6');
     localStorage.removeItem(CACHE_KEY);
     localStorage.removeItem('portfolio_local_session');
   } catch(e) {}
