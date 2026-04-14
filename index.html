@@ -1456,7 +1456,7 @@ function updateSummary(){
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#888888','#444444','#222222','#555555'];
+const PIE_COLORS=['#ffffff','#00e676','#7c4dff','#ff9800','#2196f3'];
 const PIE_LABELS=['Crypto','Indian Equity','International','Mutual Funds','Bank & Cash'];
 
 function buildPie(){
@@ -1464,19 +1464,51 @@ function buildPie(){
   const ctx=document.getElementById('pieC').getContext('2d');
   const raw=[v.c,v.i,v.x,v.m,v.b];
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0);
+
+  // Legend with value and %
   document.getElementById('pie-leg').innerHTML=slices.map(s=>`
-    <span style="display:flex;align-items:center;justify-content:space-between;">
+    <span style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
       <span style="display:flex;align-items:center;gap:8px;">
-        <span style="width:8px;height:8px;background:${s.color};flex-shrink:0;display:inline-block;"></span>
-        <span style="color:#666;font-size:11px;">${s.label}</span>
+        <span style="width:8px;height:8px;background:${s.color};border-radius:2px;flex-shrink:0;display:inline-block;"></span>
+        <span style="color:#aaa;font-size:11px;">${s.label}</span>
       </span>
-      <span style="color:#888;font-size:11px;">${(s.val/v.tot*100).toFixed(1)}%</span>
+      <span style="color:#fff;font-size:11px;font-weight:500;">${(s.val/v.tot*100).toFixed(1)}%</span>
     </span>`).join('');
-  if(pieInst)pieInst.destroy();
+
+  if(pieInst) pieInst.destroy();
   pieInst=new Chart(ctx,{
     type:'doughnut',
-    data:{labels:slices.map(s=>s.label),datasets:[{data:slices.map(s=>Math.round(s.val)),backgroundColor:slices.map(s=>s.color),borderColor:'#000',borderWidth:3,hoverOffset:6}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#111',borderColor:'#333',borderWidth:1,titleColor:'#fff',bodyColor:'#999',callbacks:{label:c=>`${c.label}: ${fI(c.raw)} (${(c.raw/v.tot*100).toFixed(1)}%)`}}}}
+    data:{
+      labels:slices.map(s=>s.label),
+      datasets:[{
+        data:slices.map(s=>Math.round(s.val)),
+        backgroundColor:slices.map(s=>s.color),
+        borderColor:'#000',
+        borderWidth:3,
+        hoverOffset:8,
+        hoverBorderColor:'#000',
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      cutout:'72%',
+      animation:{ animateRotate:true, duration:600 },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#111',
+          borderColor:'#333',
+          borderWidth:1,
+          titleColor:'#fff',
+          bodyColor:'#999',
+          padding:10,
+          callbacks:{
+            label:c=>`  ${c.label}: ${fI(c.raw)} (${(c.raw/v.tot*100).toFixed(1)}%)`
+          }
+        }
+      }
+    }
   });
 }
 
@@ -1888,9 +1920,10 @@ function renderAddForm(){
         </div>
       </div>
       <div><label>Exchange</label><select id="f-ex"><option>NSE</option><option>BSE</option></select></div>
-      <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div>
-      <div><label>Avg Cost (₹)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div>
+      <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1" oninput="calcAvgCost('indian')"></div>
+      <div><label>Total Invested (₹) <span style="color:#555;font-size:9px;font-weight:400">total amount paid</span></label><input type="number" id="f-invested" placeholder="e.g. 48000" step="any" oninput="calcAvgCost('indian')"></div>
     </div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;margin-bottom:12px" id="avg-cost-display"></div>
     <div class="info-box" style="font-size:11px;color:#888;margin-bottom:12px;">Use exact NSE ticker. Examples: <strong style="color:#fff">RELIANCE</strong>, <strong style="color:#fff">SBIN</strong> (SBI), <strong style="color:#fff">HDFCBANK</strong>, <strong style="color:#fff">INFY</strong>, <strong style="color:#fff">WAAREEENER</strong></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddStock()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
     setTimeout(()=>setupAutocomplete('f-sym','ac-indian','indian'),50);
@@ -1904,9 +1937,10 @@ function renderAddForm(){
         </div>
       </div>
       <div><label>Exchange</label><select id="f-ex"><option>NASDAQ</option><option>NYSE</option><option>LSE</option><option>TSE</option><option>SGX</option></select></div>
-      <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="1"></div>
-      <div><label>Avg Cost (USD)</label><input type="number" id="f-cst" placeholder="0.00" step="any"></div>
+      <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="any" oninput="calcAvgCost('intl')"></div>
+      <div><label>Total Invested ($) <span style="color:#555;font-size:9px;font-weight:400">total amount paid</span></label><input type="number" id="f-invested" placeholder="e.g. 1500" step="any" oninput="calcAvgCost('intl')"></div>
     </div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;margin-bottom:12px" id="avg-cost-display"></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddIntl()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
     setTimeout(()=>setupAutocomplete('f-sym','ac-intl','intl'),50);
   }else if(activeTab==='mf'){
@@ -1919,9 +1953,9 @@ function renderAddForm(){
         </div>
       </div>
       <div><label>AMFI Code <span style="color:#555;font-size:9px;text-transform:none">(auto-filled on search)</span></label><input type="text" id="f-code" placeholder="e.g. 120716"></div>
-      <div><label>Units Held</label><input type="number" id="f-units" placeholder="0.000" step="any"></div>
+      <div><label>Units Held</label><input type="number" id="f-units" placeholder="0.000" step="any" oninput="calcMFAvg()"></div>
     </div>
-    <div class="fg" style="grid-template-columns:220px"><div><label>Purchase NAV (₹)</label><input type="number" id="f-pnav" placeholder="0.00" step="any"></div></div>
+    <div class="fg" style="grid-template-columns:1fr 1fr"><div><label>Total Invested (₹) <span style="color:#555;font-size:9px;font-weight:400">total amount paid</span></label><input type="number" id="f-pnav" placeholder="e.g. 50000" step="any" oninput="calcMFAvg()"></div><div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;display:flex;align-items:flex-end;padding-bottom:4px" id="mf-avg-display"></div></div>
     <div class="info-box" style="font-size:11px;color:#888;margin-bottom:10px">Type fund name above → select from suggestions → AMFI code fills automatically. Or enter code manually: UTI Nifty 50 = <strong style="color:#fff">120716</strong></div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddMF()">Add Fund</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
@@ -2007,17 +2041,65 @@ async function doAddWallet(){
   setTimeout(()=>toggleAdd(), 900);
 }
 
-function doAddStock(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.indian.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
-function doAddIntl(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.intl.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
+// Show per-share avg cost preview as user types
+function calcAvgCost(type){
+  const qty = parseFloat(document.getElementById('f-qty')?.value||0);
+  const invested = parseFloat(document.getElementById('f-invested')?.value||0);
+  const el = document.getElementById('avg-cost-display');
+  if(!el) return;
+  if(qty>0 && invested>0){
+    const avg = invested/qty;
+    const sym = type==='intl'?'$':'₹';
+    el.textContent = `Avg cost per share: ${sym}${avg.toFixed(2)}`;
+    el.style.color = '#00e676';
+  } else {
+    el.textContent = '';
+  }
+}
+
+function doAddStock(){
+  const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();
+  const ex=document.getElementById('f-ex').value;
+  const qty=+document.getElementById('f-qty').value;
+  const invested=+document.getElementById('f-invested').value;
+  if(!sym||!qty||!invested){alert('Fill all fields — Symbol, Quantity and Total Invested are required.');return;}
+  const avgCost = invested/qty; // derive per-share avg cost from total
+  D.indian.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost,price:null,ch24:null});
+  toggleAdd();save();renderHoldings();
+  fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);
+}
+
+function doAddIntl(){
+  const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();
+  const ex=document.getElementById('f-ex').value;
+  const qty=+document.getElementById('f-qty').value;
+  const invested=+document.getElementById('f-invested').value;
+  if(!sym||!qty||!invested){alert('Fill all fields — Ticker, Quantity and Total Invested are required.');return;}
+  const avgCost = invested/qty;
+  D.intl.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost,price:null,ch24:null});
+  toggleAdd();save();renderHoldings();
+  fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);
+}
+function calcMFAvg(){
+  const units=parseFloat(document.getElementById('f-units')?.value||0);
+  const invested=parseFloat(document.getElementById('f-pnav')?.value||0);
+  const el=document.getElementById('mf-avg-display');
+  if(!el) return;
+  if(units>0&&invested>0){ el.textContent=`Avg NAV: ₹${(invested/units).toFixed(2)}`; el.style.color='#00e676'; }
+  else{ el.textContent=''; }
+}
+
 async function doAddMF(){
   const name=(document.getElementById('f-fn').value||'').trim();
   const code=(document.getElementById('f-code').value||'').trim();
   const units=+document.getElementById('f-units').value;
-  const navB=+document.getElementById('f-pnav').value;
-  if(!name||!units||!navB){alert('Fill all fields — Fund Name, Units Held and Purchase NAV are required.');return;}
-  if(!code){alert('Enter the AMFI code. Use the search box above to find it — the code appears after you select a fund.');return;}
+  const totalInvested=+document.getElementById('f-pnav').value; // now total invested
+  if(!name||!units||!totalInvested){alert('Fill all fields — Fund Name, Units Held and Total Invested are required.');return;}
+  if(!code){alert('Enter the AMFI code. Use the search box above to find it.');return;}
+  if(units<=0){alert('Units must be greater than 0.');return;}
 
-  // Validate code against MFApi before adding
+  const navBought = totalInvested / units; // derive avg NAV from total invested
+
   setFetchSt('loading','Verifying AMFI code…');
   try{
     const r=await fetch(`https://api.mfapi.in/mf/${code}`,{signal:makeSig(8000)});
@@ -2027,8 +2109,8 @@ async function doAddMF(){
     const fundName=d.meta?.scheme_name||name;
     const nav=parseFloat(d.data[0].nav);
     const ch24=d.data.length>1?((nav-parseFloat(d.data[1].nav))/parseFloat(d.data[1].nav))*100:null;
-    D.mf.push({id:Date.now(),name:fundName,code,units,navBought:navB,nav,ch24,_err:null});
-    setFetchSt('ok',`Added: ${fundName} · NAV ₹${nav.toFixed(2)}`);
+    D.mf.push({id:Date.now(),name:fundName,code,units,navBought,nav,ch24,_err:null});
+    setFetchSt('ok',`Added: ${fundName} · Avg NAV ₹${navBought.toFixed(2)} · Current ₹${nav.toFixed(2)}`);
     setTimeout(()=>toggleAdd(),900);
     save(); renderHoldings(); updateSummary(); buildPie();
   }catch(e){
