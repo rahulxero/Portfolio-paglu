@@ -1026,7 +1026,7 @@ function loadPriceCache(){
       });
     }
     if(cache.btc) D.btc.forEach(a=>{const c=cache.btc.find(x=>x.id===a.id);if(c){a.balance=c.balance;a.priceINR=c.priceINR;a.priceUSD=c.priceUSD;a.ch24=c.ch24;}});
-    if(cache.others) D.others.forEach(a=>{const c=cache.others.find(x=>x.id===a.id);if(c){a.balance=c.balance;a.priceUSD=c.priceUSD;a.ch24=c.ch24;}});
+    if(cache.others) D.others.forEach(a=>{const c=cache.others.find(x=>x.id===a.id);if(c){a.balance=c.balance;a.priceUSD=c.priceUSD;a.ch24=c.ch24;a.positions=c.positions||[];a.totalUSD=c.totalUSD||0;}});
     if(cache.indian) D.indian.forEach(a=>{const c=cache.indian.find(x=>x.id===a.id);if(c){a.price=c.price;a.ch24=c.ch24;}});
     if(cache.intl) D.intl.forEach(a=>{const c=cache.intl.find(x=>x.id===a.id);if(c){a.price=c.price;a.ch24=c.ch24;}});
     if(cache.mf) D.mf.forEach(a=>{const c=cache.mf.find(x=>x.id===a.id);if(c){a.nav=c.nav;a.ch24=c.ch24;}});
@@ -1042,7 +1042,7 @@ function savePriceCache(){
       usdInr: USD_INR,
       wallets: D.wallets.map(w=>({id:w.id,positions:w.positions,totalUSD:w.totalUSD})),
       btc:    D.btc.map(a=>({id:a.id,balance:a.balance,priceINR:a.priceINR,priceUSD:a.priceUSD,ch24:a.ch24})),
-      others: D.others.map(a=>({id:a.id,balance:a.balance,priceUSD:a.priceUSD,ch24:a.ch24})),
+      others: D.others.map(a=>({id:a.id,balance:a.balance,priceUSD:a.priceUSD,ch24:a.ch24,positions:a.positions||[],totalUSD:a.totalUSD||0})),
       indian: D.indian.map(a=>({id:a.id,price:a.price,ch24:a.ch24})),
       intl:   D.intl.map(a=>({id:a.id,price:a.price,ch24:a.ch24})),
       mf:     D.mf.map(a=>({id:a.id,nav:a.nav,ch24:a.ch24})),
@@ -1160,13 +1160,13 @@ async function fetchBTC(address){
 }
 
 async function fetchSOL(address){
-  // Route through Vercel proxy to bypass CORS on public Solana RPCs
+  // Route through Vercel proxy — gets SOL + all SPL token positions
   try {
     const r = await fetch('/api/solana', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address }),
-      signal: makeSig(15000),
+      signal: makeSig(20000),
     });
     if (!r.ok) {
       const e = await r.json().catch(()=>({}));
@@ -1174,7 +1174,8 @@ async function fetchSOL(address){
     }
     const d = await r.json();
     if (d.error) throw new Error(d.error);
-    return d.balance ?? 0;
+    // Return positions array (same structure as EVM positions)
+    return d.positions || [];
   } catch(e) {
     throw new Error('Solana: ' + e.message);
   }
@@ -1188,7 +1189,12 @@ async function fetchTRX(address){
 }
 
 async function fetchOtherWallet(a){
-  if(a.type==='sol') a.balance=await fetchSOL(a.address);
+  if(a.type==='sol'){
+    const positions = await fetchSOL(a.address);
+    a.positions = positions;
+    a.balance = positions.find(p=>p.symbol==='SOL')?.balance || 0;
+    a.totalUSD = positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
+  }
   if(a.type==='trx') a.balance=await fetchTRX(a.address);
 }
 
@@ -1388,7 +1394,11 @@ function vals(){
   const inrToUSD = v => v / (liveRates.inr || USD_INR || 84);
   const c = D.wallets.reduce((s,w)=>s+walletUSD(w),0)
           + D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0)
-          + D.others.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0);
+          + D.others.reduce((s,a)=>{
+              if(a.type==='sol' && a.positions?.length)
+                return s+a.positions.reduce((ps,p)=>ps+(p.valueUSD||0),0);
+              return s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0);
+            },0);
   const i = inrToUSD(D.indian.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0));
   const x = D.intl.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0); // already USD
   const m = inrToUSD(D.mf.reduce((s,a)=>s+(a.nav&&a.units?a.units*a.nav:0),0));
@@ -1413,7 +1423,10 @@ function updateSummary(){
   const allCrypto=[
     ...D.wallets.flatMap(w=>w.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}))),
     ...D.btc.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24})),
-    ...D.others.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24})),
+    ...D.others.flatMap(a=>{
+      if(a.type==='sol'&&a.positions?.length) return a.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}));
+      return [{v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24}];
+    }),
   ].filter(x=>x.v>0);
   const cC=wAvg(allCrypto,x=>x.v,x=>x.ch);
   const iC=wAvg(D.indian,a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
@@ -1587,26 +1600,56 @@ function renderHoldings(){
   const COIN_CHAIN={sol:'solana',trx:'tron'};
   const COIN_SYM={sol:'SOL',trx:'TRX'};
   D.others.forEach(a=>{
-    const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
-    if(hideSmall && valUSD!=null && valUSD < 1) return; // hide small others
-    const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
     const sym=COIN_SYM[a.type]||a.type.toUpperCase();
-    rows+=`<div class="w-grp">
-      <span class="badge">${sym}</span>
-      <span>${addr}</span>
-      <span style="color:#555">${a.label||''}</span>
-      <span class="w-total">${valUSD?fI(valUSD):'—'}</span>
-      <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
-      <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px" title="Remove">✕</button>
-    </div>
-    <div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
-      <div class="tok-logo" style="font-size:10px;font-weight:700">${sym.slice(0,2)}</div>
-      <div><span class="an">${sym}</span>${chainPill(COIN_CHAIN[a.type]||a.type)}<div class="as">${a.label||a.address.slice(0,12)+'…'}</div></div>
-      <span class="mv">${a.balance!=null?a.balance.toLocaleString('en-US',{maximumFractionDigits:4}):lc()}</span>
-      <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
-      <span class="mv">${valUSD?fI(valUSD):lc()}</span>
-      <span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span>
-    </div>`;
+    const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
+
+    if(a.type==='sol' && a.positions?.length){
+      // SOL — show all token positions like an EVM wallet
+      const totUSD=a.positions.reduce((s,p)=>s+(p.valueUSD||0),0);
+      if(hideSmall && totUSD<1) return;
+      rows+=`<div class="w-grp">
+        <span class="badge">SOL</span><span>${addr}</span>
+        <span style="color:#888">${a.label||''}</span>
+        <span class="w-total">${totUSD>0?fI(totUSD):'—'}</span>
+        <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
+        <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px">✕</button>
+      </div>`;
+      const visPos=[...a.positions].sort((x,y)=>(y.valueUSD||0)-(x.valueUSD||0)).filter(p=>!hideSmall||(p.valueUSD||0)>=1);
+      visPos.forEach(p=>{
+        const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-US',{maximumFractionDigits:6});
+        rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
+          <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${p.symbol.slice(0,2)}`}</div>
+          <div><span class="an">${p.symbol}</span>${chainPill('solana')}<div class="as">${p.name}</div></div>
+          <span class="mv">${balFmt}</span>
+          <span class="mv">${p.priceUSD>0?fI(p.priceUSD):lc()}</span>
+          <span class="mv">${(p.valueUSD||0)>0.01?fI(p.valueUSD):lc()}</span>
+          <span class="mv sm ${pc(p.ch24)}">${fP(p.ch24)}</span>
+        </div>`;
+      });
+      if(hideSmall && a.positions.length>visPos.length){
+        const h=a.positions.length-visPos.length;
+        rows+=`<div class="trow" style="color:#555;font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px">${h} token${h>1?'s':''} under $1 hidden</div>`;
+      }
+    } else {
+      // TRX and other single-balance wallets
+      const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
+      if(hideSmall && valUSD!=null && valUSD<1) return;
+      rows+=`<div class="w-grp">
+        <span class="badge">${sym}</span><span>${addr}</span>
+        <span style="color:#888">${a.label||''}</span>
+        <span class="w-total">${valUSD?fI(valUSD):'—'}</span>
+        <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
+        <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px">✕</button>
+      </div>
+      <div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
+        <div class="tok-logo" style="font-size:10px;font-weight:700">${sym.slice(0,2)}</div>
+        <div><span class="an">${sym}</span>${chainPill(COIN_CHAIN[a.type]||a.type)}<div class="as">${a.label||addr}</div></div>
+        <span class="mv">${a.balance!=null?a.balance.toLocaleString('en-US',{maximumFractionDigits:4}):lc()}</span>
+        <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
+        <span class="mv">${valUSD?fI(valUSD):lc()}</span>
+        <span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span>
+      </div>`;
+    }
   });
 
   }else if(activeTab==='indian'){
@@ -1935,12 +1978,18 @@ async function doAddWallet(){
 
   }else if(COIN_FETCH[wt]){
     const coinName=COIN_LABELS[wt];
-    setFetchSt('loading',`Fetching ${coinName} balance…`);
+    setFetchSt('loading',`Fetching ${coinName} wallet…`);
     try{
-      const bal=await COIN_FETCH[wt](addr);
-      D.others.push({id:Date.now(),type:wt,address:addr,label:lbl,balance:bal,priceUSD:null,ch24:null});
+      const entry={id:Date.now(),type:wt,address:addr,label:lbl,positions:[],balance:0,totalUSD:0,priceUSD:null,ch24:null};
+      await fetchOtherWallet(entry);
       await enrichCoinGecko();
-      setFetchSt('ok',`${coinName} balance: ${bal.toFixed(4)} ${wt.toUpperCase()}`);
+      D.others.push(entry);
+      if(wt==='sol'){
+        const count = entry.positions.filter(p=>p.valueUSD>0.01).length;
+        setFetchSt('ok',`Found ${count} token${count!==1?'s':''} · SOL balance: ${entry.balance.toFixed(4)}`);
+      } else {
+        setFetchSt('ok',`${coinName} balance: ${entry.balance.toFixed(4)} ${wt.toUpperCase()}`);
+      }
     }catch(e){setFetchSt('err',e.message);btn.disabled=false;btn.textContent='Add Wallet';return;}
   }
 
