@@ -1285,12 +1285,14 @@ async function fetchMF(){
     if(!f.code||f.code==='CUSTOM') return;
     try{
       const r=await fetch(`https://api.mfapi.in/mf/${f.code}`,{signal:makeSig()});
-      if(!r.ok) return;
-      const d=await r.json(); if(!d.data?.length) return;
+      if(!r.ok){ f._err=`Invalid AMFI code ${f.code}`; return; }
+      const d=await r.json();
+      if(!d.data?.length){ f._err=`No NAV data for code ${f.code}`; return; }
+      f._err=null;
       f.nav=parseFloat(d.data[0].nav);
-      f.name=d.meta.scheme_name||f.name;
+      f.name=d.meta?.scheme_name||f.name;
       if(d.data.length>1) f.ch24=((f.nav-parseFloat(d.data[1].nav))/parseFloat(d.data[1].nav))*100;
-    }catch(e){console.warn('MF',f.code,e);}
+    }catch(e){ f._err=e.message; console.warn('MF',f.code,e); }
   }));
 }
 
@@ -1696,7 +1698,7 @@ function renderHoldings(){
       const plUSD = plINR != null ? plINR / (liveRates.inr || USD_INR) : null;
       const plPct = (hasNavBought && a.nav) ? ((a.nav - a.navBought) / a.navBought * 100) : null;
       const plDisp = plUSD != null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">AMFI ${a.code}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">₹${a.nav?a.nav.toFixed(2):'—'}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -1910,16 +1912,18 @@ function renderAddForm(){
   }else if(activeTab==='mf'){
     h=`<p class="add-panel-title">Add Mutual Fund <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· NAV from <a href="https://www.mfapi.in" target="_blank">MFApi.in</a></span></p>
     <div class="fg fg3">
-      <div><label>Fund Name / AMFI Code</label>
+      <div><label>Fund Name / Search</label>
         <div class="ac-wrap">
           <input type="text" id="f-fn" placeholder="Type fund name to search…" autocomplete="off">
           <div class="ac-drop" id="ac-mf"></div>
         </div>
       </div>
-      <div><label>AMFI Code</label><input type="text" id="f-code" placeholder="120503"></div>
+      <div><label>AMFI Code <span style="color:#555;font-size:9px;text-transform:none">(auto-filled on search)</span></label><input type="text" id="f-code" placeholder="e.g. 120716"></div>
       <div><label>Units Held</label><input type="number" id="f-units" placeholder="0.000" step="any"></div>
     </div>
     <div class="fg" style="grid-template-columns:220px"><div><label>Purchase NAV (₹)</label><input type="number" id="f-pnav" placeholder="0.00" step="any"></div></div>
+    <div class="info-box" style="font-size:11px;color:#888;margin-bottom:10px">Type fund name above → select from suggestions → AMFI code fills automatically. Or enter code manually: UTI Nifty 50 = <strong style="color:#fff">120716</strong></div>
+    <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddMF()">Add Fund</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
     setTimeout(()=>setupAutocomplete('f-fn','ac-mf','mf'),50);
   }else if(activeTab==='banks'){
@@ -2005,7 +2009,32 @@ async function doAddWallet(){
 
 function doAddStock(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.indian.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
 function doAddIntl(){const sym=(document.getElementById('f-sym').value||'').toUpperCase().trim();const ex=document.getElementById('f-ex').value,qty=+document.getElementById('f-qty').value,cost=+document.getElementById('f-cst').value;if(!sym||!qty||!cost){alert('Fill all fields');return;}D.intl.push({id:Date.now(),name:sym,symbol:sym,exchange:ex,qty,avgCost:cost,price:null,ch24:null});toggleAdd();save();renderHoldings();fetchStocks().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
-function doAddMF(){const name=(document.getElementById('f-fn').value||'').trim();const code=(document.getElementById('f-code').value||'').trim();const units=+document.getElementById('f-units').value,navB=+document.getElementById('f-pnav').value;if(!name||!units||!navB){alert('Fill all fields');return;}D.mf.push({id:Date.now(),name,code:code||'CUSTOM',units,navBought:navB,nav:null,ch24:null});toggleAdd();save();renderHoldings();if(code)fetchMF().then(()=>{renderHoldings();updateSummary();buildPie();save();}).catch(console.error);}
+async function doAddMF(){
+  const name=(document.getElementById('f-fn').value||'').trim();
+  const code=(document.getElementById('f-code').value||'').trim();
+  const units=+document.getElementById('f-units').value;
+  const navB=+document.getElementById('f-pnav').value;
+  if(!name||!units||!navB){alert('Fill all fields — Fund Name, Units Held and Purchase NAV are required.');return;}
+  if(!code){alert('Enter the AMFI code. Use the search box above to find it — the code appears after you select a fund.');return;}
+
+  // Validate code against MFApi before adding
+  setFetchSt('loading','Verifying AMFI code…');
+  try{
+    const r=await fetch(`https://api.mfapi.in/mf/${code}`,{signal:makeSig(8000)});
+    if(!r.ok) throw new Error(`AMFI code ${code} not found. Use the search box to find the correct code.`);
+    const d=await r.json();
+    if(!d.data?.length) throw new Error(`No NAV data for code ${code}.`);
+    const fundName=d.meta?.scheme_name||name;
+    const nav=parseFloat(d.data[0].nav);
+    const ch24=d.data.length>1?((nav-parseFloat(d.data[1].nav))/parseFloat(d.data[1].nav))*100:null;
+    D.mf.push({id:Date.now(),name:fundName,code,units,navBought:navB,nav,ch24,_err:null});
+    setFetchSt('ok',`Added: ${fundName} · NAV ₹${nav.toFixed(2)}`);
+    setTimeout(()=>toggleAdd(),900);
+    save(); renderHoldings(); updateSummary(); buildPie();
+  }catch(e){
+    setFetchSt('err',e.message);
+  }
+}
 
 function doAddBank(){
   const name=(document.getElementById('f-bname').value||'').trim();
