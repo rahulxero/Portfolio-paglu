@@ -788,7 +788,7 @@
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <label class="toggle-wrap" title="Hide positions under $1">
-          <input type="checkbox" id="hide-small" onchange="renderHoldings()">
+          <input type="checkbox" id="hide-small" onchange="localStorage.setItem('hide_small',this.checked?'1':'0');renderHoldings()">
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-lbl">Hide &lt;$1</span>
         </label>
@@ -1343,7 +1343,10 @@ async function refreshAll(){
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
   // Fetch SOL / XRP / ADA / TRX balances
-  await Promise.all(D.others.map(a=>fetchOtherWallet(a).catch(e=>errs.push(`${a.type.toUpperCase()}: ${e.message}`))));
+  // Fetch SOL / TRX balances
+  D.others.filter(a=>a.type==='sol').forEach(a=>{a.fetching=true;});
+  renderHoldings();
+  await Promise.all(D.others.map(a=>fetchOtherWallet(a).then(()=>{a.fetching=false;}).catch(e=>{a.fetching=false;errs.push(`${a.type.toUpperCase()}: ${e.message}`);})));
   renderHoldings();
 
   setStatus('loading','Enriching prices from CoinGecko…');
@@ -1603,23 +1606,26 @@ function renderHoldings(){
     const sym=COIN_SYM[a.type]||a.type.toUpperCase();
     const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
 
-    if(a.type==='sol' && a.positions?.length){
+    if(a.type==='sol' && (a.positions?.length || a.fetching)){
       // SOL — show all token positions like an EVM wallet
-      const totUSD=a.positions.reduce((s,p)=>s+(p.valueUSD||0),0);
-      if(hideSmall && totUSD<1) return;
+      const totUSD=a.positions?.reduce((s,p)=>s+(p.valueUSD||0),0)||0;
+      if(hideSmall && totUSD<1 && !a.fetching) return;
       rows+=`<div class="w-grp">
         <span class="badge">SOL</span><span>${addr}</span>
         <span style="color:#888">${a.label||''}</span>
+        ${a.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
         <span class="w-total">${totUSD>0?fI(totUSD):'—'}</span>
         <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
         <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px">✕</button>
       </div>`;
       const visPos=[...a.positions].sort((x,y)=>(y.valueUSD||0)-(x.valueUSD||0)).filter(p=>!hideSmall||(p.valueUSD||0)>=1);
-      visPos.forEach(p=>{
+      // If no positions pass the filter but we have a SOL balance, show at least SOL
+      const showPos = visPos.length ? visPos : (a.positions.length ? a.positions.slice(0,1) : []);
+      showPos.forEach(p=>{
         const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-US',{maximumFractionDigits:6});
         rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
-          <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${p.symbol.slice(0,2)}`}</div>
-          <div><span class="an">${p.symbol}</span>${chainPill('solana')}<div class="as">${p.name}</div></div>
+          <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${(p.symbol||'??').slice(0,2)}`}</div>
+          <div><span class="an">${p.symbol||'???'}</span>${chainPill('solana')}<div class="as">${p.name||'Solana Token'}</div></div>
           <span class="mv">${balFmt}</span>
           <span class="mv">${p.priceUSD>0?fI(p.priceUSD):lc()}</span>
           <span class="mv">${(p.valueUSD||0)>0.01?fI(p.valueUSD):lc()}</span>
@@ -2947,6 +2953,12 @@ function showOnboardingTip(){
 // ── INIT — async Supabase-aware startup ───────────────────
 (async function init(){
   document.getElementById('currency-sel').value = activeCurrency;
+  // Restore hide-small toggle state
+  const hideSmallSaved = localStorage.getItem('hide_small');
+  if (hideSmallSaved === '1') {
+    const cb = document.getElementById('hide-small');
+    if (cb) cb.checked = true;
+  }
   refreshTicker();
   setInterval(refreshTicker, 90000);
 
