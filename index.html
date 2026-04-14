@@ -1160,23 +1160,24 @@ async function fetchBTC(address){
 }
 
 async function fetchSOL(address){
-  const rpcs = [
-    'https://rpc.ankr.com/solana',
-    'https://api.mainnet-beta.solana.com',
-    'https://solana.public-rpc.com',
-    'https://mainnet.rpcpool.com',
-  ];
-  const body = JSON.stringify({jsonrpc:'2.0',id:1,method:'getBalance',params:[address]});
-  for(const rpc of rpcs){
-    try{
-      const r = await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body,signal:makeSig(8000)});
-      if(!r.ok) continue;
-      const d = await r.json();
-      if(d.error) continue;
-      if(d.result?.value != null) return d.result.value/1e9;
-    }catch(e){ continue; }
+  // Route through Vercel proxy to bypass CORS on public Solana RPCs
+  try {
+    const r = await fetch('/api/solana', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address }),
+      signal: makeSig(15000),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(()=>({}));
+      throw new Error(e.error || 'Solana proxy error ' + r.status);
+    }
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    return d.balance ?? 0;
+  } catch(e) {
+    throw new Error('Solana: ' + e.message);
   }
-  throw new Error('Solana balance unavailable — try again later');
 }
 
 async function fetchTRX(address){
