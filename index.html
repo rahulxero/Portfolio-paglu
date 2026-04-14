@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="2026-04-14-v3">
   <title>Portfolio Tracker</title>
   <!-- Preload Supabase so it's ready before user clicks Sign In -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1441,19 +1442,21 @@ function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed D
 // walletUSD — total USD value of a wallet's positions (Zerion gives USD natively)
 function walletUSD(w){return w.positions.reduce((s,p)=>s+(p.valueUSD||0),0);}
 function vals(){
-  const inrToUSD = v => v / (liveRates.inr || USD_INR || 84);
-  const c = D.wallets.reduce((s,w)=>s+walletUSD(w),0)
-          + D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0)
-          + D.others.reduce((s,a)=>{
+  const rate = liveRates.inr || USD_INR || 84;
+  const inrToUSD = v => (isFinite(v) && v > 0) ? v / rate : 0;
+  const safe = v => (isFinite(v) && !isNaN(v) && v > 0) ? v : 0;
+  const c = safe(D.wallets.reduce((s,w)=>s+walletUSD(w),0))
+          + safe(D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0))
+          + safe(D.others.reduce((s,a)=>{
               if(a.type==='sol' && a.positions?.length)
-                return s+a.positions.reduce((ps,p)=>ps+(p.valueUSD||0),0);
-              return s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0);
-            },0);
-  const i = inrToUSD(D.indian.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0));
-  const x = D.intl.reduce((s,a)=>s+(a.price&&a.qty?a.qty*a.price:0),0); // already USD
-  const m = inrToUSD(D.mf.reduce((s,a)=>s+(a.nav&&a.units?a.units*a.nav:0),0));
-  const b = inrToUSD(D.banks.reduce((s,a)=>s+(a.balance||0),0));
-  return{c,i,x,m,b,tot:c+i+x+m+b}; // all in USD
+                return s+a.positions.reduce((ps,p)=>ps+safe(p.valueUSD||0),0);
+              return s+safe(a.priceUSD&&a.balance?a.balance*a.priceUSD:0);
+            },0));
+  const i = safe(inrToUSD(D.indian.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0)));
+  const x = safe(D.intl.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0));
+  const m = safe(inrToUSD(D.mf.reduce((s,a)=>s+safe(a.nav&&a.units?a.units*a.nav:0),0)));
+  const b = safe(inrToUSD(D.banks.reduce((s,a)=>s+safe(a.balance||0),0)));
+  return{c,i,x,m,b,tot:c+i+x+m+b};
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
