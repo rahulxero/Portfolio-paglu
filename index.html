@@ -1460,14 +1460,22 @@ const PIE_COLORS=['#ffffff','#00e676','#7c4dff','#ff9800','#2196f3'];
 const PIE_LABELS=['Crypto','Indian Equity','International','Mutual Funds','Bank & Cash'];
 
 function buildPie(){
-  const v=vals(); if(!v.tot) return;
-  const ctx=document.getElementById('pieC').getContext('2d');
-  const raw=[v.c,v.i,v.x,v.m,v.b];
-  const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0);
+  const v=vals();
+  const leg=document.getElementById('pie-leg');
+  const ctx=document.getElementById('pieC')?.getContext('2d');
+  if(!ctx) return;
 
-  // Legend with value and %
-  document.getElementById('pie-leg').innerHTML=slices.map(s=>`
-    <span style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+  if(!v.tot){
+    if(leg) leg.innerHTML='<span style="color:#444;font-size:11px;font-family:\'JetBrains Mono\',monospace">Add holdings to see allocation</span>';
+    return;
+  }
+
+  const raw=[v.c,v.i,v.x,v.m,v.b];
+  const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0.001);
+  if(!slices.length) return;
+
+  if(leg) leg.innerHTML=slices.map(s=>`
+    <span style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
       <span style="display:flex;align-items:center;gap:8px;">
         <span style="width:8px;height:8px;background:${s.color};border-radius:2px;flex-shrink:0;display:inline-block;"></span>
         <span style="color:#aaa;font-size:11px;">${s.label}</span>
@@ -1481,12 +1489,11 @@ function buildPie(){
     data:{
       labels:slices.map(s=>s.label),
       datasets:[{
-        data:slices.map(s=>Math.round(s.val)),
+        data:slices.map(s=>parseFloat(s.val.toFixed(4))),
         backgroundColor:slices.map(s=>s.color),
         borderColor:'#000',
         borderWidth:3,
         hoverOffset:8,
-        hoverBorderColor:'#000',
       }]
     },
     options:{
@@ -1504,7 +1511,7 @@ function buildPie(){
           bodyColor:'#999',
           padding:10,
           callbacks:{
-            label:c=>`  ${c.label}: ${fI(c.raw)} (${(c.raw/v.tot*100).toFixed(1)}%)`
+            label:c=>`  ${c.label}: ${fI(parseFloat(c.raw))} (${(parseFloat(c.raw)/v.tot*100).toFixed(1)}%)`
           }
         }
       }
@@ -1704,7 +1711,12 @@ function renderHoldings(){
       const plINR = (hasAvgCost && valINR != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct  = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
       const plDisp = plINR != null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null?pc(plINR):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      // Sanity check: if P&L % is beyond ±500%, avgCost is likely wrong — show edit hint
+      const plSane = plPct == null || Math.abs(plPct) <= 500;
+      const plHtml = !plSane
+        ? `<span style="color:#ff8800;font-size:10px;cursor:pointer" onclick="editStockCost(${a.id},'indian')" title="P&L looks wrong — click to fix">⚠ Fix cost</span>`
+        : (plDisp ?? lc());
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -1717,7 +1729,11 @@ function renderHoldings(){
       const plUSD = (hasAvgCost && valUSD != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
       const plDisp = plUSD != null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      const plSane = plPct == null || Math.abs(plPct) <= 500;
+      const plHtml = !plSane
+        ? `<span style="color:#ff8800;font-size:10px;cursor:pointer" onclick="editStockCost(${a.id},'intl')" title="P&L looks wrong — click to fix">⚠ Fix cost</span>`
+        : (plDisp ?? lc());
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -1857,6 +1873,24 @@ async function refreshOther(id){
     setStatus('warn',`${a.type.toUpperCase()} refresh failed: ${e.message}`);
   }
 }
+// Fix wrong avgCost — prompts user for total invested amount
+function editStockCost(id, type){
+  const arr = type==='indian' ? D.indian : D.intl;
+  const a = arr.find(x=>x.id===id);
+  if(!a) return;
+  const sym = type==='indian'?'₹':'$';
+  const totalNow = a.avgCost > 0 ? (a.avgCost * a.qty).toFixed(2) : '';
+  const input = prompt(
+    `Fix total amount invested in ${a.symbol}.\n\nEnter total ${sym} you paid for all ${a.qty} shares:\n(e.g. if you paid ${sym}50,000 total, enter 50000)`,
+    totalNow
+  );
+  if(!input) return;
+  const total = parseFloat(input.replace(/[,₹$\s]/g,''));
+  if(isNaN(total)||total<=0){ alert('Enter a valid amount.'); return; }
+  a.avgCost = total / a.qty;
+  save(); renderHoldings(); updateSummary();
+}
+
 function delIndian(id){
   if(!confirm('Remove this stock from your portfolio?')) return;
   D.indian=D.indian.filter(x=>x.id!==id);
