@@ -988,12 +988,35 @@ let D={
 (function loadPortfolio(){
   try{
     const raw=localStorage.getItem('nestegg_d5');
-    if(raw){ D=JSON.parse(raw); return; }
+    if(raw){
+      D=JSON.parse(raw);
+      // Ensure others array exists (for older saved data)
+      if(!D.others) D.others=[];
+      // Auto-fix bad avgCost: if avgCost > price*10 it was entered as total not per-share
+      // We can't fix it automatically without price data, so just zero it out
+      // It will show "—" instead of absurd P&L, user can fix via "Fix cost" link
+      D.indian.forEach(a=>{
+        if(a.avgCost>0 && a.price>0 && a.avgCost>a.price*50){
+          // avgCost is clearly total invested — convert to per-share
+          a.avgCost=a.avgCost/a.qty;
+        }
+      });
+      D.intl.forEach(a=>{
+        if(a.avgCost>0 && a.price>0 && a.avgCost>a.price*50){
+          a.avgCost=a.avgCost/a.qty;
+        }
+      });
+      D.mf.forEach(a=>{
+        if(a.navBought>0 && a.nav>0 && a.navBought>a.nav*50){
+          a.navBought=a.navBought/a.units;
+        }
+      });
+      return;
+    }
     // First run on d5 — try migrating from d4 but strip known demo data
     const old=localStorage.getItem('nestegg_d4');
     if(old){
       const o=JSON.parse(old);
-      // Known demo addresses/ids to strip
       const demoWallets=new Set(['0x742d35cc6634c0532925a3b844bc454e4438f44e']);
       const demoBTC=new Set(['bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh']);
       const demoIds=new Set([1,10,30,31,32,40,41,50,51,52]);
@@ -1004,7 +1027,6 @@ let D={
       D.mf=(o.mf||[]).filter(a=>!demoIds.has(a.id));
       D.banks=o.banks||[];
       D.others=o.others||[];
-      // Save clean data to new key
       localStorage.setItem('nestegg_d5',JSON.stringify(D));
     }
   }catch(e){}
@@ -1362,6 +1384,29 @@ async function refreshAll(){
 
   setStatus('loading','Fetching stock prices via AI…');
   try{await fetchStocks();}catch(e){errs.push('Stocks: '+e.message);}
+
+  // Auto-fix avgCost if it looks like total invested was entered instead of per-share
+  // Detection: if avgCost > current price * 20, it's almost certainly the total
+  let fixedCount = 0;
+  D.indian.forEach(a=>{
+    if(a.avgCost>0 && a.price>0 && a.avgCost > a.price*20 && a.qty>1){
+      a.avgCost = a.avgCost / a.qty;
+      fixedCount++;
+    }
+  });
+  D.intl.forEach(a=>{
+    if(a.avgCost>0 && a.price>0 && a.avgCost > a.price*20 && a.qty>1){
+      a.avgCost = a.avgCost / a.qty;
+      fixedCount++;
+    }
+  });
+  D.mf.forEach(a=>{
+    if(a.navBought>0 && a.nav>0 && a.navBought > a.nav*20 && a.units>1){
+      a.navBought = a.navBought / a.units;
+      fixedCount++;
+    }
+  });
+  if(fixedCount>0){ save(); }
 
   save(); savePriceCache(); hideCacheBar(); updateSummary(); buildPie(); buildPerf(); renderHoldings();
   const t=document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
