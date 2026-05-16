@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="version" content="2026-04-14-v3">
   <title>Portfolio Tracker</title>
-  <!-- Preload Supabase so it's ready before user clicks Sign In -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Firebase Auth SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -2228,58 +2229,52 @@ function doAddBank(){
 // ══════════════════════════════════════════════════════════
 //  SUPABASE AUTH + CLOUD SYNC
 // ══════════════════════════════════════════════════════════
-let _sb    = null;
+let _fbAuth = null; // Firebase auth instance
 let currentUser = null;
-let supaToken   = null;
+let supaToken   = null; // Firebase ID token used as Bearer for /api/user
 let pendingAction = null;
-let authMode = 'signin'; // 'signin' | 'signup'
+let authMode = 'signin';
 
-// Load Supabase JS — already loaded in <head>, just fetch config and init client
-async function loadSupabase(){
-  // Try localStorage cache first (instant)
+// ── FIREBASE INIT ─────────────────────────────────────────
+async function loadFirebase(){
   try {
-    const cached = localStorage.getItem('supa_cfg');
-    if (cached) {
-      const c = JSON.parse(cached);
-      if (c.url && c.key) { window.__SUPA_URL__ = c.url; window.__SUPA_KEY__ = c.key; }
-    }
+    const cached = localStorage.getItem('fb_cfg');
+    if (cached) { try { window.__FB_CFG__ = JSON.parse(cached); } catch(e){} }
   } catch(e) {}
 
-  // Fetch fresh config from server with 5s timeout
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
-    const cfgRes = await fetch('/api/config', { signal: ctrl.signal });
-    clearTimeout(t);
-    if (cfgRes.ok) {
-      const cfg = await cfgRes.json();
-      if (cfg.supabaseUrl && cfg.supabaseKey) {
-        window.__SUPA_URL__ = cfg.supabaseUrl;
-        window.__SUPA_KEY__ = cfg.supabaseKey;
-        localStorage.setItem('supa_cfg', JSON.stringify({ url: cfg.supabaseUrl, key: cfg.supabaseKey }));
+    setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch('/api/config', { signal: ctrl.signal });
+    if (r.ok) {
+      const cfg = await r.json();
+      if (cfg.firebaseApiKey) {
+        window.__FB_CFG__ = cfg;
+        localStorage.setItem('fb_cfg', JSON.stringify(cfg));
       }
     }
   } catch(e) { console.warn('Config fetch:', e.message); }
 
-  const url = window.__SUPA_URL__;
-  const key = window.__SUPA_KEY__;
-  if (!url || !key) { _sb = null; return; }
+  const cfg = window.__FB_CFG__;
+  if (!cfg?.firebaseApiKey) { console.warn('Firebase not configured'); return; }
 
   try {
-    // window.supabase is the library loaded in <head>
-    _sb = window.supabase.createClient(url, key, {
-      auth: {
-        persistSession: true,
-        storageKey: 'portfolio_auth',
-        storage: window.localStorage,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      }
-    });
-  } catch(e) {
-    console.error('Supabase init error:', e.message);
-    _sb = null;
-  }
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey:            cfg.firebaseApiKey,
+        authDomain:        cfg.firebaseAuthDomain,
+        projectId:         cfg.firebaseProjectId,
+        appId:             cfg.firebaseAppId || '',
+      });
+    }
+    _fbAuth = firebase.auth();
+    _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  } catch(e) { console.error('Firebase init:', e.message); _fbAuth = null; }
+}
+
+async function refreshFirebaseToken(){
+  if (!_fbAuth?.currentUser) return null;
+  try { supaToken = await _fbAuth.currentUser.getIdToken(true); return supaToken; } catch(e) { return null; }
 }
 
 function switchAuthTab(mode){
@@ -2299,8 +2294,7 @@ function switchAuthTab(mode){
 
 async function doLogin(){
   const err = document.getElementById('li-err');
-  err.style.color = 'var(--red)';
-  err.textContent = '';
+  err.style.color = 'var(--red)'; err.textContent = '';
   const email = (document.getElementById('li-email').value||'').trim().toLowerCase();
   const pass  = (document.getElementById('li-pass').value||'');
   if (!email) { err.textContent = 'Enter your email address.'; return; }
@@ -2308,111 +2302,62 @@ async function doLogin(){
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Enter a valid email address.'; return; }
 
   const btn = document.getElementById('li-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin-sm"></span> Signing in…';
+  btn.disabled = true; btn.innerHTML = '<span class="spin-sm"></span> Signing in\u2026';
 
-  // Wait for Supabase to load (it loads async from /api/config)
-  if (!_sb) {
-    await loadSupabase();
-  }
-
-  if (!_sb) {
-    // Supabase still not configured — block login, show setup message
-    err.textContent = 'Authentication not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to Vercel environment variables.';
-    btn.disabled = false;
-    btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
+  if (!_fbAuth) await loadFirebase();
+  if (!_fbAuth) {
+    err.textContent = 'Authentication not configured. Add Firebase keys to Vercel environment variables.';
+    btn.disabled = false; btn.textContent = authMode==='signup'?'Create Account \u2192':'Sign In \u2192';
     return;
   }
 
-  // Wrap Supabase auth in a timeout so it never hangs forever
-  const authWithTimeout = (promise, ms=15000) => Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out. Check your internet connection.')), ms))
-  ]);
-
   try {
-    let result;
+    let fbUser;
     if (authMode === 'signup') {
-      if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; btn.disabled=false; btn.textContent='Create Account →'; return; }
+      if (pass.length < 8) { err.textContent = 'Password must be at least 8 characters.'; btn.disabled=false; btn.textContent='Create Account \u2192'; return; }
       const name = (document.getElementById('li-name')?.value||'').trim() || email.split('@')[0];
-      result = await authWithTimeout(_sb.auth.signUp({
-        email, password: pass,
-        options: {
-          data: { name },
-          emailRedirectTo: window.location.origin,
-        }
-      }));
-      if (result.error) throw result.error;
-      if (!result.data.session) {
-        document.getElementById('login-mo').classList.remove('open');
-        document.getElementById('confirm-email').textContent = email;
-        document.getElementById('confirm-mo').classList.add('open');
-        btn.disabled = false; btn.textContent = 'Create Account →';
-        return;
-      }
+      const cred = await _fbAuth.createUserWithEmailAndPassword(email, pass);
+      await cred.user.updateProfile({ displayName: name });
+      fbUser = cred.user;
     } else {
-      result = await authWithTimeout(_sb.auth.signInWithPassword({ email, password: pass }));
-      if (result.error) throw result.error;
+      const cred = await _fbAuth.signInWithEmailAndPassword(email, pass);
+      fbUser = cred.user;
     }
-    const session = result.data.session;
-    supaToken = session.access_token;
-    currentUser = {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.user_metadata?.name || email.split('@')[0]
-    };
+    supaToken = await fbUser.getIdToken();
+    currentUser = { id: fbUser.uid, email: fbUser.email, name: fbUser.displayName || email.split('@')[0] };
     afterLogin(true);
   } catch(e) {
-    // Map Supabase error messages to user-friendly ones
-    const msg = e.message || '';
-    if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
-      err.textContent = 'No account found with this email, or wrong password. Please create an account first.';
-    } else if (msg.includes('Email not confirmed')) {
-      err.textContent = 'Please confirm your email first. Check your inbox.';
-    } else if (msg.includes('User already registered')) {
+    const code = e.code || '';
+    if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) {
+      err.textContent = 'No account found with this email, or wrong password.';
+    } else if (code.includes('email-already-in-use')) {
       err.textContent = 'Account already exists. Switch to Sign In tab.';
-    } else if (msg.includes('Password should be')) {
+    } else if (code.includes('weak-password')) {
       err.textContent = 'Password must be at least 8 characters.';
-    } else if (msg.includes('rate limit') || msg.includes('too many')) {
+    } else if (code.includes('too-many-requests')) {
       err.textContent = 'Too many attempts. Please wait a minute and try again.';
+    } else if (code.includes('network-request-failed')) {
+      err.textContent = 'Network error. Check your connection and try again.';
     } else {
-      err.textContent = msg || 'Something went wrong. Please try again.';
+      err.textContent = e.message || 'Something went wrong.';
     }
   }
-  btn.disabled = false;
-  btn.textContent = authMode === 'signup' ? 'Create Account →' : 'Sign In →';
+  btn.disabled = false; btn.textContent = authMode==='signup'?'Create Account \u2192':'Sign In \u2192';
 }
 
 async function doForgotPassword(){
   const errEl = document.getElementById('li-err');
-  const email  = (document.getElementById('li-email').value||'').trim().toLowerCase();
-  if (!email) {
-    errEl.style.color = 'var(--red)';
-    errEl.textContent = 'Enter your email address first, then click Forgot password.';
-    return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.style.color = 'var(--red)';
-    errEl.textContent = 'Enter a valid email address.';
-    return;
-  }
-  if (!_sb) {
-    await loadSupabase();
-    if (!_sb) {
-      errEl.style.color = 'var(--red)';
-      errEl.textContent = 'Auth not configured — contact the site owner.';
-      return;
-    }
-  }
-  const { error } = await _sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/?reset=1',
-  });
-  if (error) {
-    errEl.style.color = 'var(--red)';
-    errEl.textContent = error.message;
-  } else {
+  const email = (document.getElementById('li-email').value||'').trim().toLowerCase();
+  if (!email) { errEl.style.color='var(--red)'; errEl.textContent='Enter your email address first.'; return; }
+  if (!_fbAuth) await loadFirebase();
+  if (!_fbAuth) { errEl.style.color='var(--red)'; errEl.textContent='Auth not configured.'; return; }
+  try {
+    await _fbAuth.sendPasswordResetEmail(email);
     errEl.style.color = '#00e676';
-    errEl.textContent = `✓ Reset link sent to ${email} — check your inbox (and spam folder).`;
+    errEl.textContent = `\u2713 Reset link sent to ${email} \u2014 check your inbox.`;
+  } catch(e) {
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = (e.code==='auth/user-not-found') ? 'No account found with this email.' : e.message;
   }
 }
 
@@ -2452,7 +2397,7 @@ async function loadCloudPortfolio() {
   } catch(e) {}
 
   // Then try to get fresher data from cloud
-  if (!_sb || !supaToken) {
+  if (!_fbAuth || !supaToken) {
     // No cloud — use localStorage only
     loadPriceCache();
     renderHoldings(); updateSummary(); buildPerf();
@@ -2508,7 +2453,7 @@ async function loadCloudPortfolio() {
 }
 
 async function saveCloudPortfolio() {
-  if (!_sb || !supaToken) return; // no-op — local mode only
+  if (!_fbAuth || !supaToken) return; // no-op — local mode only
   try {
     const r = await fetch('/api/user?action=portfolio', {
       method: 'POST',
@@ -2534,7 +2479,7 @@ function save() {
 
 // ── DAILY SNAPSHOT ────────────────────────────────────────
 async function saveSnapshot() {
-  if (!_sb || !supaToken) return;
+  if (!_fbAuth || !supaToken) return;
   const v = vals();
   if (!v.tot) return;
   try {
@@ -2551,7 +2496,7 @@ let historyInst = null;
 async function loadHistory(days, btn) {
   document.querySelectorAll('#history-mo .tf').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
-  if (!_sb || !supaToken) {
+  if (!_fbAuth || !supaToken) {
     document.getElementById('history-stats').innerHTML = '<span style="color:#555">Sign in with Supabase to see history</span>';
     return;
   }
@@ -2605,7 +2550,7 @@ function openHistory(){ document.getElementById('history-mo').classList.add('ope
 async function openShare(){
   document.getElementById('share-mo').classList.add('open');
   const el = document.getElementById('share-content');
-  if (!supabase || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in with Supabase to use share links.</p>'; return; }
+  if (!_fbAuth || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in to use share links.</p>'; return; }
   el.innerHTML = '<div style="text-align:center;padding:16px"><span class="spin"></span></div>';
   try {
     const r = await fetch('/api/user?action=share_get', { headers:{Authorization:`Bearer ${supaToken}`} });
@@ -2660,7 +2605,7 @@ async function deleteShare(){
 async function openAlerts(){
   document.getElementById('alerts-mo').classList.add('open');
   const el = document.getElementById('alerts-content');
-  if (!supabase || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in with Supabase to set alerts.</p>'; return; }
+  if (!_fbAuth || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in to set alerts.</p>'; return; }
   el.innerHTML = '<div style="text-align:center;padding:16px"><span class="spin"></span></div>';
   try {
     const r = await fetch('/api/user?action=alerts',{headers:{Authorization:`Bearer ${supaToken}`}});
@@ -2727,13 +2672,14 @@ async function deleteAlert(id){
 }
 
 function doLogout() {
-  if(_sb) _sb.auth.signOut();
+  if(_fbAuth) _fbAuth.signOut();
   currentUser = null; supaToken = null;
   D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
   try {
     localStorage.removeItem('nestegg_d6');
     localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem('portfolio_local_session');
+    localStorage.removeItem('fb_cfg');
+    localStorage.removeItem('cloud_avgcost_fixed_v6');
   } catch(e) {}
   updateUserUI();
   renderHoldings(); updateSummary(); buildPie(); buildPerf();
@@ -2749,114 +2695,41 @@ function requireLogin(cb) {
 }
 
 async function loadAuth() {
-  // IMMEDIATELY hide login modal if we have any saved session — prevents flash
-  try {
-    // Check Supabase session
-    const raw = localStorage.getItem('portfolio_auth');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const sess = parsed?.currentSession || parsed;
-      if (sess?.user && sess?.access_token) {
-        const notExpired = !sess.expires_at || (sess.expires_at * 1000 > Date.now() - 60000);
-        if (notExpired) {
-          document.getElementById('login-mo').classList.remove('open');
-          currentUser = {
-            id: sess.user.id,
-            email: sess.user.email,
-            name: sess.user.user_metadata?.name || sess.user.email.split('@')[0]
-          };
-          updateUserUI();
-        }
-      }
-    }
-    // Check local-only session (no Supabase)
-    if (!currentUser) {
-      const localRaw = localStorage.getItem('portfolio_local_session');
-      if (localRaw) {
-        const localUser = JSON.parse(localRaw);
-        if (localUser?.id) {
-          document.getElementById('login-mo').classList.remove('open');
-          currentUser = localUser;
-          updateUserUI();
-        }
-      }
-    }
-  } catch(e) {}
+  // Init Firebase first
+  await loadFirebase();
 
-  await loadSupabase();
+  return new Promise((resolve) => {
+    if (!_fbAuth) {
+      // Firebase not configured — show login
+      document.getElementById('login-mo').classList.add('open');
+      resolve(false);
+      return;
+    }
 
-  if (!_sb) {
-    // Supabase not configured — use localStorage-only mode
-    // Check for existing local session first
-    try {
-      const raw = localStorage.getItem('portfolio_local_session');
-      if (raw) {
-        const stored = JSON.parse(raw);
-        currentUser = stored;
+    // Firebase persists session in localStorage automatically
+    // onAuthStateChanged fires immediately with current user (or null)
+    const unsub = _fbAuth.onAuthStateChanged(async (fbUser) => {
+      unsub(); // only need first call
+      if (fbUser) {
+        supaToken = await fbUser.getIdToken();
+        currentUser = { id: fbUser.uid, email: fbUser.email, name: fbUser.displayName || fbUser.email.split('@')[0] };
         document.getElementById('login-mo').classList.remove('open');
         updateUserUI();
-        return false;
-      }
-    } catch(e) {}
-    // Also check legacy PIN auth
-    try {
-      const raw = localStorage.getItem('nestegg_auth_v1');
-      if (raw) {
-        const stored = JSON.parse(raw);
-        currentUser = { id:'local', email: stored.name+'@local', name: stored.name };
-        document.getElementById('login-mo').classList.remove('open');
-        updateUserUI();
-        return false;
-      }
-    } catch(e) {}
-    return false;
-  }
 
-  // Verify with Supabase (handles token refresh automatically)
-  const { data: { session }, error } = await _sb.auth.getSession();
+        // Auto-refresh token every 55 minutes
+        setInterval(async () => {
+          if (_fbAuth?.currentUser) {
+            supaToken = await _fbAuth.currentUser.getIdToken(true);
+          }
+        }, 55 * 60 * 1000);
 
-  if (session && !error) {
-    supaToken = session.access_token;
-    currentUser = {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.user_metadata?.name || session.user.email.split('@')[0]
-    };
-    document.getElementById('login-mo').classList.remove('open');
-    updateUserUI();
-
-    _sb.auth.onAuthStateChange(async (event, newSession) => {
-      if (event === 'TOKEN_REFRESHED' && newSession) {
-        supaToken = newSession.access_token;
-      } else if (event === 'SIGNED_OUT') {
-        currentUser = null; supaToken = null;
-        updateUserUI();
+        resolve(true);
+      } else {
         document.getElementById('login-mo').classList.add('open');
+        resolve(false);
       }
     });
-
-    return true;
-  }
-
-  // Session expired — try silent refresh
-  const { data: refreshData } = await _sb.auth.refreshSession();
-  if (refreshData?.session) {
-    supaToken = refreshData.session.access_token;
-    currentUser = {
-      id: refreshData.session.user.id,
-      email: refreshData.session.user.email,
-      name: refreshData.session.user.user_metadata?.name || refreshData.session.user.email.split('@')[0]
-    };
-    document.getElementById('login-mo').classList.remove('open');
-    updateUserUI();
-    return true;
-  }
-
-  // Truly no valid session — show login
-  currentUser = null;
-  updateUserUI();
-  document.getElementById('login-mo').classList.add('open');
-  return false;
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3118,17 +2991,21 @@ async function doChangePassword(){
   const pass = document.getElementById('new-pass').value;
   const msg  = document.getElementById('pass-msg');
   if(!pass || pass.length < 8){ msg.style.color='#ff4444'; msg.textContent='Password must be at least 8 characters.'; return; }
-  if(!_sb){ msg.style.color='#ff8800'; msg.textContent='Supabase not configured.'; return; }
-  const { error } = await _sb.auth.updateUser({ password: pass });
-  if(error){ msg.style.color='#ff4444'; msg.textContent=error.message; return; }
-  msg.style.color='#00e676'; msg.textContent='Password updated successfully!';
-  document.getElementById('new-pass').value='';
-  setTimeout(()=>{ document.getElementById('change-pass-form').style.display='none'; msg.textContent=''; }, 2000);
+  if(!_fbAuth?.currentUser){ msg.style.color='#ff8800'; msg.textContent='Not signed in.'; return; }
+  try {
+    await _fbAuth.currentUser.updatePassword(pass);
+    msg.style.color='#00e676'; msg.textContent='Password updated successfully!';
+    document.getElementById('new-pass').value='';
+    setTimeout(()=>{ document.getElementById('change-pass-form').style.display='none'; msg.textContent=''; }, 2000);
+  } catch(e) {
+    msg.style.color='#ff4444';
+    msg.textContent = e.code==='auth/requires-recent-login' ? 'Please sign out and sign in again before changing password.' : e.message;
+  }
 }
 
 async function doForgotFromSettings(){
-  if(!_sb || !currentUser){ return; }
-  await _sb.auth.resetPasswordForEmail(currentUser.email);
+  if(!_fbAuth || !currentUser){ return; }
+  await _fbAuth.sendPasswordResetEmail(currentUser.email);
   const msg = document.getElementById('pass-msg');
   document.getElementById('change-pass-form').style.display='block';
   msg.style.color='#00e676';
@@ -3175,33 +3052,6 @@ function showOnboardingTip(){
   refreshTicker();
   setInterval(refreshTicker, 90000);
 
-  // Handle password reset redirect (?reset=1 from email link)
-  if (window.location.search.includes('reset=1') || window.location.hash.includes('type=recovery')) {
-    // Supabase will fire SIGNED_IN with type=recovery via onAuthStateChange
-    // Show the change password form immediately
-    document.getElementById('login-mo').classList.remove('open');
-    setTimeout(async () => {
-      await loadSupabase();
-      if (_sb) {
-        _sb.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-            supaToken = session?.access_token;
-            currentUser = session ? {
-              id: session.user.id, email: session.user.email,
-              name: session.user.user_metadata?.name || session.user.email.split('@')[0]
-            } : null;
-            updateUserUI();
-            // Open account modal on change password section
-            openSettings();
-            document.getElementById('change-pass-form').style.display = 'block';
-            document.getElementById('pass-msg').style.color = '#00e676';
-            document.getElementById('pass-msg').textContent = 'Enter your new password below.';
-          }
-        });
-      }
-    }, 500);
-  }
-
   const hasSession = await loadAuth();
 
   if(!currentUser){
@@ -3212,7 +3062,7 @@ function showOnboardingTip(){
   }
 
   // Has session — load portfolio
-  if(hasSession && _sb){
+  if(hasSession && _fbAuth){
     await loadCloudPortfolio();
   } else {
     const hasCachedPrices = loadPriceCache();
