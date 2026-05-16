@@ -1223,6 +1223,19 @@ async function fetchTRX(address){
   return (d.balance||0)/1e6; // SUN → TRX
 }
 
+async function fetchHL(address){
+  const r = await fetch('/api/hyperliquid', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address }),
+    signal: makeSig(20000),
+  });
+  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error||'Hyperliquid error '+r.status); }
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d.positions || [];
+}
+
 async function fetchOtherWallet(a){
   if(a.type==='sol'){
     const positions = await fetchSOL(a.address);
@@ -1231,6 +1244,12 @@ async function fetchOtherWallet(a){
     a.totalUSD = positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
   }
   if(a.type==='trx') a.balance=await fetchTRX(a.address);
+  if(a.type==='hl'){
+    const positions = await fetchHL(a.address);
+    a.positions = positions;
+    a.balance = positions.find(p=>p.symbol==='HYPE')?.balance || 0;
+    a.totalUSD = positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
+  }
 }
 
 // ── WALLET FETCH ──────────────────────────────────────────
@@ -1380,8 +1399,8 @@ async function refreshAll(){
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
   // Fetch SOL / XRP / ADA / TRX balances
-  // Fetch SOL / TRX balances
-  D.others.filter(a=>a.type==='sol').forEach(a=>{a.fetching=true;});
+  // Fetch SOL / TRX / HL balances
+  D.others.filter(a=>a.type==='sol'||a.type==='hl').forEach(a=>{a.fetching=true;});
   renderHoldings();
   await Promise.all(D.others.map(a=>fetchOtherWallet(a).then(()=>{a.fetching=false;}).catch(e=>{a.fetching=false;errs.push(`${a.type.toUpperCase()}: ${e.message}`);})));
   renderHoldings();
@@ -1460,7 +1479,7 @@ function vals(){
   const c = safe(D.wallets.reduce((s,w)=>s+walletUSD(w),0))
           + safe(D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0))
           + safe(D.others.reduce((s,a)=>{
-              if(a.type==='sol' && a.positions?.length)
+              if((a.type==='sol'||a.type==='hl') && a.positions?.length)
                 return s+a.positions.reduce((ps,p)=>ps+safe(p.valueUSD||0),0);
               return s+safe(a.priceUSD&&a.balance?a.balance*a.priceUSD:0);
             },0));
@@ -1489,7 +1508,7 @@ function updateSummary(){
     ...D.wallets.flatMap(w=>w.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}))),
     ...D.btc.map(a=>({v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24})),
     ...D.others.flatMap(a=>{
-      if(a.type==='sol'&&a.positions?.length) return a.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}));
+      if((a.type==='sol'||a.type==='hl')&&a.positions?.length) return a.positions.map(p=>({v:p.valueUSD||0,ch:p.ch24}));
       return [{v:(a.priceUSD||0)*(a.balance||0),ch:a.ch24}];
     }),
   ].filter(x=>x.v>0);
@@ -1701,18 +1720,20 @@ function renderHoldings(){
     if(!rows) rows=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
 
   // Render SOL / XRP / ADA / TRX wallets
-  const COIN_CHAIN={sol:'solana',trx:'tron'};
-  const COIN_SYM={sol:'SOL',trx:'TRX'};
+  const COIN_CHAIN={sol:'solana',trx:'tron',hl:'hyperliquid'};
+  const COIN_SYM={sol:'SOL',trx:'TRX',hl:'HYPE'};
   D.others.forEach(a=>{
     const sym=COIN_SYM[a.type]||a.type.toUpperCase();
     const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
+    const isPositionBased = (a.type==='sol'||a.type==='hl');
 
-    if(a.type==='sol' && (a.positions?.length || a.fetching)){
-      // SOL — show all token positions like an EVM wallet
+    if(isPositionBased && (a.positions?.length || a.fetching)){
+      const badgeLabel = a.type==='hl'?'HYPE':sym;
+      const chainLabel = a.type==='hl'?'hyperliquid':'solana';
       const totUSD=a.positions?.reduce((s,p)=>s+(p.valueUSD||0),0)||0;
       if(hideSmall && totUSD<1 && !a.fetching) return;
       rows+=`<div class="w-grp">
-        <span class="badge">SOL</span><span>${addr}</span>
+        <span class="badge">${badgeLabel}</span><span>${addr}</span>
         <span style="color:#888">${a.label||''}</span>
         ${a.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
         <span class="w-total">${totUSD>0?fI(totUSD):'—'}</span>
@@ -1720,13 +1741,13 @@ function renderHoldings(){
         <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px">✕</button>
       </div>`;
       const visPos=[...a.positions].sort((x,y)=>(y.valueUSD||0)-(x.valueUSD||0)).filter(p=>!hideSmall||(p.valueUSD||0)>=1);
-      // If no positions pass the filter but we have a SOL balance, show at least SOL
       const showPos = visPos.length ? visPos : (a.positions.length ? a.positions.slice(0,1) : []);
       showPos.forEach(p=>{
         const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-US',{maximumFractionDigits:6});
+        const srcLabel = p.source==='hypercore-perp'?' <span style="font-size:9px;color:#555">(perp)</span>':p.source==='hyperevm-native'?' <span style="font-size:9px;color:#555">(EVM)</span>':'';
         rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
           <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${(p.symbol||'??').slice(0,2)}`}</div>
-          <div><span class="an">${p.symbol||'???'}</span>${chainPill('solana')}<div class="as">${p.name||'Solana Token'}</div></div>
+          <div><span class="an">${p.symbol||'???'}</span>${chainPill(chainLabel)}${srcLabel}<div class="as">${p.name||'Token'}</div></div>
           <span class="mv">${balFmt}</span>
           <span class="mv">${p.priceUSD>0?fI(p.priceUSD):lc()}</span>
           <span class="mv">${(p.valueUSD||0)>0.01?fI(p.valueUSD):lc()}</span>
@@ -1997,11 +2018,12 @@ function renderAddForm(){
         <option value="btc">Bitcoin (BTC)</option>
         <option value="sol">Solana (SOL)</option>
         <option value="trx">TRON (TRX)</option>
+        <option value="hl">Hyperliquid (HyperCore + HyperEVM)</option>
       </select></div>
       <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok">✓ EVM wallets use Zerion (40+ chains). SOL/TRX use free public APIs — no key needed.</div>
+    <div class="info-box info-ok">✓ EVM wallets use Zerion (40+ chains). SOL/TRX/Hyperliquid use free public APIs — no key needed.</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -2091,8 +2113,8 @@ async function doAddWallet(){
   const btn=document.getElementById('add-btn');
   btn.disabled=true; btn.textContent='⟳ Fetching…';
 
-  const COIN_LABELS={sol:'Solana',trx:'TRON'};
-  const COIN_FETCH={sol:fetchSOL, trx:fetchTRX};
+  const COIN_LABELS={sol:'Solana',trx:'TRON',hl:'Hyperliquid'};
+  const COIN_FETCH={sol:fetchSOL, trx:fetchTRX, hl:fetchHL};
 
   if(wt==='evm'){
     const w={id:Date.now(),address:addr,label:lbl,positions:[],totalUSD:0,fetching:false};
@@ -2122,9 +2144,9 @@ async function doAddWallet(){
       await fetchOtherWallet(entry);
       await enrichCoinGecko();
       D.others.push(entry);
-      if(wt==='sol'){
-        const count = entry.positions.filter(p=>p.valueUSD>0.01).length;
-        setFetchSt('ok',`Found ${count} token${count!==1?'s':''} · SOL balance: ${entry.balance.toFixed(4)}`);
+      if(wt==='sol'||wt==='hl'){
+        const count = entry.positions.filter(p=>(p.valueUSD||0)>0.01).length;
+        setFetchSt('ok',`Found ${count} token${count!==1?'s':''} · Total: ${fI(entry.totalUSD)}`);
       } else {
         setFetchSt('ok',`${coinName} balance: ${entry.balance.toFixed(4)} ${wt.toUpperCase()}`);
       }
