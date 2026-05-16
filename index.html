@@ -909,13 +909,39 @@
 // ══════════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════════
-let USD_INR=84, activeTab='crypto', addOpen=false;
+let USD_INR=96, activeTab='crypto', addOpen=false;
+
+// Fetch live USD/INR rate immediately — don't wait for CoinGecko enrichment
+(async function fetchLiveINR(){
+  try {
+    // Try exchangerate-api (free, no key)
+    const r = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) {
+      const d = await r.json();
+      const rate = d.rates?.INR;
+      if (rate && rate > 50 && rate < 200) {
+        USD_INR = rate;
+        liveRates.inr = rate;
+        return;
+      }
+    }
+  } catch(e) {}
+  try {
+    // Fallback: frankfurter.app
+    const r = await fetch('https://api.frankfurter.app/latest?from=USD&to=INR', { signal: AbortSignal.timeout(5000) });
+    if (r.ok) {
+      const d = await r.json();
+      const rate = d.rates?.INR;
+      if (rate && rate > 50) { USD_INR = rate; liveRates.inr = rate; }
+    }
+  } catch(e) {}
+})();
 let perfInst=null, pieInst=null, curTF='7d', loading=false;
 
 // ── CURRENCY SYSTEM ───────────────────────────────────────
 // Exchange rates vs USD (updated from CoinGecko on each refresh)
 const CURRENCY_CONFIG = {
-  INR: { sym:'₹', name:'INR', gecko:'inr',  decimals:0,  perUSD:84   },
+  INR: { sym:'₹', name:'INR', gecko:'inr',  decimals:0,  perUSD:96   },
   USD: { sym:'$', name:'USD', gecko:'usd',  decimals:2,  perUSD:1    },
   EUR: { sym:'€', name:'EUR', gecko:'eur',  decimals:2,  perUSD:0.92 },
   GBP: { sym:'£', name:'GBP', gecko:'gbp',  decimals:2,  perUSD:0.79 },
@@ -927,7 +953,7 @@ const CURRENCY_CONFIG = {
 };
 let activeCurrency = localStorage.getItem('nestegg_currency') || 'INR';
 // Live rates fetched from CoinGecko (USD base)
-let liveRates = { usd:1, inr:84, eur:0.92, gbp:0.79, jpy:150, cny:7.24, sgd:1.34, aed:3.67, aud:1.53 };
+let liveRates = { usd:1, inr:96, eur:0.92, gbp:0.79, jpy:150, cny:7.24, sgd:1.34, aed:3.67, aud:1.53 };
 
 function setCurrency(code) {
   activeCurrency = code;
@@ -2110,6 +2136,18 @@ async function doAddWallet(){
   const addr=(document.getElementById('f-addr').value||'').trim();
   const lbl=(document.getElementById('f-lbl').value||'').trim()||addr.slice(0,8)+'…';
   if(!addr){alert('Please enter a wallet address');return;}
+
+  // Basic address format validation per chain
+  if(wt==='btc' && !addr.match(/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/)){
+    setFetchSt('err','Invalid Bitcoin address format'); return;
+  }
+  if((wt==='evm'||wt==='hl') && !addr.match(/^0x[0-9a-fA-F]{40}$/)){
+    setFetchSt('err','Invalid address — must be 0x followed by 40 hex characters'); return;
+  }
+  if(wt==='sol' && addr.length < 32){
+    setFetchSt('err','Invalid Solana address'); return;
+  }
+
   const btn=document.getElementById('add-btn');
   btn.disabled=true; btn.textContent='⟳ Fetching…';
 
@@ -2139,18 +2177,27 @@ async function doAddWallet(){
   }else if(COIN_FETCH[wt]){
     const coinName=COIN_LABELS[wt];
     setFetchSt('loading',`Fetching ${coinName} wallet…`);
+    const entry={id:Date.now(),type:wt,address:addr,label:lbl,positions:[],balance:0,totalUSD:0,priceUSD:null,ch24:null};
     try{
-      const entry={id:Date.now(),type:wt,address:addr,label:lbl,positions:[],balance:0,totalUSD:0,priceUSD:null,ch24:null};
       await fetchOtherWallet(entry);
       await enrichCoinGecko();
-      D.others.push(entry);
       if(wt==='sol'||wt==='hl'){
         const count = entry.positions.filter(p=>(p.valueUSD||0)>0.01).length;
         setFetchSt('ok',`Found ${count} token${count!==1?'s':''} · Total: ${fI(entry.totalUSD)}`);
       } else {
         setFetchSt('ok',`${coinName} balance: ${entry.balance.toFixed(4)} ${wt.toUpperCase()}`);
       }
-    }catch(e){setFetchSt('err',e.message);btn.disabled=false;btn.textContent='Add Wallet';return;}
+    }catch(e){
+      console.error('fetchOtherWallet error:', e);
+      // Still save the wallet — show error but don't block adding
+      setFetchSt('err',`${e.message} — wallet saved, will retry on refresh`);
+    }
+    // Always push and save regardless of fetch result
+    D.others.push(entry);
+    save(); renderHoldings(); updateSummary(); buildPie();
+    setTimeout(()=>toggleAdd(), 1500);
+    btn.disabled=false; btn.textContent='Add Wallet';
+    return;
   }
 
   save(); renderHoldings(); updateSummary(); buildPie();
