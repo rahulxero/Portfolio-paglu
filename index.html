@@ -1497,7 +1497,11 @@ const lc=()=>'<span class="lv">—</span>';
 function ageLbl(ms){const m=Math.floor(ms/60000);if(m<2)return'just now';if(m<60)return`${m}m ago`;const h=Math.floor(m/60);if(h<24)return`${h}h ago`;const d=Math.floor(h/24);if(d<30)return`${d}d ago`;const mo=Math.floor(d/30);return`${mo}mo ago`;}
 function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed Deposit',rd:'Recurring Deposit',ppf:'PPF',nps:'NPS',wallet:'Digital Wallet',other:'Other'}[t]||'Savings';}
 // walletUSD — total USD value of a wallet's positions (Zerion gives USD natively)
-function walletUSD(w){ return w.totalUSD || w.positions?.reduce((s,p)=>s+(p.valueUSD||0),0) || 0; }
+function walletUSD(w){
+  if(w.totalUSD > 0) return w.totalUSD;
+  if(w.positions?.length) return w.positions.reduce((s,p)=>s+(p.valueUSD||0),0);
+  return 0;
+}
 // Stablecoin symbol list for pie chart splitting
 const STABLE_SYMS = new Set(['USDC','USDT','DAI','BUSD','TUSD','FDUSD','USDP','GUSD','USDD','FRAX','LUSD','CRVUSD','PYUSD','USDS','USDE','USDN','XUSD','SUSD','NUSD','EURC','AGEUR','MIM','DOLA','UST']);
 
@@ -2566,11 +2570,11 @@ async function loadCloudPortfolio() {
   }
 
   loadPriceCache();
-  renderHoldings(); updateSummary(); buildPerf();
+  renderHoldings(); updateSummary(); buildPie(); buildPerf();
   const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
   if (hasAny) {
     const age = cacheAge(); const lbl = cacheAgeLabel();
-    if (age < CACHE_TTL && lbl) { buildPie(); showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
+    if (age < CACHE_TTL && lbl) { showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
     else { setStatus('loading','Loading live prices…'); refreshAll(); }
   } else {
     setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`);
@@ -3276,12 +3280,12 @@ function showOnboardingTip(){
     await loadCloudPortfolio();
   } else {
     const hasCachedPrices = loadPriceCache();
-    renderHoldings(); updateSummary(); buildPerf();
+    renderHoldings(); updateSummary(); buildPie(); buildPerf();
     const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
     if(hasCachedPrices || hasAny){
       const age = cacheAge(); const lbl = cacheAgeLabel();
-      if(age < CACHE_TTL){ buildPie(); showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
-      else { buildPie(); showCacheBar(age>CACHE_MAX,lbl); setStatus('loading',`Refreshing… (${lbl})`); refreshAll(); }
+      if(age < CACHE_TTL){ showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
+      else { showCacheBar(age>CACHE_MAX,lbl); setStatus('loading',`Refreshing… (${lbl})`); refreshAll(); }
     } else {
       setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`);
       setTimeout(showOnboardingTip, 600);
