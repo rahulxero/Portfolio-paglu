@@ -1146,7 +1146,6 @@ function cacheAgeLabel(){
 // ══════════════════════════════════════════════════════════
 async function zerionGetPositions(address){
   let all=[];
-  // First request params
   let reqParams = {
     path: `/v1/wallets/${address}/positions/`,
     'filter[positions]': 'only_simple',
@@ -1167,6 +1166,15 @@ async function zerionGetPositions(address){
       await new Promise(res=>setTimeout(res,3000));
       r = await fetch(`/api/zerion?${qs}`, {headers, signal:makeSig(25000)});
     }
+
+    // Handle rate limit with backoff
+    if(r.status===429){
+      console.warn('Zerion rate limited — waiting 10s before retry');
+      await new Promise(res=>setTimeout(res,10000));
+      r = await fetch(`/api/zerion?${qs}`, {headers, signal:makeSig(25000)});
+      if(r.status===429) throw new Error('Zerion rate limited (429) — try again in a minute');
+    }
+
     if(!r.ok){
       const e = await r.json().catch(()=>({}));
       throw new Error(e.error||'Zerion error '+r.status);
@@ -1174,8 +1182,6 @@ async function zerionGetPositions(address){
     const d = await r.json();
     all.push(...(d.data||[]));
 
-    // Zerion returns absolute next URL like https://api.zerion.io/v1/wallets/.../positions/?cursor=xxx
-    // Extract path + all query params for our proxy
     const nextUrl = d.links?.next;
     if(!nextUrl) break;
     try{
@@ -1298,11 +1304,19 @@ async function fetchWalletPositions(wallet){
 
   // ── Zerion (EVM positions) ────────────────────────────────
   let evmPositions = [];
+  const hadCachedPositions = wallet.positions?.length > 0;
   try{
     evmPositions = await zerionGetPositions(wallet.address);
     wallet._zerionError = null;
   }catch(e){
     console.warn('Zerion failed:', e.message);
+    if(e.message.includes('429') && hadCachedPositions){
+      // Rate limited — keep existing cached positions, just note the error
+      wallet._zerionError = 'Rate limited — showing cached data';
+      wallet.fetching = false;
+      renderHoldings();
+      return;
+    }
     try {
       const bal = await fetchETHNative(wallet.address);
       evmPositions = [{id:'eth-native',symbol:'ETH',name:'Ethereum',chain:'ethereum',balance:bal,priceUSD:0,valueUSD:0,ch24:null,logo:'',_fallback:true}];
