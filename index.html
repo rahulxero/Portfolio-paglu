@@ -2088,31 +2088,30 @@ function renderAddForm(){
   }else if(activeTab==='mf'){
     h=`<p class="add-panel-title">Add Mutual Fund</p>
     <div style="margin-bottom:16px">
-      <label style="font-size:10px;letter-spacing:.06em;color:#555;font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Search Fund</label>
-      <div class="ac-wrap" style="margin-top:6px">
-        <input type="text" id="f-fn" placeholder="e.g. UTI Nifty 50 Direct Growth" autocomplete="off"
-          style="width:100%;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #222;color:#fff;font-family:'JetBrains Mono',monospace">
+      <div class="ac-wrap">
+        <input type="text" id="f-fn" placeholder="Search mutual fund…" autocomplete="off"
+          style="width:100%;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
         <div class="ac-drop" id="ac-mf"></div>
       </div>
-      <div id="mf-selected" style="display:none;margin-top:8px;padding:10px 14px;background:#0f1a0f;border:1px solid #1a3a1a;border-radius:2px">
-        <div style="font-size:12px;color:#00e676;font-family:'JetBrains Mono',monospace" id="mf-sel-name"></div>
-        <div style="font-size:10px;color:#555;margin-top:2px" id="mf-sel-meta"></div>
+      <div id="mf-selected" style="display:none;margin-top:8px;padding:10px 14px;background:#0a0a0a;border:1px solid #1a3a1a">
+        <div style="font-size:13px;color:#fff;font-family:'JetBrains Mono',monospace" id="mf-sel-name"></div>
+        <div style="font-size:11px;color:#00e676;margin-top:3px" id="mf-sel-meta"></div>
       </div>
     </div>
     <input type="hidden" id="f-code">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
       <div>
         <label style="font-size:10px;letter-spacing:.06em;color:#555;font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Units Held</label>
         <input type="number" id="f-units" placeholder="e.g. 584.481" step="any" oninput="calcMFAvg()"
-          style="width:100%;margin-top:6px;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #222;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
+          style="width:100%;margin-top:6px;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
       </div>
       <div>
         <label style="font-size:10px;letter-spacing:.06em;color:#555;font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Total Invested (₹)</label>
         <input type="number" id="f-pnav" placeholder="e.g. 50000" step="any" oninput="calcMFAvg()"
-          style="width:100%;margin-top:6px;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #222;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
+          style="width:100%;margin-top:6px;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
       </div>
     </div>
-    <div id="mf-avg-display" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#666;margin-bottom:12px;min-height:16px"></div>
+    <div id="mf-avg-display" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;margin-bottom:12px;min-height:16px"></div>
     <div id="fetch-st" class="fetch-st" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddMF()">Add Fund</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
     setTimeout(()=>setupMFAutocomplete(),50);
@@ -3028,29 +3027,21 @@ function setupMFAutocomplete() {
         const r = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`, { signal: makeSig(6000) });
         if (!r.ok) return;
         const results = await r.json();
-        if (!results.length) { drop.innerHTML='<div class="ac-item" style="color:#555">No funds found</div>'; drop.style.display='block'; return; }
-
-        drop.innerHTML = results.slice(0, 15).map(f => {
+        if (!results.length) {
+          drop.innerHTML='<div style="padding:12px 14px;color:#555;font-size:12px">No funds found</div>';
+          drop.style.display='block'; return;
+        }
+        drop.innerHTML = results.slice(0, 12).map(f => {
           const name = f.schemeName || '';
-          // Detect plan type for color coding
-          const isGrowth = /growth/i.test(name) && !/idcw|dividend/i.test(name);
-          const isDividend = /idcw|dividend/i.test(name);
           const isDirect = /direct/i.test(name);
-          const planColor = isGrowth ? '#00e676' : isDividend ? '#ff9800' : '#888';
-          const planLabel = isGrowth ? 'GROWTH' : isDividend ? 'IDCW' : 'REGULAR';
-          const planBg = isGrowth ? '#0f1a0f' : isDividend ? '#1a1000' : '#111';
-
-          // Shorten name for display
-          const shortName = name.length > 60 ? name.slice(0, 57) + '…' : name;
-
-          return `<div class="ac-item" onclick="selectMFFund('${f.schemeCode}', ${JSON.stringify(name).replace(/'/g, "\\'")})"
-            style="padding:10px 12px;border-bottom:1px solid #111;cursor:pointer">
-            <div style="font-size:12px;color:#fff;line-height:1.4">${shortName}</div>
-            <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
-              <span style="font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 6px;background:${planBg};color:${planColor};border:1px solid ${planColor}33">${planLabel}</span>
-              ${isDirect?'<span style="font-size:9px;color:#7c4dff;font-family:\'JetBrains Mono\',monospace">DIRECT</span>':'<span style="font-size:9px;color:#555;font-family:\'JetBrains Mono\',monospace">REGULAR</span>'}
-              <span style="font-size:9px;color:#444;font-family:\'JetBrains Mono\',monospace">AMFI ${f.schemeCode}</span>
-            </div>
+          const isGrowth = /growth/i.test(name) && !/idcw|dividend/i.test(name);
+          const typeColor = isGrowth ? '#00e676' : '#ff9800';
+          const typeLabel = isGrowth ? 'Growth' : /idcw|dividend/i.test(name) ? 'IDCW' : 'Other';
+          const planLabel = isDirect ? 'Direct' : 'Regular';
+          return `<div class="ac-item" onclick="selectMFFund('${f.schemeCode}', ${JSON.stringify(name)})"
+            style="padding:11px 14px;border-bottom:1px solid #111;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <span style="font-size:12px;color:#ccc;font-family:'JetBrains Mono',monospace;line-height:1.4;flex:1">${name}</span>
+            <span style="font-size:10px;color:${typeColor};white-space:nowrap;opacity:0.8">${planLabel} · ${typeLabel}</span>
           </div>`;
         }).join('');
         drop.style.display = 'block';
@@ -3059,9 +3050,7 @@ function setupMFAutocomplete() {
   });
 
   document.addEventListener('click', e => {
-    if (!inp.contains(e.target) && !drop.contains(e.target)) {
-      drop.style.display = 'none';
-    }
+    if (!inp.contains(e.target) && !drop.contains(e.target)) drop.style.display='none';
   });
 }
 
