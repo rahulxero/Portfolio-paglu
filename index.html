@@ -1472,6 +1472,8 @@ async function refreshAll(){
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   if(errs.length) setStatus('warn',`Partial · ${ts} · ${errs[0]}${errs.length>1?` +${errs.length-1} more`:''}`);
   else{ const cfg=CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR; const rate=liveRates[cfg.gecko]||cfg.perUSD; setStatus('ok',`Live · Updated at ${ts} · 1 USD = ${cfg.sym}${rate.toLocaleString('en-US',{maximumFractionDigits:2})}`); }
+  // Save daily snapshot after successful refresh
+  setTimeout(saveSnapshot, 2000);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3299,13 +3301,6 @@ function showOnboardingTip(){
     }
   });
 })();
-
-// ── Save snapshot after each successful refresh ───────────
-const _origRefreshAll = refreshAll;
-async function refreshAll(){
-  await _origRefreshAll.call(this, ...arguments);
-  setTimeout(saveSnapshot, 2000);
-}
 
 // ── Wire ALL login modal interactions via JS (no onclick attrs) ──
 (function wireLoginModal(){
