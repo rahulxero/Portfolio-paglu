@@ -9,13 +9,33 @@ async function verifyFirebaseToken(authHeader) {
   if (!token) return null;
   try {
     const [, payloadB64] = token.split('.');
-    const payload = JSON.parse(Buffer.from(payloadB64 + '==', 'base64').toString());
+    // Fix base64 padding
+    const padded = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = padded.length % 4;
+    const fixed = pad ? padded + '='.repeat(4 - pad) : padded;
+    const payload = JSON.parse(Buffer.from(fixed, 'base64').toString('utf8'));
+
+    // Check expiry
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      console.warn('Token expired');
+      return null;
+    }
+
+    // Check audience — Firebase tokens have aud = projectId
     const projectId = process.env.FIREBASE_PROJECT_ID;
-    if (!projectId) return null;
-    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
-    if (payload.aud !== projectId) return null;
-    return { uid: payload.user_id || payload.sub, email: payload.email };
-  } catch(e) { return null; }
+    if (projectId && payload.aud !== projectId) {
+      console.warn('Token aud mismatch:', payload.aud, '!=', projectId);
+      return null;
+    }
+
+    const uid = payload.user_id || payload.sub;
+    if (!uid) return null;
+
+    return { uid, email: payload.email };
+  } catch(e) {
+    console.error('Token verify error:', e.message);
+    return null;
+  }
 }
 
 function getSupabase() {
