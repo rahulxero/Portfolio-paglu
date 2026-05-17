@@ -6,6 +6,6 @@
     "@supabase/supabase-js": "^2.49.4"
   },
   "engines": {
-    "node": ">=18"
+    "node": "20.x"
   }
 }
