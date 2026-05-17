@@ -1497,7 +1497,7 @@ const lc=()=>'<span class="lv">—</span>';
 function ageLbl(ms){const m=Math.floor(ms/60000);if(m<2)return'just now';if(m<60)return`${m}m ago`;const h=Math.floor(m/60);if(h<24)return`${h}h ago`;const d=Math.floor(h/24);if(d<30)return`${d}d ago`;const mo=Math.floor(d/30);return`${mo}mo ago`;}
 function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed Deposit',rd:'Recurring Deposit',ppf:'PPF',nps:'NPS',wallet:'Digital Wallet',other:'Other'}[t]||'Savings';}
 // walletUSD — total USD value of a wallet's positions (Zerion gives USD natively)
-function walletUSD(w){return w.positions.reduce((s,p)=>s+(p.valueUSD||0),0);}
+function walletUSD(w){ return w.totalUSD || w.positions?.reduce((s,p)=>s+(p.valueUSD||0),0) || 0; }
 // Stablecoin symbol list for pie chart splitting
 const STABLE_SYMS = new Set(['USDC','USDT','DAI','BUSD','TUSD','FDUSD','USDP','GUSD','USDD','FRAX','LUSD','CRVUSD','PYUSD','USDS','USDE','USDN','XUSD','SUSD','NUSD','EURC','AGEUR','MIM','DOLA','UST']);
 
@@ -1518,10 +1518,15 @@ function vals(){
   // Split crypto into stablecoins vs actual crypto
   let cryptoUSD = 0, stableUSD = 0;
 
-  // EVM wallets
+  // EVM wallets — split into stable vs crypto if positions available
   D.wallets.forEach(w => {
-    cryptoUSD += safe(walletCryptoUSD(w));
-    stableUSD += safe(walletStableUSD(w));
+    if (w.positions?.length) {
+      cryptoUSD += safe(walletCryptoUSD(w));
+      stableUSD += safe(walletStableUSD(w));
+    } else {
+      // Positions not loaded yet — count all as crypto
+      cryptoUSD += safe(walletUSD(w));
+    }
   });
 
   // BTC (never a stablecoin)
