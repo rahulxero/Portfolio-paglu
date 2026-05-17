@@ -1337,8 +1337,25 @@ async function fetchWalletPositions(wallet){
     }catch(e){ console.warn('Hyperliquid fetch failed:', e.message); }
   }
 
-  // Merge — deduplicate by symbol+chain
-  wallet.positions = [...evmPositions, ...hlPositions];
+  // ── Polymarket positions ──────────────────────────────────
+  let polyPositions = [];
+  if(wallet.includeHL){ // includeHL wallets also check Polymarket (same EVM address)
+    try{
+      const r = await fetch('/api/polymarket', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ address: wallet.address }),
+        signal: makeSig(15000),
+      });
+      if(r.ok){
+        const d = await r.json();
+        polyPositions = (d.positions||[]).filter(p=>p.currentValue>0.1);
+        wallet._polyTotal = d.totalValue || 0;
+      }
+    }catch(e){ console.warn('Polymarket fetch failed:', e.message); }
+  }
+
+  // Merge all positions
+  wallet.positions = [...evmPositions, ...hlPositions, ...polyPositions];
   wallet.totalUSD = wallet.positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
   wallet.fetching = false;
 }
@@ -1779,7 +1796,7 @@ function renderHoldings(){
       if(hideSmall && !w.fetching && w.positions.length && !visiblePositions.length) return;
 
       rows+=`<div class="w-grp">
-        <span class="badge">${w.includeHL ? 'EVM+HL' : 'EVM'}</span>
+        <span class="badge">EVM</span>
         <span>${addr}</span>
         <span style="color:#888">${w.label}</span>
         ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
@@ -1790,7 +1807,7 @@ function renderHoldings(){
       </div>`;
 
       if(w.fetching){
-        rows+=`<div class="trow" style="color:#555;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> ${w.includeHL ? 'Zerion + Hyperliquid scanning…' : 'Zerion scanning 40+ chains…'}</div>`;
+        rows+=`<div class="trow" style="color:#555;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Scanning EVM chains + Hyperliquid…</div>`;
       }else if(!w.positions.length){
         rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:14px 8px;display:flex;align-items:center;gap:12px">${
           w._zerionError
@@ -1802,6 +1819,26 @@ function renderHoldings(){
       }else{
         visiblePositions.forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
+
+          // Polymarket positions get special rendering
+          if(p.source==='polymarket'){
+            const pnlColor = p.cashPnl>=0?'#00e676':'#ff4444';
+            const pnlSign = p.cashPnl>=0?'+':'';
+            const prob = (p.curPrice*100).toFixed(1)+'%';
+            rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
+              <div class="tok-logo" style="font-size:9px">${p.icon?`<img src="${p.icon}" onerror="this.style.display='none'">`:'🎯'}</div>
+              <div>
+                <span class="an" style="font-size:10px;line-height:1.3">${p.title.length>45?p.title.slice(0,42)+'…':p.title}</span>
+                ${chainPill('polymarket')}
+                <div class="as">${p.outcome} · ${prob} prob.</div>
+              </div>
+              <span class="mv">${p.size.toFixed(2)} shares</span>
+              <span class="mv">${prob}</span>
+              <span class="mv">${fI(p.currentValue)}</span>
+              <span class="mv sm" style="color:${pnlColor}">${pnlSign}${fI(Math.abs(p.cashPnl))} (${pnlSign}${p.percentPnl.toFixed(1)}%)</span>
+            </div>`;
+            return;
+          }
           rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
             <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${p.symbol.slice(0,2)}`}</div>
             <div><span class="an">${p.symbol}</span>${chainPill(p.chain)}<div class="as">${p.name}</div></div>
@@ -2141,18 +2178,16 @@ function renderAddForm(){
     h=`<p class="add-panel-title">Add Wallet</p>
     <div class="fg fg3">
       <div><label>Chain</label><select id="f-wt">
-        <option value="evm">EVM — Ethereum, Polygon, BNB, Arbitrum, Base…</option>
-        <option value="evm+hl">EVM + Hyperliquid — same 0x address on both</option>
+        <option value="evm+hl">EVM — Ethereum, Polygon, BNB, Arbitrum, Base…</option>
         <option value="btc">Bitcoin (BTC)</option>
         <option value="sol">Solana (SOL)</option>
         <option value="trx">TRON (TRX)</option>
-        <option value="hl">Hyperliquid only (HyperCore + HyperEVM)</option>
         <option value="xmr">Monero (XMR)</option>
       </select></div>
       <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok">✓ EVM+Hyperliquid fetches both Zerion and HyperCore/HyperEVM in one entry. Monero via viewkey scan.</div>
+    <div class="info-box info-ok">✓ EVM wallets auto-scan 40+ chains via Zerion + Hyperliquid positions. Monero balance is entered manually.</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -2622,7 +2657,11 @@ async function loadCloudPortfolio() {
     const r = await fetch('/api/user?action=portfolio', {
       headers: { Authorization: `Bearer ${supaToken}` }
     });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) {
+      const errData = await r.json().catch(()=>({error:'parse failed'}));
+      console.error('API /user error:', r.status, JSON.stringify(errData));
+      throw new Error(`HTTP ${r.status}: ${errData.error||''} | code: ${errData.code||'-'} | ${errData.details||''}`);
+    }
     const data = await r.json();
     if (data.error) throw new Error(data.error);
 
