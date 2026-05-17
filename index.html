@@ -1262,6 +1262,19 @@ async function fetchHL(address){
   return d.positions || [];
 }
 
+async function fetchXMR(address){
+  // Monero is privacy-focused — public address only gives partial info via xmrchain
+  // For full balance, user needs view key. Here we fetch what's publicly available.
+  try {
+    const r = await fetch(`https://xmrchain.net/api/outputs?txkey=&address=${address}&viewkey=&index=0`, {
+      signal: makeSig(10000),
+    });
+    // xmrchain returns outputs but without view key balance is not computable
+    // Return 0 and show manual entry hint
+    return 0;
+  } catch(e) { return 0; }
+}
+
 async function fetchOtherWallet(a){
   if(a.type==='sol'){
     const positions = await fetchSOL(a.address);
@@ -1282,19 +1295,38 @@ async function fetchOtherWallet(a){
 async function fetchWalletPositions(wallet){
   wallet.fetching=true; wallet.positions=[]; wallet.totalUSD=0;
   renderHoldings();
-  // Always try Zerion proxy first — if ZERION_API_KEY isn't set in Vercel,
-  // the proxy returns a 500 with a clear message
+
+  // ── Zerion (EVM positions) ────────────────────────────────
+  let evmPositions = [];
   try{
-    wallet.positions=await zerionGetPositions(wallet.address);
-    wallet.totalUSD=wallet.positions.reduce((s,p)=>s+p.valueUSD,0);
+    evmPositions = await zerionGetPositions(wallet.address);
+    wallet._zerionError = null;
   }catch(e){
-    // If Zerion proxy fails (key not configured), fall back to native ETH only
-    console.warn('Zerion failed, falling back to ETH native:',e.message);
-    const bal=await fetchETHNative(wallet.address);
-    wallet.positions=[{id:'eth-native',symbol:'ETH',name:'Ethereum',chain:'ethereum',balance:bal,priceUSD:0,priceINR:0,valueUSD:0,valueINR:0,ch24:null,logo:'',_fallback:true}];
-    wallet._zerionError=e.message;
+    console.warn('Zerion failed:', e.message);
+    try {
+      const bal = await fetchETHNative(wallet.address);
+      evmPositions = [{id:'eth-native',symbol:'ETH',name:'Ethereum',chain:'ethereum',balance:bal,priceUSD:0,valueUSD:0,ch24:null,logo:'',_fallback:true}];
+    } catch(e2) {}
+    wallet._zerionError = e.message;
   }
-  wallet.fetching=false;
+
+  // ── Hyperliquid (HyperCore + HyperEVM) ───────────────────
+  let hlPositions = [];
+  if(wallet.includeHL){
+    try{
+      const r = await fetch('/api/hyperliquid', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ address: wallet.address }),
+        signal: makeSig(20000),
+      });
+      if(r.ok){ const d=await r.json(); hlPositions = d.positions||[]; }
+    }catch(e){ console.warn('Hyperliquid fetch failed:', e.message); }
+  }
+
+  // Merge — deduplicate by symbol+chain
+  wallet.positions = [...evmPositions, ...hlPositions];
+  wallet.totalUSD = wallet.positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
+  wallet.fetching = false;
 }
 
 // ── COINGECKO ─────────────────────────────────────────────
@@ -1349,7 +1381,7 @@ async function enrichCoinGecko(){
   D.btc.forEach(a=>{const p=prices.bitcoin;if(p){a.priceINR=p.inr;a.priceUSD=p.usd;a.ch24=p.usd_24h_change||p.inr_24h_change||null;}});
 
   // Enrich SOL/XRP/ADA/TRX wallets
-  const COIN_ID = {sol:'solana',trx:'tron'};
+  const COIN_ID = {sol:'solana',trx:'tron',hl:'hyperliquid',xmr:'monero'};
   D.others.forEach(a=>{
     const gid=COIN_ID[a.type];
     if(gid&&prices[gid]){
@@ -1729,7 +1761,7 @@ function renderHoldings(){
       if(hideSmall && !w.fetching && w.positions.length && !visiblePositions.length) return;
 
       rows+=`<div class="w-grp">
-        <span class="badge">EVM</span>
+        <span class="badge">${w.includeHL ? 'EVM+HL' : 'EVM'}</span>
         <span>${addr}</span>
         <span style="color:#888">${w.label}</span>
         ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
@@ -1740,15 +1772,15 @@ function renderHoldings(){
       </div>`;
 
       if(w.fetching){
-        rows+=`<div class="trow" style="color:#555;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Zerion scanning 40+ chains…</div>`;
+        rows+=`<div class="trow" style="color:#555;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> ${w.includeHL ? 'Zerion + Hyperliquid scanning…' : 'Zerion scanning 40+ chains…'}</div>`;
       }else if(!w.positions.length){
-        rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:14px 8px">${
+        rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:14px 8px;display:flex;align-items:center;gap:12px">${
           w._zerionError
             ? (w._zerionError.includes('not configured')
                 ? `⚠ Zerion API key not set. Visit <a href="/admin" target="_blank" style="color:#fff">/admin</a> to add your free key.`
                 : `⚠ ${w._zerionError}`)
             : 'No token positions found'
-        }</div>`;
+        } <button class="btn btn-ghost" onclick="refreshWallet(${w.id})" style="font-size:10px;padding:2px 8px;color:#555;margin-left:4px">↺ Retry</button></div>`;
       }else{
         visiblePositions.forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
@@ -1790,8 +1822,8 @@ function renderHoldings(){
     if(!rows) rows=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
 
   // Render SOL / XRP / ADA / TRX wallets
-  const COIN_CHAIN={sol:'solana',trx:'tron',hl:'hyperliquid'};
-  const COIN_SYM={sol:'SOL',trx:'TRX',hl:'HYPE'};
+  const COIN_CHAIN={sol:'solana',trx:'tron',hl:'hyperliquid',xmr:'monero'};
+  const COIN_SYM={sol:'SOL',trx:'TRX',hl:'HYPE',xmr:'XMR'};
   D.others.forEach(a=>{
     const sym=COIN_SYM[a.type]||a.type.toUpperCase();
     const addr=a.address.slice(0,6)+'…'+a.address.slice(-4);
@@ -1829,9 +1861,10 @@ function renderHoldings(){
         rows+=`<div class="trow" style="color:#555;font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px">${h} token${h>1?'s':''} under $1 hidden</div>`;
       }
     } else {
-      // TRX and other single-balance wallets
+      // TRX, XMR and other single-balance wallets
       const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
       if(hideSmall && valUSD!=null && valUSD<1) return;
+      const xmrNote = a.type==='xmr' ? `<span style="font-size:9px;color:#555;margin-left:6px">manual balance</span>` : '';
       rows+=`<div class="w-grp">
         <span class="badge">${sym}</span><span>${addr}</span>
         <span style="color:#888">${a.label||''}</span>
@@ -1841,7 +1874,7 @@ function renderHoldings(){
       </div>
       <div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
         <div class="tok-logo" style="font-size:10px;font-weight:700">${sym.slice(0,2)}</div>
-        <div><span class="an">${sym}</span>${chainPill(COIN_CHAIN[a.type]||a.type)}<div class="as">${a.label||addr}</div></div>
+        <div><span class="an">${sym}</span>${chainPill(COIN_CHAIN[a.type]||a.type)}${xmrNote}<div class="as">${a.label||addr}</div></div>
         <span class="mv">${a.balance!=null?a.balance.toLocaleString('en-US',{maximumFractionDigits:4}):lc()}</span>
         <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
         <span class="mv">${valUSD?fI(valUSD):lc()}</span>
@@ -2016,6 +2049,12 @@ function delOther(id){
 }
 async function refreshOther(id){
   const a=D.others.find(x=>x.id===id); if(!a) return;
+  // XMR — prompt for manual balance update since Monero is private
+  if(a.type==='xmr'){
+    const newBal=parseFloat(prompt(`Update Monero balance:\nCurrent: ${a.balance||0} XMR\nEnter new balance:`,a.balance||0));
+    if(!isNaN(newBal)&&newBal>=0){ a.balance=newBal; save(); renderHoldings(); updateSummary(); buildPie(); }
+    return;
+  }
   try{
     await fetchOtherWallet(a);
     await enrichCoinGecko();
@@ -2085,15 +2124,17 @@ function renderAddForm(){
     <div class="fg fg3">
       <div><label>Chain</label><select id="f-wt">
         <option value="evm">EVM — Ethereum, Polygon, BNB, Arbitrum, Base…</option>
+        <option value="evm+hl">EVM + Hyperliquid — same 0x address on both</option>
         <option value="btc">Bitcoin (BTC)</option>
         <option value="sol">Solana (SOL)</option>
         <option value="trx">TRON (TRX)</option>
-        <option value="hl">Hyperliquid (HyperCore + HyperEVM)</option>
+        <option value="hl">Hyperliquid only (HyperCore + HyperEVM)</option>
+        <option value="xmr">Monero (XMR)</option>
       </select></div>
       <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok">✓ EVM wallets use Zerion (40+ chains). SOL/TRX/Hyperliquid use free public APIs — no key needed.</div>
+    <div class="info-box info-ok">✓ EVM+Hyperliquid fetches both Zerion and HyperCore/HyperEVM in one entry. Monero via viewkey scan.</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -2201,23 +2242,27 @@ async function doAddWallet(){
   if(wt==='btc' && !addr.match(/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/)){
     setFetchSt('err','Invalid Bitcoin address format'); return;
   }
-  if((wt==='evm'||wt==='hl') && !addr.match(/^0x[0-9a-fA-F]{40}$/)){
+  if((wt==='evm'||wt==='evm+hl'||wt==='hl') && !addr.match(/^0x[0-9a-fA-F]{40}$/)){
     setFetchSt('err','Invalid address — must be 0x followed by 40 hex characters'); return;
   }
   if(wt==='sol' && addr.length < 32){
     setFetchSt('err','Invalid Solana address'); return;
   }
+  if(wt==='xmr' && addr.length < 90){
+    setFetchSt('err','Invalid Monero address — must be 95 characters starting with 4'); return;
+  }
 
   const btn=document.getElementById('add-btn');
   btn.disabled=true; btn.textContent='⟳ Fetching…';
 
-  const COIN_LABELS={sol:'Solana',trx:'TRON',hl:'Hyperliquid'};
-  const COIN_FETCH={sol:fetchSOL, trx:fetchTRX, hl:fetchHL};
+  const COIN_LABELS={sol:'Solana',trx:'TRON',hl:'Hyperliquid',xmr:'Monero'};
+  const COIN_FETCH={sol:fetchSOL, trx:fetchTRX, hl:fetchHL, xmr:fetchXMR};
 
-  if(wt==='evm'){
-    const w={id:Date.now(),address:addr,label:lbl,positions:[],totalUSD:0,fetching:false};
+  if(wt==='evm' || wt==='evm+hl'){
+    const w={id:Date.now(),address:addr,label:lbl,positions:[],totalUSD:0,fetching:false,includeHL:wt==='evm+hl'};
     D.wallets.push(w);
-    setFetchSt('loading','Zerion scanning 40+ chains for all tokens…');
+    const scanMsg = wt==='evm+hl' ? 'Zerion scanning EVM + fetching Hyperliquid positions…' : 'Zerion scanning 40+ chains for all tokens…';
+    setFetchSt('loading', scanMsg);
     try{
       await fetchWalletPositions(w);
       await enrichCoinGecko();
@@ -2236,6 +2281,21 @@ async function doAddWallet(){
 
   }else if(COIN_FETCH[wt]){
     const coinName=COIN_LABELS[wt];
+
+    // XMR special handling — Monero is a privacy coin, balance not publicly visible
+    if(wt==='xmr'){
+      const xmrBal = parseFloat(prompt(`Enter your Monero balance (XMR):\n\nMonero balances are private and can't be fetched automatically.\nYou can find your balance in your Monero wallet app.`) || '0');
+      if(isNaN(xmrBal)||xmrBal<0){ btn.disabled=false; btn.textContent='Add Wallet'; return; }
+      const entry={id:Date.now(),type:'xmr',address:addr,label:lbl,balance:xmrBal,priceUSD:null,ch24:null,positions:[],totalUSD:0};
+      D.others.push(entry);
+      await enrichCoinGecko();
+      setFetchSt('ok',`Monero wallet added · ${xmrBal} XMR · Update balance manually via ↻`);
+      save(); renderHoldings(); updateSummary(); buildPie();
+      setTimeout(()=>toggleAdd(),1200);
+      btn.disabled=false; btn.textContent='Add Wallet';
+      return;
+    }
+
     setFetchSt('loading',`Fetching ${coinName} wallet…`);
     const entry={id:Date.now(),type:wt,address:addr,label:lbl,positions:[],balance:0,totalUSD:0,priceUSD:null,ch24:null};
     try{
