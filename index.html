@@ -2179,7 +2179,7 @@ function renderAddForm(){
   let h='';
   if(activeTab==='crypto'){
     h=`<p class="add-panel-title">Add Wallet</p>
-    <div class="fg fg3">
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:12px">
       <div>
         <label>Chain</label>
         <select id="f-wt" onchange="updateChainInfo()">
@@ -2189,13 +2189,13 @@ function renderAddForm(){
           <option value="trx">TRON (TRX)</option>
           <option value="xmr">Monero (XMR)</option>
         </select>
-        <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555;overflow:hidden;white-space:nowrap">
+        <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555;overflow:hidden;white-space:nowrap;width:200px">
           <span id="chain-marquee" style="display:inline-block;animation:marquee 18s linear infinite">
             Ethereum &nbsp;·&nbsp; Arbitrum &nbsp;·&nbsp; Base &nbsp;·&nbsp; BNB Chain &nbsp;·&nbsp; Polygon &nbsp;·&nbsp; Optimism &nbsp;·&nbsp; Avalanche &nbsp;·&nbsp; Fantom &nbsp;·&nbsp; zkSync &nbsp;·&nbsp; Linea &nbsp;·&nbsp; Hyperliquid &nbsp;·&nbsp; Polymarket &nbsp;·&nbsp; Blast &nbsp;·&nbsp; Scroll &nbsp;&nbsp;&nbsp;&nbsp;
           </span>
         </div>
       </div>
-      <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
+      <div><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
     <div class="info-box info-ok" id="chain-desc">✓ Scans 40+ EVM chains via Zerion + Hyperliquid positions + Polymarket — all in one entry.</div>
