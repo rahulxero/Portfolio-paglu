@@ -1,7 +1,8 @@
 // api/user.js — Portfolio CRUD
-// Auth: Firebase ID token | Storage: Supabase service key
+// Uses Supabase REST API directly (no SDK) to avoid Node.js 20 WebSocket issues
+// Auth: Firebase ID token
 
-const { createClient } = require('@supabase/supabase-js');
+const https = require('https');
 
 function decodeToken(authHeader) {
   try {
@@ -12,19 +13,51 @@ function decodeToken(authHeader) {
     let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     while (b64.length % 4) b64 += '=';
     const p = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
-    if (p.exp && p.exp * 1000 < Date.now()) { console.log('Token expired'); return null; }
+    if (p.exp && p.exp * 1000 < Date.now()) return null;
     const uid = p.user_id || p.sub;
-    if (!uid) { console.log('No uid in token, keys:', Object.keys(p)); return null; }
-    console.log('Auth OK uid:', uid, 'aud:', p.aud, 'project:', process.env.FIREBASE_PROJECT_ID);
+    if (!uid) return null;
     return { uid, email: p.email };
-  } catch(e) { console.error('Token decode error:', e.message); return null; }
+  } catch(e) { return null; }
 }
 
-function sb() {
+// Direct Supabase REST call — no SDK needed
+async function supaFetch(method, table, opts = {}) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) { console.log('Supabase env vars missing'); return null; }
-  return createClient(url, key, { auth: { persistSession: false } });
+  if (!url || !key) throw new Error('Supabase not configured');
+
+  const { filter, body, select, upsert } = opts;
+  let endpoint = `${url}/rest/v1/${table}`;
+
+  const params = new URLSearchParams();
+  if (select) params.set('select', select);
+  if (filter) Object.entries(filter).forEach(([k, v]) => params.set(k, v));
+  if (upsert) params.set('on_conflict', upsert);
+  const qs = params.toString();
+  if (qs) endpoint += '?' + qs;
+
+  const headers = {
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
+    'Content-Type': 'application/json',
+    'Prefer': method === 'POST' ? (upsert ? 'resolution=merge-duplicates,return=minimal' : 'return=representation') : 'return=representation',
+  };
+
+  const res = await fetch(endpoint, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch(e) { data = text; }
+
+  if (!res.ok) {
+    console.error(`Supabase ${method} ${table} error:`, res.status, text.slice(0, 300));
+    throw Object.assign(new Error(data?.message || data?.error || `Supabase ${res.status}`), { code: data?.code, details: data?.details });
+  }
+  return data;
 }
 
 const EMPTY = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
@@ -38,41 +71,40 @@ module.exports = async function handler(req, res) {
   const user = decodeToken(req.headers.authorization);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-  const client = sb();
-  if (!client) return res.status(200).json({ data: EMPTY, currency: 'INR', isNew: true, _note: 'no db' });
+  if (!process.env.SUPABASE_URL) {
+    return res.status(200).json({ data: EMPTY, currency: 'INR', isNew: true });
+  }
 
   const action = req.query.action || req.body?.action;
 
   try {
     // ── GET portfolio ──────────────────────────────────────
     if (req.method === 'GET' && action === 'portfolio') {
-      const { data, error } = await client
-        .from('portfolios').select('data,currency,updated_at')
-        .eq('user_id', user.uid).maybeSingle();
-      if (error) { console.error('GET portfolio error:', error); throw error; }
-      if (!data) return res.json({ data: EMPTY, currency: 'INR', isNew: true });
-      return res.json(data);
+      const rows = await supaFetch('GET', 'portfolios', {
+        select: 'data,currency,updated_at',
+        filter: { 'user_id': `eq.${user.uid}`, 'limit': '1' },
+      });
+      if (!rows || !rows.length) return res.json({ data: EMPTY, currency: 'INR', isNew: true });
+      return res.json(rows[0]);
     }
 
     // ── SAVE portfolio ─────────────────────────────────────
     if (req.method === 'POST' && action === 'portfolio') {
       const { data: portfolio, currency } = req.body;
-      const { error } = await client.from('portfolios').upsert(
-        { user_id: user.uid, data: portfolio, currency: currency || 'INR', updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      );
-      if (error) { console.error('SAVE portfolio error:', error); throw error; }
+      await supaFetch('POST', 'portfolios', {
+        body: { user_id: user.uid, data: portfolio, currency: currency || 'INR', updated_at: new Date().toISOString() },
+        upsert: 'user_id',
+      });
       return res.json({ ok: true });
     }
 
     // ── SNAPSHOT ───────────────────────────────────────────
     if (req.method === 'POST' && action === 'snapshot') {
       const { value_usd, breakdown } = req.body;
-      const { error } = await client.from('snapshots').upsert(
-        { user_id: user.uid, value_usd, breakdown, snapped_at: new Date().toISOString().slice(0,10) },
-        { onConflict: 'user_id,snapped_at' }
-      );
-      if (error) { console.error('Snapshot error:', error); throw error; }
+      await supaFetch('POST', 'snapshots', {
+        body: { user_id: user.uid, value_usd, breakdown, snapped_at: new Date().toISOString().slice(0,10) },
+        upsert: 'user_id,snapped_at',
+      });
       return res.json({ ok: true });
     }
 
@@ -80,69 +112,62 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET' && action === 'snapshots') {
       const days = parseInt(req.query.days || '90');
       const since = new Date(Date.now() - days * 86400000).toISOString().slice(0,10);
-      const { data, error } = await client.from('snapshots')
-        .select('value_usd,breakdown,snapped_at')
-        .eq('user_id', user.uid).gte('snapped_at', since)
-        .order('snapped_at', { ascending: true });
-      if (error) throw error;
-      return res.json({ snapshots: data || [] });
+      const rows = await supaFetch('GET', 'snapshots', {
+        select: 'value_usd,breakdown,snapped_at',
+        filter: { 'user_id': `eq.${user.uid}`, 'snapped_at': `gte.${since}`, 'order': 'snapped_at.asc' },
+      });
+      return res.json({ snapshots: rows || [] });
     }
 
     // ── ALERTS ─────────────────────────────────────────────
     if (req.method === 'GET' && action === 'alerts') {
-      const { data, error } = await client.from('alerts').select('*')
-        .eq('user_id', user.uid).order('created_at', { ascending: false });
-      if (error) throw error;
-      return res.json({ alerts: data || [] });
+      const rows = await supaFetch('GET', 'alerts', {
+        select: '*',
+        filter: { 'user_id': `eq.${user.uid}`, 'order': 'created_at.desc' },
+      });
+      return res.json({ alerts: rows || [] });
     }
 
     if (req.method === 'POST' && action === 'alert_create') {
       const { type, asset, threshold, currency, channel, telegram_chat_id } = req.body;
-      const { data, error } = await client.from('alerts').insert(
-        { user_id: user.uid, type, asset, threshold, currency: currency||'USD', channel: channel||'email', telegram_chat_id }
-      ).select().single();
-      if (error) throw error;
-      return res.json({ alert: data });
+      const rows = await supaFetch('POST', 'alerts', {
+        body: { user_id: user.uid, type, asset, threshold, currency: currency||'USD', channel: channel||'email', telegram_chat_id },
+      });
+      return res.json({ alert: rows?.[0] });
     }
 
     if (req.method === 'DELETE' && action === 'alert_delete') {
-      const { error } = await client.from('alerts').delete().eq('id', req.body?.id).eq('user_id', user.uid);
-      if (error) throw error;
-      return res.json({ ok: true });
-    }
-
-    if (req.method === 'POST' && action === 'alert_toggle') {
-      const { error } = await client.from('alerts').update({ active: req.body?.active }).eq('id', req.body?.id).eq('user_id', user.uid);
-      if (error) throw error;
+      await supaFetch('DELETE', `alerts?id=eq.${req.body?.id}&user_id=eq.${user.uid}`, {});
       return res.json({ ok: true });
     }
 
     // ── SHARE LINKS ────────────────────────────────────────
     if (req.method === 'POST' && action === 'share_create') {
       const { slug, show_values } = req.body;
-      const { data: ex } = await client.from('share_links').select('id').eq('slug', slug).maybeSingle();
-      if (ex) return res.status(409).json({ error: 'Slug taken' });
-      const { data, error } = await client.from('share_links')
-        .insert({ user_id: user.uid, slug, show_values: show_values !== false }).select().single();
-      if (error) throw error;
-      return res.json({ link: data });
+      const existing = await supaFetch('GET', 'share_links', { filter: { 'slug': `eq.${slug}`, 'limit': '1' } });
+      if (existing?.length) return res.status(409).json({ error: 'Slug taken' });
+      const rows = await supaFetch('POST', 'share_links', {
+        body: { user_id: user.uid, slug, show_values: show_values !== false },
+      });
+      return res.json({ link: rows?.[0] });
     }
 
     if (req.method === 'GET' && action === 'share_get') {
-      const { data, error } = await client.from('share_links').select('*').eq('user_id', user.uid).maybeSingle();
-      if (error) throw error;
-      return res.json({ link: data || null });
+      const rows = await supaFetch('GET', 'share_links', {
+        filter: { 'user_id': `eq.${user.uid}`, 'limit': '1' },
+      });
+      return res.json({ link: rows?.[0] || null });
     }
 
     if (req.method === 'DELETE' && action === 'share_delete') {
-      await client.from('share_links').delete().eq('user_id', user.uid);
+      await supaFetch('DELETE', `share_links?user_id=eq.${user.uid}`, {});
       return res.json({ ok: true });
     }
 
     return res.status(400).json({ error: 'Unknown action: ' + action });
 
   } catch(err) {
-    console.error('user.js handler error:', err?.message, err?.code, err?.details);
-    return res.status(500).json({ error: err?.message || 'Server error', code: err?.code, details: err?.details });
+    console.error('user.js error:', err.message, err.code);
+    return res.status(500).json({ error: err.message, code: err.code });
   }
 };
