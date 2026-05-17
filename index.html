@@ -2093,6 +2093,9 @@ function renderAddForm(){
           style="width:100%;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
         <div class="ac-drop" id="ac-mf"></div>
       </div>
+      <div style="font-size:10px;color:#444;font-family:'JetBrains Mono',monospace;margin-top:6px">
+        💡 Direct Growth plans shown first — these are the best for long-term investing
+      </div>
       <div id="mf-selected" style="display:none;margin-top:8px;padding:10px 14px;background:#0a0a0a;border:1px solid #1a3a1a">
         <div style="font-size:13px;color:#fff;font-family:'JetBrains Mono',monospace" id="mf-sel-name"></div>
         <div style="font-size:11px;color:#00e676;margin-top:3px" id="mf-sel-meta"></div>
@@ -3021,32 +3024,40 @@ function setupMFAutocomplete() {
   inp.addEventListener('input', () => {
     clearTimeout(debounce);
     const q = inp.value.trim();
-    if (q.length < 3) { drop.innerHTML=''; drop.style.display='none'; return; }
+    if (q.length < 3) { drop.style.display='none'; return; }
     debounce = setTimeout(async () => {
       try {
         const r = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`, { signal: makeSig(6000) });
         if (!r.ok) return;
-        const results = await r.json();
-        if (!results.length) {
-          drop.innerHTML='<div style="padding:12px 14px;color:#555;font-size:12px">No funds found</div>';
+        const all = await r.json();
+        if (!all.length) {
+          drop.innerHTML='<div style="padding:14px;color:#555;font-size:12px;font-family:\'JetBrains Mono\',monospace">No funds found</div>';
           drop.style.display='block'; return;
         }
-        drop.innerHTML = results.slice(0, 12).map(f => {
+
+        // Prefer Direct Growth, then Direct, then everything else
+        const directGrowth = all.filter(f => /direct/i.test(f.schemeName) && /growth/i.test(f.schemeName) && !/idcw|dividend/i.test(f.schemeName));
+        const directOther  = all.filter(f => /direct/i.test(f.schemeName) && !/growth/i.test(f.schemeName));
+        const rest         = all.filter(f => !/direct/i.test(f.schemeName));
+
+        // Build ordered list — direct growth first, max 8 results
+        const ordered = [...directGrowth, ...directOther, ...rest].slice(0, 8);
+
+        drop.innerHTML = ordered.map(f => {
           const name = f.schemeName || '';
-          const isDirect = /direct/i.test(name);
           const isGrowth = /growth/i.test(name) && !/idcw|dividend/i.test(name);
-          const typeColor = isGrowth ? '#00e676' : '#ff9800';
-          const typeLabel = isGrowth ? 'Growth' : /idcw|dividend/i.test(name) ? 'IDCW' : 'Other';
-          const planLabel = isDirect ? 'Direct' : 'Regular';
+          const tag = isGrowth
+            ? `<span style="font-size:9px;padding:2px 6px;background:#0a1f0a;color:#00e676;border:1px solid #00e67633;font-family:'JetBrains Mono',monospace">GROWTH</span>`
+            : `<span style="font-size:9px;padding:2px 6px;background:#1a1000;color:#ff9800;border:1px solid #ff980033;font-family:'JetBrains Mono',monospace">IDCW</span>`;
           return `<div class="ac-item" onclick="selectMFFund('${f.schemeCode}', ${JSON.stringify(name)})"
-            style="padding:11px 14px;border-bottom:1px solid #111;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px">
-            <span style="font-size:12px;color:#ccc;font-family:'JetBrains Mono',monospace;line-height:1.4;flex:1">${name}</span>
-            <span style="font-size:10px;color:${typeColor};white-space:nowrap;opacity:0.8">${planLabel} · ${typeLabel}</span>
+            style="padding:12px 14px;border-bottom:1px solid #0d0d0d;cursor:pointer">
+            <div style="font-size:12px;color:#ddd;font-family:'JetBrains Mono',monospace;line-height:1.5;margin-bottom:4px">${name}</div>
+            ${tag}
           </div>`;
         }).join('');
         drop.style.display = 'block';
       } catch(e) {}
-    }, 300);
+    }, 350);
   });
 
   document.addEventListener('click', e => {
