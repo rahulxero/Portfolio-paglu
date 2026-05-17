@@ -1498,22 +1498,55 @@ function ageLbl(ms){const m=Math.floor(ms/60000);if(m<2)return'just now';if(m<60
 function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed Deposit',rd:'Recurring Deposit',ppf:'PPF',nps:'NPS',wallet:'Digital Wallet',other:'Other'}[t]||'Savings';}
 // walletUSD — total USD value of a wallet's positions (Zerion gives USD natively)
 function walletUSD(w){return w.positions.reduce((s,p)=>s+(p.valueUSD||0),0);}
+// Stablecoin symbol list for pie chart splitting
+const STABLE_SYMS = new Set(['USDC','USDT','DAI','BUSD','TUSD','FDUSD','USDP','GUSD','USDD','FRAX','LUSD','CRVUSD','PYUSD','USDS','USDE','USDN','XUSD','SUSD','NUSD','EURC','AGEUR','MIM','DOLA','UST']);
+
+function isStable(sym) { return STABLE_SYMS.has((sym||'').toUpperCase()); }
+
+function walletStableUSD(w){
+  return (w.positions||[]).reduce((s,p)=>s+(isStable(p.symbol)?(p.valueUSD||0):0),0);
+}
+function walletCryptoUSD(w){
+  return (w.positions||[]).reduce((s,p)=>s+(isStable(p.symbol)?0:(p.valueUSD||0)),0);
+}
+
 function vals(){
-  const rate = liveRates.inr || USD_INR || 84;
+  const rate = liveRates.inr || USD_INR || 96;
   const inrToUSD = v => (isFinite(v) && v > 0) ? v / rate : 0;
   const safe = v => (isFinite(v) && !isNaN(v) && v > 0) ? v : 0;
-  const c = safe(D.wallets.reduce((s,w)=>s+walletUSD(w),0))
-          + safe(D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0))
-          + safe(D.others.reduce((s,a)=>{
-              if((a.type==='sol'||a.type==='hl') && a.positions?.length)
-                return s+a.positions.reduce((ps,p)=>ps+safe(p.valueUSD||0),0);
-              return s+safe(a.priceUSD&&a.balance?a.balance*a.priceUSD:0);
-            },0));
+
+  // Split crypto into stablecoins vs actual crypto
+  let cryptoUSD = 0, stableUSD = 0;
+
+  // EVM wallets
+  D.wallets.forEach(w => {
+    cryptoUSD += safe(walletCryptoUSD(w));
+    stableUSD += safe(walletStableUSD(w));
+  });
+
+  // BTC (never a stablecoin)
+  cryptoUSD += safe(D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0));
+
+  // SOL / HL / TRX
+  D.others.forEach(a=>{
+    if((a.type==='sol'||a.type==='hl') && a.positions?.length){
+      a.positions.forEach(p=>{
+        const v = safe(p.valueUSD||0);
+        if(isStable(p.symbol)) stableUSD += v;
+        else cryptoUSD += v;
+      });
+    } else {
+      cryptoUSD += safe(a.priceUSD&&a.balance?a.balance*a.priceUSD:0);
+    }
+  });
+
+  const c = cryptoUSD;
+  const s = stableUSD;
   const i = safe(inrToUSD(D.indian.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0)));
   const x = safe(D.intl.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0));
   const m = safe(inrToUSD(D.mf.reduce((s,a)=>s+safe(a.nav&&a.units?a.units*a.nav:0),0)));
   const b = safe(inrToUSD(D.banks.reduce((s,a)=>s+safe(a.balance||0),0)));
-  return{c,i,x,m,b,tot:c+i+x+m+b};
+  return{c,s,i,x,m,b,tot:c+s+i+x+m+b};
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
@@ -1542,11 +1575,11 @@ function updateSummary(){
   const iC=wAvg(D.indian,a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
   const xC=wAvg(D.intl,a=>a.price&&a.qty?a.qty*a.price:0,a=>a.ch24);
   const mC=wAvg(D.mf,a=>a.nav&&a.units?inrToUSD(a.units*a.nav):0,a=>a.ch24);
-  const segs=[{v:v.c,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC},{v:v.b,ch:null}].filter(s=>s.v>0);
+  const segs=[{v:v.c+v.s,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC},{v:v.b,ch:null}].filter(s=>s.v>0);
   const tC=segs.length?wAvg(segs.filter(s=>s.ch!=null),s=>s.v,s=>s.ch):null;
   document.getElementById('tot-chg').innerHTML=tC!=null?`<span class="${pc(tC)}">${fP(tC)}</span> <span class="muted sm"> · weighted 24h return</span>`:'<span class="muted">—</span>';
   function uc(vi,ci,val,chg){document.getElementById(vi).textContent=val>0?fI(val):'—';const el=document.getElementById(ci);el.textContent=fP(chg);el.className='card-chg '+(chg!=null?pc(chg):'muted');}
-  uc('c-val','c-chg',v.c,cC);uc('i-val','i-chg',v.i,iC);uc('x-val','x-chg',v.x,xC);uc('m-val','m-chg',v.m,mC);
+  uc('c-val','c-chg',v.c+v.s,cC);uc('i-val','i-chg',v.i,iC);uc('x-val','x-chg',v.x,xC);uc('m-val','m-chg',v.m,mC);
   // Bank card
   document.getElementById('b-val').textContent=v.b>0?fI(v.b):'—';
   const bChgEl=document.getElementById('b-chg');
@@ -1561,8 +1594,8 @@ function updateSummary(){
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#00e676','#7c4dff','#ff9800','#2196f3'];
-const PIE_LABELS=['Crypto','Indian Equity','International','Mutual Funds','Bank & Cash'];
+const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#2196f3'];
+const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Bank & Cash'];
 
 function buildPie(){
   const v=vals();
@@ -1575,12 +1608,12 @@ function buildPie(){
     return;
   }
 
-  const raw=[v.c,v.i,v.x,v.m,v.b];
+  const raw=[v.c, v.s, v.i, v.x, v.m, v.b];
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0.001);
   if(!slices.length) return;
 
   if(leg) leg.innerHTML=slices.map(s=>`
-    <span style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <span style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
       <span style="display:flex;align-items:center;gap:8px;">
         <span style="width:8px;height:8px;background:${s.color};border-radius:2px;flex-shrink:0;display:inline-block;"></span>
         <span style="color:#aaa;font-size:11px;">${s.label}</span>
@@ -2575,7 +2608,7 @@ async function saveSnapshot() {
     await fetch('/api/user?action=snapshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supaToken}` },
-      body: JSON.stringify({ value_usd: v.tot, breakdown: { c: v.c, i: v.i, x: v.x, m: v.m, b: v.b } }),
+      body: JSON.stringify({ value_usd: v.tot, breakdown: { c: v.c, s: v.s, i: v.i, x: v.x, m: v.m, b: v.b } }),
     });
   } catch(e) {}
 }
