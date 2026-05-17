@@ -137,7 +137,10 @@
       border-radius: 50%; animation: spin .7s linear infinite;
       display: inline-block; vertical-align: middle;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes marquee {
+      0%   { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    } to { transform: rotate(360deg); } }
 
     /* ── NOTICES ─────────────────────────────────────────── */
     .notice {
@@ -2177,17 +2180,25 @@ function renderAddForm(){
   if(activeTab==='crypto'){
     h=`<p class="add-panel-title">Add Wallet</p>
     <div class="fg fg3">
-      <div><label>Chain</label><select id="f-wt">
-        <option value="evm+hl">EVM — Ethereum, Polygon, BNB, Arbitrum, Base…</option>
-        <option value="btc">Bitcoin (BTC)</option>
-        <option value="sol">Solana (SOL)</option>
-        <option value="trx">TRON (TRX)</option>
-        <option value="xmr">Monero (XMR)</option>
-      </select></div>
+      <div>
+        <label>Chain</label>
+        <select id="f-wt" onchange="updateChainInfo()">
+          <option value="evm+hl">EVM</option>
+          <option value="btc">Bitcoin (BTC)</option>
+          <option value="sol">Solana (SOL)</option>
+          <option value="trx">TRON (TRX)</option>
+          <option value="xmr">Monero (XMR)</option>
+        </select>
+        <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555;overflow:hidden;white-space:nowrap">
+          <span id="chain-marquee" style="display:inline-block;animation:marquee 18s linear infinite">
+            Ethereum &nbsp;·&nbsp; Arbitrum &nbsp;·&nbsp; Base &nbsp;·&nbsp; BNB Chain &nbsp;·&nbsp; Polygon &nbsp;·&nbsp; Optimism &nbsp;·&nbsp; Avalanche &nbsp;·&nbsp; Fantom &nbsp;·&nbsp; zkSync &nbsp;·&nbsp; Linea &nbsp;·&nbsp; Hyperliquid &nbsp;·&nbsp; Polymarket &nbsp;·&nbsp; Blast &nbsp;·&nbsp; Scroll &nbsp;&nbsp;&nbsp;&nbsp;
+          </span>
+        </div>
+      </div>
       <div style="grid-column:span 2"><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
     </div>
     <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok">✓ EVM wallets auto-scan 40+ chains via Zerion + Hyperliquid positions. Monero balance is entered manually.</div>
+    <div class="info-box info-ok" id="chain-desc">✓ Scans 40+ EVM chains via Zerion + Hyperliquid positions + Polymarket — all in one entry.</div>
     <div id="fetch-st" class="fetch-st"></div>
     <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }else if(activeTab==='indian'){
@@ -2378,8 +2389,23 @@ async function doAddWallet(){
 }
 
 // Show per-share avg cost preview as user types
+function updateChainInfo(){
+  const wt = document.getElementById('f-wt')?.value;
+  const info = document.getElementById('chain-desc');
+  const marqueeWrap = document.getElementById('chain-info');
+  const msgs = {
+    'evm+hl': '✓ Scans 40+ EVM chains via Zerion + Hyperliquid positions + Polymarket — all in one entry.',
+    'btc':    '✓ Bitcoin balance via Blockstream public API — no key needed.',
+    'sol':    '✓ Solana balance + all SPL token positions via public RPC.',
+    'trx':    '✓ TRON balance via TronScan public API.',
+    'xmr':    '⚠ Monero is a privacy coin — balance entered manually, price fetched live.',
+  };
+  const showMarquee = wt === 'evm+hl';
+  if(marqueeWrap) marqueeWrap.style.display = showMarquee ? 'block' : 'none';
+  if(info) info.textContent = msgs[wt] || '';
+}
+
 function calcAvgCost(type){
-  const qty = parseFloat(document.getElementById('f-qty')?.value||0);
   const invested = parseFloat(document.getElementById('f-invested')?.value||0);
   const el = document.getElementById('avg-cost-display');
   if(!el) return;
