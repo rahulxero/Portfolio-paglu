@@ -1464,9 +1464,13 @@ async function refreshAll(){
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
-  await Promise.all(D.wallets.map(w=>
-    fetchWalletPositions(w).catch(e=>{errs.push(w.label+': '+e.message);w.fetching=false;})
-  ));
+  // Fetch EVM wallets sequentially to avoid Zerion rate limits
+  for(const w of D.wallets){
+    try{ await fetchWalletPositions(w); }
+    catch(e){ errs.push(w.label+': '+e.message); w.fetching=false; }
+    // Small delay between wallets to avoid 429
+    if(D.wallets.indexOf(w) < D.wallets.length-1) await new Promise(r=>setTimeout(r,1500));
+  }
   await Promise.all(D.btc.map(a=>
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
