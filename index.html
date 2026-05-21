@@ -140,7 +140,41 @@
     @keyframes marquee {
       0%   { transform: translateX(100%); }
       100% { transform: translateX(-100%); }
-    } to { transform: rotate(360deg); } }
+    }
+
+    /* ── LIGHT MODE ─────────────────────────────────────── */
+    body.light-mode {
+      --black: #f5f5f5;
+      --white: #0a0a0a;
+      --border-rule: 1px solid #ddd;
+      --border-thin: 1px solid #e0e0e0;
+      background: #f5f5f5;
+      color: #0a0a0a;
+    }
+    body.light-mode .hdr { background: #fff; border-bottom-color: #e0e0e0; }
+    body.light-mode .ticker-bar { background: #fff; border-bottom-color: #e0e0e0; }
+    body.light-mode .hc, body.light-mode .cc { background: #fff; border-color: #e0e0e0; }
+    body.light-mode .trow { border-bottom-color: #f0f0f0; }
+    body.light-mode .trow:hover { background: #fafafa; }
+    body.light-mode .badge { background: #f0f0f0; color: #333; border-color: #ddd; }
+    body.light-mode .btn { border-color: #ddd; color: #333; }
+    body.light-mode .btn:hover { background: #f0f0f0; }
+    body.light-mode .btn-p { background: #0a0a0a; color: #fff; }
+    body.light-mode .an { color: #0a0a0a; }
+    body.light-mode .as { color: #888; }
+    body.light-mode .mv { color: #222; }
+    body.light-mode select, body.light-mode input { background: #fff; border-color: #ddd; color: #0a0a0a; }
+    body.light-mode .login-mo { background: rgba(245,245,245,.97); }
+    body.light-mode .login-card { background: #fff; border-color: #ddd; }
+    body.light-mode .login-card h2 { color: #0a0a0a; }
+    body.light-mode .login-card input { background: #f5f5f5; border-color: #ddd; color: #0a0a0a; }
+    body.light-mode .info-box { background: #f0fff0; border-color: #b0d8b0; }
+    body.light-mode .info-box.info-ok { color: #1a5c1a; }
+    body.light-mode #pie-leg span span[style*="color:#aaa"] { color: #555 !important; }
+    body.light-mode .cc-title { color: #0a0a0a; }
+    body.light-mode .muted { color: #888; }
+    body.light-mode .card-val { color: #0a0a0a; }
+    body.light-mode .sum-card { background: #fff; border-color: #e0e0e0; } to { transform: rotate(360deg); } }
 
     /* ── NOTICES ─────────────────────────────────────────── */
     .notice {
@@ -626,6 +660,10 @@
       <option value="AED">د AED</option>
       <option value="AUD">A$ AUD</option>
     </select>
+    <button class="btn btn-ghost" onclick="toggleTheme()" id="theme-btn" title="Toggle light mode" style="font-size:14px;padding:4px 8px">☀</button>
+    <button class="btn btn-ghost" onclick="toggleHeatmap()" title="Portfolio heatmap" style="font-size:13px;padding:4px 8px">▦</button>
+    <button class="btn btn-ghost" onclick="toggleRebal()" title="Rebalancing calculator" style="font-size:13px;padding:4px 8px">⚖</button>
+    <button class="btn btn-ghost" onclick="openShareCard()" title="Share portfolio" style="font-size:13px;padding:4px 8px">↗</button>
     <button class="btn btn-icon" id="history-btn" onclick="openHistory()" title="Portfolio History" style="display:none">📈</button>
     <button class="btn" id="ref-btn" onclick="refreshAll()">⟳ Refresh</button>
     <button class="btn btn-icon" onclick="openSettings()" title="Account & Settings">⚙</button>
@@ -765,10 +803,15 @@
     <div class="cc">
       <div class="cc-hdr">
         <span class="cc-title">Performance</span>
-        <div class="tf-grp">
-          <button class="tf on" onclick="setTF('7d',this)">7D</button>
-          <button class="tf" onclick="setTF('30d',this)">30D</button>
-          <button class="tf" onclick="setTF('6m',this)">6M</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:9px;color:#555;font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" id="bench-toggle" onchange="buildPerf()" style="accent-color:#00e676"> vs Nifty
+          </label>
+          <div class="tf-grp">
+            <button class="tf on" onclick="setTF('7d',this)">7D</button>
+            <button class="tf" onclick="setTF('30d',this)">30D</button>
+            <button class="tf" onclick="setTF('6m',this)">6M</button>
+          </div>
         </div>
       </div>
       <div class="perf-meta">
@@ -779,6 +822,18 @@
         <canvas id="perfC" role="img" aria-label="Portfolio performance chart">Performance chart</canvas>
       </div>
     </div>
+  </div>
+
+  <!-- Rebalancing Calculator -->
+  <div class="hc" id="rebal-panel" style="display:none;margin-bottom:16px">
+    <div class="cc-hdr"><span class="cc-title">Rebalancing Calculator</span><button class="btn btn-ghost" onclick="document.getElementById('rebal-panel').style.display='none'" style="font-size:11px">✕</button></div>
+    <div id="rebal-body" style="padding:16px 0"></div>
+  </div>
+
+  <!-- Portfolio Heatmap -->
+  <div class="hc" id="heatmap-panel" style="display:none;margin-bottom:16px">
+    <div class="cc-hdr"><span class="cc-title">Portfolio Heatmap</span><button class="btn btn-ghost" onclick="document.getElementById('heatmap-panel').style.display='none'" style="font-size:11px">✕</button></div>
+    <div id="heatmap-body" style="padding:12px 0"></div>
   </div>
 
   <!-- Holdings table -->
@@ -1738,22 +1793,115 @@ function buildPie(){
   });
 }
 
+// Benchmark returns (approximate annualized, broken into periods)
+const BENCH = {
+  nifty: { '7d':.008, '30d':.032, '6m':.11 },  // Nifty 50 typical
+  sp500: { '7d':.006, '30d':.025, '6m':.09 },   // S&P 500 typical
+};
+let _snapCache = null;
+
+async function fetchSnapshots(days){
+  try {
+    if(!_fbAuth||!supaToken) return null;
+    const r = await fetch(`/api/user?action=snapshots&days=${days}`, { headers:{Authorization:`Bearer ${supaToken}`} });
+    if(!r.ok) return null;
+    const { snapshots } = await r.json();
+    return snapshots?.length >= 2 ? snapshots : null;
+  } catch(e){ return null; }
+}
+
 const TFD={'7d':{days:7,pf:.03},'30d':{days:30,pf:.12},'6m':{days:182,pf:.38}};
-function buildPerf(){
-  const v=vals(),ctx=document.getElementById('perfC').getContext('2d'),tf=TFD[curTF];
-  const end=v.tot||1000000,start=end/(1+tf.pf);
-  let seed=777; const sr=()=>{seed=(seed*1664525+1013904223)&0xffffffff;return(seed>>>0)/0xffffffff;};
-  const labels=[],values=[];
-  for(let i=0;i<=tf.days;i++){const d=new Date();d.setDate(d.getDate()-(tf.days-i));labels.push(d.getDate()+' '+d.toLocaleString('en-IN',{month:'short'}));values.push(Math.round(start+(end-start)*(i/tf.days)+(sr()-.5)*start*.012));}
-  const ret=end-start,retPct=ret/start*100;
+async function buildPerf(){
+  const v=vals(), ctx=document.getElementById('perfC')?.getContext('2d'), tf=TFD[curTF];
+  if(!ctx) return;
+  const showBench = document.getElementById('bench-toggle')?.checked;
+
+  // Try real snapshot data first
+  const snaps = await fetchSnapshots(tf.days + 2);
+  let labels=[], portfolioVals=[];
+
+  if(snaps && snaps.length >= 2){
+    // Use real data
+    snaps.forEach(s=>{
+      const d = new Date(s.snapped_at);
+      labels.push(d.getDate()+' '+d.toLocaleString('en-IN',{month:'short'}));
+      portfolioVals.push(parseFloat(s.value_usd) * (liveRates.inr||USD_INR));
+    });
+    // Add today's current value
+    const todayLabel = new Date().getDate()+' '+new Date().toLocaleString('en-IN',{month:'short'});
+    if(labels[labels.length-1] !== todayLabel){
+      labels.push(todayLabel);
+      portfolioVals.push(v.tot * (liveRates.inr||USD_INR));
+    }
+  } else {
+    // Simulated with seeded random
+    const end=v.tot*(liveRates.inr||USD_INR)||1000000, start=end/(1+tf.pf);
+    let seed=777; const sr=()=>{seed=(seed*1664525+1013904223)&0xffffffff;return(seed>>>0)/0xffffffff;};
+    for(let i=0;i<=tf.days;i++){
+      const d=new Date();d.setDate(d.getDate()-(tf.days-i));
+      labels.push(d.getDate()+' '+d.toLocaleString('en-IN',{month:'short'}));
+      portfolioVals.push(Math.round(start+(end-start)*(i/tf.days)+(sr()-.5)*start*.012));
+    }
+  }
+
+  const startVal = portfolioVals[0]||1;
+  const endVal = portfolioVals[portfolioVals.length-1];
+  const ret = endVal - startVal;
+  const retPct = ret / startVal * 100;
+
   document.getElementById('tf-r').innerHTML=`<span class="${pc(ret)}">${ret>=0?'+':''}${fI(Math.abs(ret))}</span>`;
   document.getElementById('tf-p').innerHTML=`<span class="${pc(retPct)}">${retPct>=0?'+':''}${retPct.toFixed(2)}%</span>`;
-  if(perfInst)perfInst.destroy();
+
+  // Build benchmark line (normalized to same start)
+  const benchPct = BENCH.nifty[curTF]||0.05;
+  const benchVals = portfolioVals.map((_,i) => startVal * (1 + benchPct * (i/(portfolioVals.length-1||1))));
+
+  const datasets = [{
+    label:'Portfolio',
+    data: portfolioVals,
+    borderColor:'#ffffff',
+    backgroundColor:'rgba(255,255,255,.04)',
+    fill:true, tension:.4, pointRadius:0, pointHoverRadius:5,
+    pointHoverBackgroundColor:'#fff', borderWidth:1.5
+  }];
+
+  if(showBench){
+    datasets.push({
+      label:'Nifty 50',
+      data: benchVals,
+      borderColor:'#00e676',
+      backgroundColor:'transparent',
+      fill:false, tension:.4, pointRadius:0, pointHoverRadius:4,
+      borderWidth:1, borderDash:[4,4]
+    });
+  }
+
+  if(perfInst) perfInst.destroy();
   perfInst=new Chart(ctx,{
     type:'line',
-    data:{labels,datasets:[{data:values,borderColor:'#ffffff',backgroundColor:'rgba(255,255,255,.04)',fill:true,tension:.4,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:'#fff',borderWidth:1.5}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{backgroundColor:'#111',borderColor:'#333',borderWidth:1,titleColor:'#666',bodyColor:'#fff',callbacks:{label:c=>fI(c.raw)}}},
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ display:showBench, labels:{color:'#666',font:{size:10,family:"'JetBrains Mono'"}, boxWidth:20} },
+        tooltip:{
+          backgroundColor:'#111',borderColor:'#333',borderWidth:1,
+          titleColor:'#666',bodyColor:'#fff',
+          callbacks:{
+            label:c=>`${c.dataset.label}: ${fI(c.raw)}`,
+            afterBody: items => {
+              if(items.length>=2){
+                const myPct = ((items[0].raw-startVal)/startVal*100).toFixed(1);
+                const bPct = ((items[1].raw-startVal)/startVal*100).toFixed(1);
+                const diff = (parseFloat(myPct)-parseFloat(bPct)).toFixed(1);
+                return [`You: ${myPct>=0?'+':''}${myPct}% vs Nifty: +${bPct}%`, `Alpha: ${diff>=0?'+':''}${diff}%`];
+              }
+              return [];
+            }
+          }
+        }
+      },
       scales:{
         x:{ticks:{maxTicksLimit:6,font:{size:10,family:"'JetBrains Mono'"},color:'#444'},grid:{color:'#111'},border:{color:'#222'}},
         y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:'#444',callback:v=>'₹'+(v/100000).toFixed(1)+'L'},grid:{color:'#111'},border:{color:'#222'}}
@@ -3567,7 +3715,225 @@ function showOnboardingTip(){
   });
 })();
 
-// ── Wire ALL login modal interactions via JS (no onclick attrs) ──
+// ══════════════════════════════════════════════════════════
+//  REBALANCING CALCULATOR
+// ══════════════════════════════════════════════════════════
+function toggleRebal(){
+  const panel = document.getElementById('rebal-panel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen) buildRebal();
+}
+
+function buildRebal(){
+  const v = vals();
+  if(!v.tot){ document.getElementById('rebal-body').innerHTML='<p style="color:#555;font-size:12px;padding:0 8px">Add holdings to use the rebalancer.</p>'; return; }
+
+  const cats = [
+    { key:'c', label:'Crypto', color:'#ffffff', cur: (v.c+v.s)/v.tot*100 },
+    { key:'i', label:'Indian Equity', color:'#00e676', cur: v.i/v.tot*100 },
+    { key:'x', label:'International', color:'#7c4dff', cur: v.x/v.tot*100 },
+    { key:'m', label:'Mutual Funds', color:'#ff9800', cur: v.m/v.tot*100 },
+    { key:'b', label:'Bank & Cash', color:'#2196f3', cur: v.b/v.tot*100 },
+  ].filter(c=>c.cur>0||true);
+
+  const el = document.getElementById('rebal-body');
+  el.innerHTML = `
+    <div style="padding:0 8px">
+      <p style="font-size:11px;color:#555;font-family:'JetBrains Mono',monospace;margin-bottom:16px">Set your target allocation. We'll tell you exactly what to buy/sell.</p>
+      <div style="display:grid;grid-template-columns:1fr 120px 120px 150px;gap:8px;font-size:10px;letter-spacing:.08em;color:#444;font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:8px">
+        <span>Asset Class</span><span>Current</span><span>Target %</span><span>Action</span>
+      </div>
+      ${cats.map(c=>`
+        <div style="display:grid;grid-template-columns:1fr 120px 120px 150px;gap:8px;align-items:center;margin-bottom:10px">
+          <span style="display:flex;align-items:center;gap:8px;font-size:12px;color:#ccc">
+            <span style="width:8px;height:8px;background:${c.color};border-radius:2px;display:inline-block"></span>${c.label}
+          </span>
+          <span style="font-size:12px;color:#888;font-family:'JetBrains Mono',monospace">${c.cur.toFixed(1)}%</span>
+          <input type="number" id="rb-${c.key}" value="${Math.round(c.cur)}" min="0" max="100" step="1" oninput="calcRebal()"
+            style="padding:6px 8px;background:#111;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;width:80px">
+          <span id="rba-${c.key}" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555">—</span>
+        </div>`).join('')}
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:center">
+        <span id="rb-total" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555">Total: 0%</span>
+        <span style="font-size:10px;color:#444;font-family:'JetBrains Mono',monospace">Total portfolio: ${fI(v.tot)}</span>
+      </div>
+    </div>`;
+  calcRebal();
+}
+
+function calcRebal(){
+  const v = vals();
+  const cats = ['c','i','x','m','b'];
+  const vals_ = { c:(v.c+v.s), i:v.i, x:v.x, m:v.m, b:v.b };
+  let total = 0;
+  cats.forEach(k=>{
+    const input = document.getElementById('rb-'+k);
+    if(input) total += parseFloat(input.value||0);
+  });
+  const totEl = document.getElementById('rb-total');
+  if(totEl){ totEl.textContent = `Total: ${total.toFixed(0)}%`; totEl.style.color = Math.abs(total-100)<0.5?'#00e676':'#ff4444'; }
+
+  cats.forEach(k=>{
+    const input = document.getElementById('rb-'+k);
+    const actionEl = document.getElementById('rba-'+k);
+    if(!input||!actionEl) return;
+    const target = parseFloat(input.value||0)/100 * v.tot;
+    const current = vals_[k]||0;
+    const diff = target - current;
+    if(Math.abs(diff) < 1){ actionEl.textContent='✓ Balanced'; actionEl.style.color='#00e676'; return; }
+    const sign = diff>0?'+':'';
+    actionEl.innerHTML = diff>0
+      ? `<span style="color:#00e676">BUY ${fI(Math.abs(diff))}</span>`
+      : `<span style="color:#ff4444">SELL ${fI(Math.abs(diff))}</span>`;
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  PORTFOLIO HEATMAP
+// ══════════════════════════════════════════════════════════
+function toggleHeatmap(){
+  const panel = document.getElementById('heatmap-panel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen) buildHeatmap();
+}
+
+function buildHeatmap(){
+  const el = document.getElementById('heatmap-body');
+  // Collect all positions with 24h change
+  const all = [];
+
+  D.wallets.forEach(w=>{
+    (w.positions||[]).forEach(p=>{
+      if(p.ch24!=null && (p.valueUSD||0)>1)
+        all.push({name:p.symbol, value:p.valueUSD||0, ch24:p.ch24, chain:p.chain});
+    });
+  });
+  D.btc.forEach(a=>{ if(a.priceUSD&&a.balance) all.push({name:'BTC',value:a.balance*a.priceUSD,ch24:a.ch24||0,chain:'bitcoin'}); });
+  D.others.forEach(a=>{
+    if(a.positions?.length) a.positions.forEach(p=>{ if((p.valueUSD||0)>1) all.push({name:p.symbol,value:p.valueUSD,ch24:p.ch24||0,chain:p.chain}); });
+    else if(a.balance&&a.priceUSD) all.push({name:(a.type||'').toUpperCase(),value:a.balance*a.priceUSD,ch24:a.ch24||0,chain:a.type});
+  });
+  D.indian.forEach(a=>{ if(a.price&&a.qty) all.push({name:a.symbol,value:a.qty*a.price/(liveRates.inr||USD_INR),ch24:a.ch24||0,chain:'nse'}); });
+  D.intl.forEach(a=>{ if(a.price&&a.qty) all.push({name:a.symbol,value:a.qty*a.price,ch24:a.ch24||0,chain:'nasdaq'}); });
+  D.mf.forEach(a=>{ if(a.nav&&a.units) all.push({name:a.name.split(' ')[0],value:a.units*a.nav/(liveRates.inr||USD_INR),ch24:a.ch24||0,chain:'mf'}); });
+
+  if(!all.length){ el.innerHTML='<p style="color:#555;font-size:12px;padding:8px">Add holdings to see the heatmap.</p>'; return; }
+
+  const sorted = all.sort((a,b)=>b.value-a.value).slice(0,40);
+  const maxVal = sorted[0].value;
+
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:0 8px">` +
+    sorted.map(p=>{
+      const sz = Math.max(60, Math.min(160, 60 + (p.value/maxVal)*100));
+      const ch = p.ch24||0;
+      const intensity = Math.min(Math.abs(ch)/5, 1);
+      const bg = ch>=0
+        ? `rgba(0,${Math.round(100+intensity*156)},${Math.round(50+intensity*70)},${0.15+intensity*0.5})`
+        : `rgba(${Math.round(150+intensity*105)},${Math.round(30+intensity*20)},${Math.round(30+intensity*20)},${0.15+intensity*0.5})`;
+      const textColor = ch>=0?'#00e676':'#ff6b6b';
+      return `<div style="width:${sz}px;height:${sz*0.75}px;background:${bg};border:1px solid ${ch>=0?'#1a3a1a':'#3a1a1a'};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:default;transition:transform .15s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <div style="font-size:${sz>80?12:10}px;font-weight:700;color:#fff;font-family:'JetBrains Mono',monospace">${p.name.slice(0,6)}</div>
+        <div style="font-size:${sz>80?11:9}px;color:${textColor};font-family:'JetBrains Mono',monospace">${ch>=0?'+':''}${ch.toFixed(2)}%</div>
+        ${sz>90?`<div style="font-size:9px;color:#555;font-family:'JetBrains Mono',monospace">${fI(p.value)}</div>`:''}
+      </div>`;
+    }).join('') + `</div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  SHARE CARD
+// ══════════════════════════════════════════════════════════
+function openShareCard(){
+  const v = vals();
+  const existing = document.getElementById('share-card-modal');
+  if(existing) existing.remove();
+
+  const now = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  const tot = fI(v.tot);
+  const cats = [
+    {label:'Crypto', val:v.c+v.s, color:'#fff'},
+    {label:'Indian', val:v.i, color:'#00e676'},
+    {label:'Global', val:v.x, color:'#7c4dff'},
+    {label:'MF', val:v.m, color:'#ff9800'},
+    {label:'Cash', val:v.b, color:'#2196f3'},
+  ].filter(c=>c.val>0);
+
+  const modal = document.createElement('div');
+  modal.id = 'share-card-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:600;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px';
+
+  const card = document.createElement('div');
+  card.id = 'the-share-card';
+  card.style.cssText='background:linear-gradient(135deg,#0a0a0a 0%,#111 100%);border:1px solid #222;padding:32px;width:420px;font-family:"JetBrains Mono",monospace';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
+      <div>
+        <div style="font-size:9px;letter-spacing:.15em;color:#555;text-transform:uppercase;margin-bottom:4px">Portfolio Value</div>
+        <div style="font-size:32px;font-weight:700;color:#fff;font-family:'Syne',sans-serif">${tot}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;color:#555;letter-spacing:.08em">${now}</div>
+        <div style="font-size:11px;color:#333;margin-top:4px">portfoliopaglu.vercel.app</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:0;height:6px;border-radius:3px;overflow:hidden;margin-bottom:16px">
+      ${cats.map(c=>`<div style="width:${(c.val/v.tot*100).toFixed(1)}%;background:${c.color};opacity:.8"></div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
+      ${cats.map(c=>`<div style="display:flex;align-items:center;gap:8px">
+        <span style="width:6px;height:6px;background:${c.color};border-radius:1px;display:inline-block;flex-shrink:0"></span>
+        <span style="font-size:10px;color:#888">${c.label}</span>
+        <span style="font-size:10px;color:#fff;margin-left:auto">${(c.val/v.tot*100).toFixed(1)}%</span>
+      </div>`).join('')}
+    </div>
+    <div style="border-top:1px solid #1a1a1a;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:9px;color:#333;letter-spacing:.1em">BUILT WITH PORTFOLIOPAGLU</div>
+      <div style="font-size:9px;color:#333">🔒 SELF-HOSTED</div>
+    </div>`;
+
+  const btns = document.createElement('div');
+  btns.style.cssText='display:flex;gap:8px';
+  btns.innerHTML=`
+    <button onclick="downloadCard()" style="padding:10px 20px;background:#fff;color:#000;border:none;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">↓ DOWNLOAD</button>
+    <button onclick="document.getElementById('share-card-modal').remove()" style="padding:10px 20px;background:transparent;color:#555;border:1px solid #333;font-family:'Syne',sans-serif;font-size:11px;cursor:pointer">CLOSE</button>`;
+
+  modal.appendChild(card);
+  modal.appendChild(btns);
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{ if(e.target===modal) modal.remove(); });
+}
+
+async function downloadCard(){
+  // Use html2canvas if available, otherwise show copy instructions
+  try {
+    const { default: html2canvas } = await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.esm.js');
+    const canvas = await html2canvas(document.getElementById('the-share-card'), { backgroundColor:'#0a0a0a', scale:2 });
+    const a = document.createElement('a');
+    a.download = 'portfolio-card.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  } catch(e) {
+    alert('Screenshot your screen to save the card, or use browser Print > Save as PDF');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  DARK / LIGHT MODE
+// ══════════════════════════════════════════════════════════
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light-mode');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = isLight ? '🌙' : '☀';
+}
+// Restore theme on load
+(function initTheme(){
+  if(localStorage.getItem('theme')==='light'){
+    document.body.classList.add('light-mode');
+    setTimeout(()=>{ const btn=document.getElementById('theme-btn'); if(btn) btn.textContent='🌙'; },100);
+  }
+})();
+
 (function wireLoginModal(){
   const $ = id => document.getElementById(id);
 
