@@ -1146,7 +1146,8 @@ const GECKO={
 
 let D={
   wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[], bonds:[],
-  others:[] // [{id, type:'sol'|'trx'|'hl'|'xmr', address, label, balance, priceUSD, ch24}]
+  manualCrypto:[], // [{id, sym, network, qty, priceUSD, ch24, cgId, invested, updatedAt}]
+  others:[]
 };
 
 // ── Load portfolio structure ──────────────────────────────
@@ -1740,8 +1741,12 @@ function vals(){
     }
   });
 
-  // BTC (never a stablecoin)
-  cryptoUSD += safe(D.btc.reduce((s,a)=>s+(a.priceUSD&&a.balance?a.balance*a.priceUSD:0),0));
+  // Manual crypto entries (CEX, cold storage etc)
+  (D.manualCrypto||[]).forEach(a=>{
+    const v = safe((a.priceUSD||0)*a.qty);
+    if(isStable(a.sym)) stableUSD += v;
+    else cryptoUSD += v;
+  });
 
   // SOL / HL / TRX
   D.others.forEach(a=>{
@@ -2108,6 +2113,36 @@ function renderHoldings(){
         <span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span>
       </div>`;
     });
+
+    // ── Manual crypto entries (CEX / cold storage) ─────────
+    if((D.manualCrypto||[]).length){
+      rows+=`<div style="font-size:9px;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;text-transform:uppercase;padding:12px 8px 6px;border-top:1px solid #111;margin-top:4px">Manual Entries</div>`;
+      D.manualCrypto.forEach(a=>{
+        const valUSD = (a.priceUSD||0)*a.qty;
+        if(hideSmall && valUSD<1) return;
+        const plUSD = a.invested>0 ? valUSD - a.invested : null;
+        const plPct = a.invested>0 ? (plUSD/a.invested*100) : null;
+        const plHtml = plUSD!=null
+          ? `<span class="${pc(plUSD)}">${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span></span>`
+          : `<span style="color:#555">—</span>`;
+        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;">
+          <div>
+            <span class="an">${a.sym}</span>
+            <span style="font-size:9px;padding:1px 5px;background:#1a1000;color:#ff9800;border:1px solid #3a2000;font-family:'JetBrains Mono',monospace;margin-left:6px;border-radius:4px">${a.network}</span>
+            <div class="as">Manual entry</div>
+          </div>
+          <span class="mv">${a.qty.toLocaleString('en-US',{maximumFractionDigits:6})}</span>
+          <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
+          <span class="mv">${valUSD>0?fI(valUSD):lc()}</span>
+          <span class="mv sm">${plHtml}</span>
+          <span style="display:flex;gap:4px">
+            <button class="btn btn-ghost" onclick="editManualCrypto(${a.id})" style="padding:2px 6px;font-size:11px" title="Edit">✎</button>
+            <button class="btn btn-ghost" onclick="delManualCrypto(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button>
+          </span>
+        </div>`;
+      });
+    }
+
     if(!rows) rows=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
 
   // Render SOL / XRP / ADA / TRX wallets
@@ -2610,29 +2645,68 @@ function renderAddForm(){
   const p=document.getElementById('add-panel');
   let h='';
   if(activeTab==='crypto'){
-    h=`<p class="add-panel-title">Add Wallet</p>
-    <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:12px">
-      <div>
-        <label>Chain</label>
-        <select id="f-wt" onchange="updateChainInfo()">
-          <option value="evm+hl">EVM</option>
-          <option value="btc">Bitcoin (BTC)</option>
-          <option value="sol">Solana (SOL)</option>
-          <option value="trx">TRON (TRX)</option>
-          <option value="xmr">Monero (XMR)</option>
-        </select>
-        <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555;overflow:hidden;white-space:nowrap;width:200px">
-          <span id="chain-marquee" style="display:inline-block;animation:marquee 18s linear infinite">
-            Ethereum &nbsp;·&nbsp; Arbitrum &nbsp;·&nbsp; Base &nbsp;·&nbsp; BNB Chain &nbsp;·&nbsp; Polygon &nbsp;·&nbsp; Optimism &nbsp;·&nbsp; Avalanche &nbsp;·&nbsp; Fantom &nbsp;·&nbsp; zkSync &nbsp;·&nbsp; Linea &nbsp;·&nbsp; Hyperliquid &nbsp;·&nbsp; Polymarket &nbsp;·&nbsp; Blast &nbsp;·&nbsp; Scroll &nbsp;&nbsp;&nbsp;&nbsp;
-          </span>
-        </div>
-      </div>
-      <div><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
+    h=`<div style="display:flex;gap:0;margin-bottom:20px;border:1px solid #222;border-radius:8px;overflow:hidden;width:fit-content">
+      <button id="mode-wallet" onclick="setCryptoAddMode('wallet')"
+        style="padding:9px 20px;font-size:11px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:#fff;color:#000">
+        ⬡ Add Wallet
+      </button>
+      <button id="mode-manual" onclick="setCryptoAddMode('manual')"
+        style="padding:9px 20px;font-size:11px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:#555">
+        ✎ Manual Entry
+      </button>
     </div>
-    <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
-    <div class="info-box info-ok" id="chain-desc">✓ Scans 40+ EVM chains via Zerion + Hyperliquid positions + Polymarket — all in one entry.</div>
-    <div id="fetch-st" class="fetch-st"></div>
-    <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+
+    <div id="crypto-wallet-form">
+      <p class="add-panel-title" style="margin-top:0">Add Wallet</p>
+      <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label>Chain</label>
+          <select id="f-wt" onchange="updateChainInfo()">
+            <option value="evm+hl">EVM</option>
+            <option value="btc">Bitcoin (BTC)</option>
+            <option value="sol">Solana (SOL)</option>
+            <option value="trx">TRON (TRX)</option>
+            <option value="xmr">Monero (XMR)</option>
+          </select>
+          <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555;overflow:hidden;white-space:nowrap;width:200px">
+            <span id="chain-marquee" style="display:inline-block;animation:marquee 18s linear infinite">
+              Ethereum &nbsp;·&nbsp; Arbitrum &nbsp;·&nbsp; Base &nbsp;·&nbsp; BNB Chain &nbsp;·&nbsp; Polygon &nbsp;·&nbsp; Optimism &nbsp;·&nbsp; Avalanche &nbsp;·&nbsp; Fantom &nbsp;·&nbsp; zkSync &nbsp;·&nbsp; Linea &nbsp;·&nbsp; Hyperliquid &nbsp;·&nbsp; Polymarket &nbsp;·&nbsp; Blast &nbsp;·&nbsp; Scroll &nbsp;&nbsp;&nbsp;&nbsp;
+            </span>
+          </div>
+        </div>
+        <div><label>Wallet Address</label><input type="text" id="f-addr" placeholder="0x… / bc1… / wallet address"></div>
+      </div>
+      <div class="fg" style="grid-template-columns:1fr"><div><label>Label (optional)</label><input type="text" id="f-lbl" placeholder="My main wallet"></div></div>
+      <div class="info-box info-ok" id="chain-desc">✓ Scans 40+ EVM chains via Zerion + Hyperliquid positions + Polymarket — all in one entry.</div>
+      <div id="fetch-st" class="fetch-st"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p" id="add-btn" onclick="doAddWallet()">Add Wallet</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>
+    </div>
+
+    <div id="crypto-manual-form" style="display:none">
+      <p class="add-panel-title" style="margin-top:0">Manual Crypto Entry <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· for CEX, cold storage, or any token</span></p>
+      <div class="fg fg4" style="margin-bottom:12px">
+        <div>
+          <label>Token Symbol</label>
+          <div class="ac-wrap">
+            <input type="text" id="f-mcsym" placeholder="e.g. BTC, ETH, BNB" autocomplete="off" oninput="searchManualCrypto(this.value)" style="text-transform:uppercase">
+            <div class="ac-drop" id="ac-mc"></div>
+          </div>
+        </div>
+        <div><label>Network / Source</label>
+          <input type="text" id="f-mcnet" placeholder="e.g. Binance, Bybit, Ledger" list="mc-net-list">
+          <datalist id="mc-net-list">
+            <option value="Binance"><option value="Bybit"><option value="Coinbase">
+            <option value="OKX"><option value="Kucoin"><option value="Kraken">
+            <option value="Ledger"><option value="Trezor"><option value="Cold Storage">
+          </datalist>
+        </div>
+        <div><label>Quantity</label><input type="number" id="f-mcqty" placeholder="0" step="any" oninput="calcManualCryptoVal()"></div>
+        <div><label>Total Invested ($) <span style="color:#555;font-size:9px">optional</span></label><input type="number" id="f-mcinvested" placeholder="e.g. 5000" step="any"></div>
+      </div>
+      <div id="mc-preview" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#00e676;margin-bottom:12px;min-height:16px"></div>
+      <div id="fetch-st-mc" class="fetch-st" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddManualCrypto()">Add Entry</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>
+    </div>`;
     setTimeout(()=>{
       updateChainInfo();
       const addrInput = document.getElementById('f-addr');
@@ -3201,7 +3275,7 @@ async function loadCloudPortfolio() {
     const raw = localStorage.getItem('nestegg_d6');
     if (raw) {
       const parsed = JSON.parse(raw);
-      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ...parsed };
+      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], manualCrypto:[], ...parsed };
     }
   } catch(e) {}
 
@@ -3229,7 +3303,7 @@ async function loadCloudPortfolio() {
     if (data.error) throw new Error(data.error);
 
     // Cloud data loaded — merge with empty defaults
-    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ...data.data };
+    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], manualCrypto:[], ...data.data };
     if (data.currency) {
       activeCurrency = data.currency;
       document.getElementById('currency-sel').value = data.currency;
@@ -3488,7 +3562,7 @@ async function deleteAlert(id){
 function doLogout() {
   if(_fbAuth) _fbAuth.signOut();
   currentUser = null; supaToken = null;
-  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[] };
+  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], manualCrypto:[] };
   try {
     localStorage.removeItem('nestegg_d6');
     localStorage.removeItem(CACHE_KEY);
@@ -4201,6 +4275,147 @@ function toggleTheme(){
     setTimeout(()=>{ const btn=document.getElementById('theme-btn'); if(btn) btn.textContent='🌙'; },100);
   }
 })();
+
+// ── MANUAL CRYPTO ENTRY ──────────────────────────────────
+function setCryptoAddMode(mode){
+  const wallet = document.getElementById('crypto-wallet-form');
+  const manual = document.getElementById('crypto-manual-form');
+  const btnW = document.getElementById('mode-wallet');
+  const btnM = document.getElementById('mode-manual');
+  if(!wallet||!manual) return;
+  if(mode==='wallet'){
+    wallet.style.display='block'; manual.style.display='none';
+    btnW.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:#fff;color:#000';
+    btnM.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:#555';
+    updateChainInfo();
+  } else {
+    wallet.style.display='none'; manual.style.display='block';
+    btnM.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:#fff;color:#000';
+    btnW.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:#555';
+  }
+}
+
+let _mcPriceCache = {};
+async function searchManualCrypto(q){
+  q = (q||'').trim().toUpperCase();
+  const drop = document.getElementById('ac-mc');
+  if(!drop) return;
+  if(q.length < 1){ drop.style.display='none'; return; }
+  try {
+    const r = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`, { signal: makeSig(5000) });
+    if(!r.ok) return;
+    const d = await r.json();
+    const coins = (d.coins||[]).slice(0,8);
+    if(!coins.length){ drop.style.display='none'; return; }
+    drop.innerHTML = coins.map(c=>
+      `<div class="ac-item mc-coin" data-id="${c.id}" data-sym="${c.symbol.toUpperCase()}"
+        style="padding:10px 12px;border-bottom:1px solid #111;cursor:pointer;display:flex;align-items:center;gap:10px">
+        ${c.thumb?`<img src="${c.thumb}" style="width:20px;height:20px;border-radius:50%">`:'<div style="width:20px;height:20px;background:#222;border-radius:50%"></div>'}
+        <div>
+          <div style="font-size:12px;color:#fff;font-family:\'JetBrains Mono\',monospace">${c.symbol.toUpperCase()}</div>
+          <div style="font-size:10px;color:#555">${c.name} · Rank #${c.market_cap_rank||'?'}</div>
+        </div>
+      </div>`
+    ).join('');
+    drop.querySelectorAll('.mc-coin').forEach(el=>{
+      el.addEventListener('click', async ()=>{
+        const sym=el.dataset.sym, id=el.dataset.id;
+        document.getElementById('f-mcsym').value=sym;
+        drop.style.display='none';
+        try {
+          const pr = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&include_24hr_change=true`,{signal:makeSig(5000)});
+          const pd = await pr.json();
+          _mcPriceCache[sym]={price:pd[id]?.usd||0,ch24:pd[id]?.usd_24h_change||0,id};
+          calcManualCryptoVal();
+        }catch(e){}
+      });
+    });
+    drop.style.display='block';
+  }catch(e){}
+}
+
+function calcManualCryptoVal(){
+  const sym=(document.getElementById('f-mcsym')?.value||'').toUpperCase();
+  const qty=parseFloat(document.getElementById('f-mcqty')?.value||0);
+  const el=document.getElementById('mc-preview');
+  if(!el) return;
+  const p=_mcPriceCache[sym];
+  if(p&&qty>0) el.textContent=`≈ ${fI(p.price*qty)} · $${p.price.toLocaleString('en-US',{maximumFractionDigits:4})} per ${sym}`;
+  else el.textContent='';
+}
+
+async function doAddManualCrypto(){
+  const sym=(document.getElementById('f-mcsym')?.value||'').trim().toUpperCase();
+  const network=(document.getElementById('f-mcnet')?.value||'').trim()||'Manual';
+  const qty=parseFloat(document.getElementById('f-mcqty')?.value||0);
+  const invested=parseFloat(document.getElementById('f-mcinvested')?.value||0);
+  const stEl=document.getElementById('fetch-st-mc');
+  const setMCSt=(t,m)=>{ if(stEl) stEl.innerHTML=t==='err'?`<span class="ferr">✗</span> ${m}`:t==='ok'?`<span class="fok">✓</span> ${m}`:`<span class="spin-sm"></span> ${m}`; };
+  if(!sym){setMCSt('err','Enter a token symbol');return;}
+  if(!qty||qty<=0){setMCSt('err','Enter quantity');return;}
+  let priceUSD=0,ch24=null,cgId=null;
+  const cached=_mcPriceCache[sym];
+  if(cached){priceUSD=cached.price;ch24=cached.ch24;cgId=cached.id;}
+  else{
+    setMCSt('load','Fetching price…');
+    try{
+      const r=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(sym)}`,{signal:makeSig(5000)});
+      const d=await r.json();
+      const coin=d.coins?.find(c=>c.symbol.toUpperCase()===sym)||d.coins?.[0];
+      if(coin){
+        cgId=coin.id;
+        const pr=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd&include_24hr_change=true`,{signal:makeSig(5000)});
+        const pd=await pr.json();
+        priceUSD=pd[cgId]?.usd||0; ch24=pd[cgId]?.usd_24h_change||null;
+      }
+    }catch(e){}
+  }
+  if(!D.manualCrypto) D.manualCrypto=[];
+  D.manualCrypto.push({id:Date.now(),sym,network,qty,invested:invested||0,priceUSD,ch24,cgId,updatedAt:Date.now()});
+  setMCSt('ok',`Added ${qty} ${sym}${priceUSD?` · ${fI(priceUSD*qty)}`:''}`);
+  save(); renderHoldings(); updateSummary(); buildPie();
+  setTimeout(()=>toggleAdd(),1000);
+}
+
+function editManualCrypto(id){
+  const a=(D.manualCrypto||[]).find(x=>x.id===id); if(!a) return;
+  const modal=document.createElement('div');
+  modal.id='edit-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center';
+  const inner=document.createElement('div');
+  inner.style.cssText='background:#0a0a0a;border:1px solid #222;padding:28px;width:460px;max-width:95vw;border-radius:8px';
+  inner.innerHTML=[
+    `<div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Edit Manual Entry</div>`,
+    `<div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:20px">${a.sym} <span style="font-size:12px;color:#555;font-weight:400">${a.network}</span></div>`,
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Quantity</div>`,
+    `<input type="number" id="emc-qty" value="${a.qty}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Total Invested ($)</div>`,
+    `<input type="number" id="emc-inv" value="${a.invested||''}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Network / Source</div>`,
+    `<input type="text" id="emc-net" value="${a.network}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `</div>`,
+    `<div style="display:flex;gap:8px">`,
+    `<button id="emc-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;border-radius:6px">Save</button>`,
+    `<button id="emc-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
+    `</div>`,
+  ].join('');
+  modal.appendChild(inner); document.body.appendChild(modal);
+  document.getElementById('emc-save').onclick=()=>{
+    a.qty=parseFloat(document.getElementById('emc-qty').value)||a.qty;
+    a.invested=parseFloat(document.getElementById('emc-inv').value)||0;
+    a.network=document.getElementById('emc-net').value||a.network;
+    modal.remove(); save(); renderHoldings(); updateSummary(); buildPie();
+  };
+  document.getElementById('emc-cancel').onclick=()=>modal.remove();
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+
+function delManualCrypto(id){
+  if(!confirm('Remove this entry?')) return;
+  D.manualCrypto=(D.manualCrypto||[]).filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
 
 (function wireLoginModal(){
   const $ = id => document.getElementById(id);
