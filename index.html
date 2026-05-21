@@ -143,8 +143,9 @@
       100% { transform: translateX(-100%); }
     }
 
-    .user-pill { border-radius: 8px; height: 52px; padding: 0 14px; border: 1px solid #222; display:flex;align-items:center;gap:10px; }
-    #currency-sel { height: 52px; border-radius: 8px; padding: 0 12px; font-size: 12px; border: 1px solid #222; }
+    .user-pill { border-radius: 8px !important; height: 52px; padding: 0 14px; border: 1px solid #2a2a2a !important; display:flex;align-items:center;gap:10px;cursor:pointer; }
+    .user-pill:hover { border-color: #555 !important; background: #111; }
+    #currency-sel { height: 52px; border-radius: 8px !important; padding: 0 12px; font-size: 12px; border: 1px solid #2a2a2a; min-width: 80px; }
     *, *::before, *::after { border-radius: 0; }
     .btn, .hdr-btn, .hdr-r select,
     .hc, .cc, .sum-card, .add-panel,
@@ -153,7 +154,7 @@
     .badge, .cp, .tok-logo,
     .w-grp, .trow, .info-box,
     .charts-row, .edit-modal { border-radius: 8px; }
-    .logo-mark { border-radius: 8px !important; }
+    .logo-mark { border-radius: 0 !important; overflow: visible !important; }
     .ticker-bar { border-radius: 0; } /* full-width bars stay square */
     .hdr { border-radius: 0; }
 
@@ -166,37 +167,38 @@
       width: 56px;
       height: 52px;
       background: transparent;
-      border: 1px solid #222;
-      color: #666;
+      border: 1px solid #2a2a2a;
+      color: #ccc;
       cursor: pointer;
       transition: all .15s;
       gap: 2px;
       border-radius: 8px;
       flex-shrink: 0;
     }
-    .hdr-btn:hover { background: #111; color: #fff; border-color: #444; }
-    .hdr-btn-icon { font-size: 16px; line-height: 1; }
-    .hdr-btn-label { font-size: 7px; letter-spacing: .08em; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; color: #444; }
-    .hdr-btn:hover .hdr-btn-label { color: #888; }
+    .hdr-btn:hover { background: #1a1a1a; color: #fff; border-color: #555; }
+    .hdr-btn-icon { font-size: 17px; line-height: 1; }
+    .hdr-btn-label { font-size: 7.5px; letter-spacing: .08em; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; color: #888; }
+    .hdr-btn:hover .hdr-btn-label { color: #999; }
     .hdr-btn-wide {
       width: auto;
-      min-width: 100px;
+      min-width: 110px;
       flex-direction: row;
-      gap: 6px;
       font-size: 11px;
       font-family: 'Syne', sans-serif;
       font-weight: 600;
-      letter-spacing: .06em;
+      letter-spacing: .08em;
       text-transform: uppercase;
-      color: #aaa;
-      border-color: #333;
-      padding: 0 16px;
+      color: #ccc;
+      border-color: #2a2a2a;
+      padding: 0 18px;
+      gap: 8px;
     }
-    .hdr-btn-wide:hover { color: #fff; background: #fff; color: #000; border-color: #fff; }
-    .hdr-btn-sq { width: 52px; height: 52px; font-size: 16px; flex-direction: row; }
+    .hdr-btn-wide:hover { background: #fff; color: #000; border-color: #fff; }
+    .hdr-btn-sq { width: 56px; height: 52px; font-size: 17px; flex-direction: row; }
     body.light-mode .hdr-btn { border-color: #ddd; color: #555; }
     body.light-mode .hdr-btn:hover { background: #f0f0f0; color: #000; border-color: #aaa; }
-    body.light-mode .hdr-btn-label { color: #999; }
+    body.light-mode .hdr-btn-label { color: #888; }
+    body.light-mode .hdr-btn-wide { color: #333; }
     body.light-mode {
       --black: #f5f5f5;
       --white: #0a0a0a;
@@ -695,7 +697,7 @@
 <!-- ── HEADER ──────────────────────────────────────────────────── -->
 <header class="hdr">
   <div class="logo">
-    <div class="logo-mark" style="background:transparent;overflow:hidden;border-radius:4px"><img src="https://media1.tenor.com/m/5Q1H7kEB-9gAAAAC/sigma-cat.gif" style="width:28px;height:28px;object-fit:cover;display:block"></div>
+    <div class="logo-mark" style="background:transparent;overflow:visible;border-radius:0"><img src="https://media1.tenor.com/m/5Q1H7kEB-9gAAAAC/sigma-cat.gif" style="width:28px;height:28px;object-fit:cover;display:block"></div>
     <span class="logo-text">Portfolio <span style="color:#00e676">Paglu</span></span>
   </div>
   <div class="hdr-r">
@@ -718,7 +720,7 @@
     <button class="hdr-btn" onclick="toggleHeatmap()" title="Heatmap"><span class="hdr-btn-icon">▦</span><span class="hdr-btn-label">MAP</span></button>
     <button class="hdr-btn" onclick="toggleRebal()" title="Rebalance"><span class="hdr-btn-icon">⚖</span><span class="hdr-btn-label">REBAL</span></button>
     <button class="hdr-btn" onclick="openShareCard()" title="Share"><span class="hdr-btn-icon">↗</span><span class="hdr-btn-label">SHARE</span></button>
-    <button class="btn btn-icon" id="history-btn" onclick="openHistory()" title="Portfolio History" style="display:none">📈</button>
+    <button class="hdr-btn" id="history-btn" onclick="openHistory()" title="Portfolio History" style="display:none"><span class="hdr-btn-icon">📈</span><span class="hdr-btn-label">HIST</span></button>
     <button class="hdr-btn hdr-btn-wide" id="ref-btn" onclick="refreshAll()">⟳ REFRESH</button>
     <button class="hdr-btn hdr-btn-sq" onclick="openSettings()" title="Settings">⚙</button>
   </div>
@@ -897,10 +899,11 @@
     <div class="hc-hdr">
       <div class="tab-grp" id="main-tabs">
         <button class="tab on" onclick="sw('crypto',this)">Crypto</button>
-        <button class="tab" onclick="sw('indian',this)">Indian Stocks</button>
+        <button class="tab" id="tab-indian" onclick="sw('indian',this)">Indian Stocks</button>
         <button class="tab" onclick="sw('intl',this)">Global</button>
         <button class="tab" onclick="sw('mf',this)">Mutual Funds</button>
-        <button class="tab" onclick="sw('banks',this)">Bank & Cash</button>
+        <button class="tab" id="tab-banks" onclick="sw('banks',this)">Bank & Cash</button>
+        <button class="tab" onclick="sw('bonds',this)">Bonds</button>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <label class="toggle-wrap" title="Hide positions under $1">
@@ -1069,10 +1072,32 @@ let activeCurrency = localStorage.getItem('nestegg_currency') || 'INR';
 // Live rates fetched from CoinGecko (USD base)
 let liveRates = { usd:1, inr:96, eur:0.92, gbp:0.79, jpy:150, cny:7.24, sgd:1.34, aed:3.67, aud:1.53 };
 
+// Currency-aware market names
+const CURRENCY_MARKET = {
+  INR: { stocks: 'Indian Stocks', bank: 'Bank & Cash', mf: 'Mutual Funds', exchange: 'NSE/BSE' },
+  USD: { stocks: 'US Stocks', bank: 'Bank & Cash', mf: 'ETFs/Funds', exchange: 'NYSE/NASDAQ' },
+  SGD: { stocks: 'SGX Stocks', bank: 'Bank & Cash', mf: 'Unit Trusts', exchange: 'SGX' },
+  GBP: { stocks: 'UK Stocks', bank: 'Bank & Cash', mf: 'OEIC/Funds', exchange: 'LSE' },
+  EUR: { stocks: 'EU Stocks', bank: 'Bank & Cash', mf: 'UCITS Funds', exchange: 'Euronext' },
+  JPY: { stocks: 'JP Stocks', bank: 'Bank & Cash', mf: 'Investment Trusts', exchange: 'TSE' },
+  AED: { stocks: 'UAE Stocks', bank: 'Bank & Cash', mf: 'Funds', exchange: 'DFM/ADX' },
+  AUD: { stocks: 'AU Stocks', bank: 'Bank & Cash', mf: 'Managed Funds', exchange: 'ASX' },
+  CNY: { stocks: 'CN Stocks', bank: 'Bank & Cash', mf: 'Funds', exchange: 'SSE/SZSE' },
+};
+
+function updateTabLabels(){
+  const market = CURRENCY_MARKET[activeCurrency] || CURRENCY_MARKET.INR;
+  const tabIndian = document.getElementById('tab-indian');
+  const tabBanks = document.getElementById('tab-banks');
+  if(tabIndian) tabIndian.textContent = market.stocks;
+  if(tabBanks) tabBanks.textContent = market.bank;
+}
+
 function setCurrency(code) {
   activeCurrency = code;
   try { localStorage.setItem('nestegg_currency', code); } catch(e) {}
   document.getElementById('currency-sel').value = code;
+  updateTabLabels();
   updateSummary(); buildPie(); buildPerf(); renderHoldings();
 }
 
@@ -1120,9 +1145,8 @@ const GECKO={
 };
 
 let D={
-  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[],
-  // Single-chain native wallets: SOL, XRP, ADA, TRX
-  others:[] // [{id, type:'sol'|'xrp'|'ada'|'trx', address, label, balance, priceUSD, ch24}]
+  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[], bonds:[],
+  others:[] // [{id, type:'sol'|'trx'|'hl'|'xmr', address, label, balance, priceUSD, ch24}]
 };
 
 // ── Load portfolio structure ──────────────────────────────
@@ -1738,7 +1762,8 @@ function vals(){
   const x = safe(D.intl.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0));
   const m = safe(inrToUSD(D.mf.reduce((s,a)=>s+safe(a.nav&&a.units?a.units*a.nav:0),0)));
   const b = safe(inrToUSD(D.banks.reduce((s,a)=>s+safe(a.balance||0),0)));
-  return{c,s,i,x,m,b,tot:c+s+i+x+m+b};
+  const bn = safe(inrToUSD((D.bonds||[]).reduce((s,x)=>s+safe(x.value||0),0)));
+  return{c,s,i,x,m,b,bn,tot:c+s+i+x+m+b+bn};
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
@@ -1786,8 +1811,8 @@ function updateSummary(){
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#2196f3'];
-const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Bank & Cash'];
+const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#2196f3','#ffd700'];
+const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Bank & Cash','Bonds'];
 
 function buildPie(){
   const v=vals();
@@ -1800,7 +1825,7 @@ function buildPie(){
     return;
   }
 
-  const raw=[v.c, v.s, v.i, v.x, v.m, v.b];
+  const raw=[v.c, v.s, v.i, v.x, v.m, v.b, v.bn];
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0.001);
   if(!slices.length) return;
 
@@ -2256,8 +2281,102 @@ function renderHoldings(){
         </div>`;
       });
     }
+  }else if(activeTab==='bonds'){
+    const BOND_TYPES = { govt:'Govt Bond', corporate:'Corp Bond', fd:'Fixed Deposit', ppf:'PPF', sgb:'Sovereign Gold Bond', nsc:'NSC', epf:'EPF', nps:'NPS', other:'Other' };
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
+    head.innerHTML=`<span>Bond / Instrument</span><span>Type</span><span>Invested</span><span>Cur. Value</span><span>Rate</span><span>Maturity</span><span></span>`;
+    if(!D.bonds?.length){
+      rows+=`<div style="padding:40px 16px;text-align:center">
+        <div style="font-size:32px;margin-bottom:12px">🏦</div>
+        <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Track your bonds & fixed income</div>
+        <div style="color:#555;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
+          PPF · Fixed Deposits · Govt Bonds · Corporate Bonds<br>
+          Sovereign Gold Bonds · NSC · EPF · NPS
+        </div>
+        <button class="btn btn-p" onclick="toggleAdd()" style="margin-top:16px">+ Add Bond</button>
+      </div>`;
+    }else{
+      (D.bonds||[]).forEach(b=>{
+        const rate = b.rate ? `${b.rate}% p.a.` : '—';
+        const maturity = b.maturity ? new Date(b.maturity).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '—';
+        const valueUSD = b.value / (liveRates.inr||USD_INR);
+        const investedUSD = b.invested ? b.invested / (liveRates.inr||USD_INR) : valueUSD;
+        const pnlUSD = valueUSD - investedUSD;
+        const pnlPct = investedUSD > 0 ? (pnlUSD/investedUSD*100) : 0;
+        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;align-items:center">
+          <div><span class="an">${b.name}</span><div class="as">${b.issuer||''}</div></div>
+          <span class="badge" style="font-size:9px;color:#ffd700;border-color:#4a3a00;background:#1a1000">${BOND_TYPES[b.type]||b.type}</span>
+          <span class="mv" style="color:#888">${fI(investedUSD)}</span>
+          <span class="mv">${fI(valueUSD)}</span>
+          <span class="mv" style="color:#00e676">${rate}</span>
+          <span class="mv" style="font-size:10px;color:#555">${maturity}</span>
+          <span style="display:flex;gap:4px">
+            <button class="btn btn-ghost" onclick="editBond(${b.id})" style="padding:2px 6px;font-size:11px">✎</button>
+            <button class="btn btn-ghost" onclick="delBond(${b.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
+          </span>
+        </div>`;
+      });
+    }
   }
   list.innerHTML=rows||`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
+}
+
+// ── BONDS ─────────────────────────────────────────────────
+function doAddBond(){
+  const name=(document.getElementById('f-bndname')?.value||'').trim();
+  const issuer=(document.getElementById('f-bndissuer')?.value||'').trim();
+  const type=document.getElementById('f-bndtype')?.value||'other';
+  const invested=parseFloat(document.getElementById('f-bndinvested')?.value||0);
+  const value=parseFloat(document.getElementById('f-bndvalue')?.value||0)||invested;
+  const rate=parseFloat(document.getElementById('f-bndrate')?.value||0);
+  const maturity=document.getElementById('f-bndmaturity')?.value||'';
+  const notes=(document.getElementById('f-bndnotes')?.value||'').trim();
+  if(!name){ alert('Enter a name for this bond'); return; }
+  if(!invested||invested<=0){ alert('Enter the amount invested'); return; }
+  if(!D.bonds) D.bonds=[];
+  D.bonds.push({ id:Date.now(), name, issuer, type, value, invested, rate, maturity, notes });
+  save(); renderHoldings(); updateSummary(); buildPie();
+  toggleAdd();
+}
+
+function editBond(id){
+  const b=(D.bonds||[]).find(x=>x.id===id); if(!b) return;
+  const modal=document.createElement('div');
+  modal.id='edit-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center';
+  const inner=document.createElement('div');
+  inner.style.cssText='background:#0a0a0a;border:1px solid #222;padding:28px;width:480px;max-width:95vw;border-radius:8px';
+  inner.innerHTML=[
+    `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit Bond</div>`,
+    `<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:20px">${b.name}</div>`,
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Amount Invested (₹)</div><input type="number" id="eb-invested" value="${b.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Current Value (₹)</div><input type="number" id="eb-value" value="${b.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Interest Rate (% p.a.)</div><input type="number" id="eb-rate" value="${b.rate||''}" step="0.01" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Maturity Date</div><input type="date" id="eb-maturity" value="${b.maturity||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `</div>`,
+    `<div style="display:flex;gap:8px;margin-top:4px">`,
+    `<button id="eb-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;border-radius:6px">Save</button>`,
+    `<button id="eb-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
+    `</div>`
+  ].join('');
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+  document.getElementById('eb-save').onclick=()=>{
+    b.invested=parseFloat(document.getElementById('eb-invested').value)||b.invested;
+    b.value=parseFloat(document.getElementById('eb-value').value)||b.value;
+    b.rate=parseFloat(document.getElementById('eb-rate').value)||b.rate;
+    b.maturity=document.getElementById('eb-maturity').value||b.maturity;
+    modal.remove(); save(); renderHoldings(); updateSummary(); buildPie();
+  };
+  document.getElementById('eb-cancel').onclick=()=>modal.remove();
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+
+function delBond(id){
+  if(!confirm('Remove this bond?')) return;
+  D.bonds=(D.bonds||[]).filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
 }
 
 // ── BANK INLINE EDIT ──────────────────────────────────────
@@ -2618,6 +2737,36 @@ function renderAddForm(){
       Balance is entered manually. A <span style="color:var(--amber)">⚠ nudge</span> appears after 7 days reminding you to update it. Click ✎ on any row to update the balance at any time.
     </div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddBank()">Add Account</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+  }else if(activeTab==='bonds'){
+    h=`<p class="add-panel-title">Add Bond / Fixed Income</p>
+    <div class="fg fg3" style="margin-bottom:12px">
+      <div><label>Name</label><input type="text" id="f-bndname" placeholder="e.g. SBI 7.2% Bonds 2029"></div>
+      <div><label>Issuer / Bank</label><input type="text" id="f-bndissuer" placeholder="e.g. SBI, Govt of India"></div>
+      <div><label>Type</label>
+        <select id="f-bndtype">
+          <option value="govt">Government Bond</option>
+          <option value="corporate">Corporate Bond</option>
+          <option value="fd">Fixed Deposit (FD)</option>
+          <option value="ppf">PPF</option>
+          <option value="sgb">Sovereign Gold Bond</option>
+          <option value="nsc">NSC</option>
+          <option value="epf">EPF / PF</option>
+          <option value="nps">NPS</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg fg3" style="margin-bottom:12px">
+      <div><label>Amount Invested (₹)</label><input type="number" id="f-bndinvested" placeholder="e.g. 100000" step="1" min="0"></div>
+      <div><label>Current Value (₹)</label><input type="number" id="f-bndvalue" placeholder="e.g. 108000" step="1" min="0"></div>
+      <div><label>Interest Rate (% p.a.)</label><input type="number" id="f-bndrate" placeholder="e.g. 7.2" step="0.01" min="0"></div>
+    </div>
+    <div class="fg" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label>Maturity Date</label><input type="date" id="f-bndmaturity" style="font-family:'JetBrains Mono',monospace"></div>
+      <div><label>Notes (optional)</label><input type="text" id="f-bndnotes" placeholder="e.g. Locked-in, auto-renew"></div>
+    </div>
+    <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ Balance is entered manually. Update current value periodically to track growth.</div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddBond()">Add Bond</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }
   p.innerHTML=h;
 }
@@ -2992,7 +3141,7 @@ async function loadCloudPortfolio() {
     const raw = localStorage.getItem('nestegg_d6');
     if (raw) {
       const parsed = JSON.parse(raw);
-      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], ...parsed };
+      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ...parsed };
     }
   } catch(e) {}
 
@@ -3020,7 +3169,7 @@ async function loadCloudPortfolio() {
     if (data.error) throw new Error(data.error);
 
     // Cloud data loaded — merge with empty defaults
-    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], ...data.data };
+    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ...data.data };
     if (data.currency) {
       activeCurrency = data.currency;
       document.getElementById('currency-sel').value = data.currency;
@@ -3043,6 +3192,7 @@ async function loadCloudPortfolio() {
   }
 
   loadPriceCache();
+  updateTabLabels();
   renderHoldings(); updateSummary(); buildPie(); buildPerf();
   const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
   if (hasAny) {
@@ -3278,7 +3428,7 @@ async function deleteAlert(id){
 function doLogout() {
   if(_fbAuth) _fbAuth.signOut();
   currentUser = null; supaToken = null;
-  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[] };
+  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[] };
   try {
     localStorage.removeItem('nestegg_d6');
     localStorage.removeItem(CACHE_KEY);
