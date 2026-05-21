@@ -1943,7 +1943,7 @@ function renderHoldings(){
 
   }else if(activeTab==='indian'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
-    head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.indian.forEach(a=>{
       // price and avgCost are both in INR from yfinance
@@ -1958,11 +1958,11 @@ function renderHoldings(){
       const plHtml = !plSane
         ? `<span style="color:#ff8800;font-size:10px;cursor:pointer" onclick="editStockCost(${a.id},'indian')" title="P&L looks wrong — click to fix">⚠ Fix cost</span>`
         : (plDisp ?? lc());
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
-    head.style.cssText=`display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span><span>Value (${curSym})</span><span>24h</span><span>P&L (${curSym})</span><span></span>`;
     D.intl.forEach(a=>{
       // price is in USD
@@ -1975,11 +1975,11 @@ function renderHoldings(){
       const plHtml = !plSane
         ? `<span style="color:#ff8800;font-size:10px;cursor:pointer" onclick="editStockCost(${a.id},'intl')" title="P&L looks wrong — click to fix">⚠ Fix cost</span>`
         : (plDisp ?? lc());
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .9fr .6fr 1fr .9fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
-    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span><span>Value (${curSym})</span><span>1d</span><span>Gain/Loss (${curSym})</span><span></span>`;
     D.mf.forEach(a=>{
       const valUSD = a.nav && a.units ? a.units * a.nav / (liveRates.inr || USD_INR) : null;
@@ -1988,7 +1988,7 @@ function renderHoldings(){
       const plUSD = plINR != null ? plINR / (liveRates.inr || USD_INR) : null;
       const plPct = (hasNavBought && a.nav) ? ((a.nav - a.navBought) / a.navBought * 100) : null;
       const plDisp = plUSD != null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr 28px;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plDisp??lc()}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -2121,7 +2121,88 @@ async function refreshOther(id){
     setStatus('warn',`${a.type.toUpperCase()} refresh failed: ${e.message}`);
   }
 }
-// Fix wrong avgCost — prompts user for total invested amount
+function editPosition(id, type){
+  const arr = type==='indian' ? D.indian : type==='intl' ? D.intl : D.mf;
+  const a = arr.find(x=>x.id===id);
+  if(!a) return;
+
+  const isMF = type==='mf';
+  const sym = isMF ? a.name.split(' ').slice(0,4).join(' ')+'…' : a.symbol;
+  const curQty = isMF ? a.units : a.qty;
+  const curInvested = isMF ? (a.navBought * a.units).toFixed(2) : (a.avgCost * a.qty).toFixed(2);
+  const cur = type==='intl' ? '$' : '₹';
+  const qtyLabel = isMF ? 'Units Held' : 'Quantity';
+
+  const existing = document.getElementById('edit-modal');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'edit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center';
+
+  const inner = document.createElement('div');
+  inner.style.cssText = 'background:#0a0a0a;border:1px solid #222;padding:28px;width:460px;max-width:95vw';
+  inner.innerHTML = [
+    '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit Position</div>',
+    `<div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:20px">${sym}</div>`,
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">',
+      `<div><div style="font-size:10px;letter-spacing:.06em;color:#555;font-weight:700;text-transform:uppercase;margin-bottom:6px">${qtyLabel}</div>`,
+      `<input type="number" id="ep-qty" value="${curQty}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+      `<div><div style="font-size:10px;letter-spacing:.06em;color:#555;font-weight:700;text-transform:uppercase;margin-bottom:6px">Total Invested (${cur})</div>`,
+      `<input type="number" id="ep-invested" value="${curInvested}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    '</div>',
+    '<div style="font-size:11px;color:#555;margin-bottom:8px">Add shares: increase qty + add to total invested. Reduce: decrease qty + reduce total.</div>',
+    '<div id="ep-preview" style="font-size:11px;color:#00e676;margin-bottom:16px;min-height:16px"></div>',
+    '<div style="display:flex;gap:8px">',
+      `<button id="ep-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-transform:uppercase">Save Changes</button>`,
+      '<button id="ep-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;text-transform:uppercase">Cancel</button>',
+    '</div>'
+  ].join('');
+
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+
+  // Wire buttons
+  document.getElementById('ep-save').onclick = () => saveEditPosition(id, type);
+  document.getElementById('ep-cancel').onclick = () => modal.remove();
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+
+  // Live avg preview
+  const preview = () => {
+    const qty = parseFloat(document.getElementById('ep-qty')?.value||0);
+    const inv = parseFloat(document.getElementById('ep-invested')?.value||0);
+    const el = document.getElementById('ep-preview');
+    if(el && qty>0 && inv>0) el.textContent = `Avg cost: ${cur}${(inv/qty).toFixed(2)} per ${isMF?'unit':'share'}`;
+    else if(el) el.textContent = '';
+  };
+  document.getElementById('ep-qty').addEventListener('input', preview);
+  document.getElementById('ep-invested').addEventListener('input', preview);
+  preview();
+}
+
+function saveEditPosition(id, type){
+  const arr = type==='indian' ? D.indian : type==='intl' ? D.intl : D.mf;
+  const a = arr.find(x=>x.id===id);
+  if(!a) return;
+
+  const qty = parseFloat(document.getElementById('ep-qty')?.value||0);
+  const invested = parseFloat(document.getElementById('ep-invested')?.value||0);
+  if(!qty||qty<=0){ alert('Quantity must be greater than 0'); return; }
+  if(!invested||invested<=0){ alert('Total invested must be greater than 0'); return; }
+
+  if(type==='mf'){
+    a.units = qty;
+    a.navBought = invested / qty;
+  } else {
+    a.qty = qty;
+    a.avgCost = invested / qty;
+  }
+
+  document.getElementById('edit-modal')?.remove();
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+
+// Fix wrong avgCost via prompt (legacy — kept for ⚠ Fix cost button)
 function editStockCost(id, type){
   const arr = type==='indian' ? D.indian : D.intl;
   const a = arr.find(x=>x.id===id);
