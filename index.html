@@ -4193,7 +4193,7 @@ function toggleRebal(){
   const panel = document.getElementById('rebal-panel');
   const isOpen = panel.style.display !== 'none';
   panel.style.display = isOpen ? 'none' : 'block';
-  if(!isOpen) buildRebal();
+  if(!isOpen){ buildRebal(); setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}),80); }
 }
 
 function buildRebal(){
@@ -4267,7 +4267,7 @@ function toggleHeatmap(){
   const panel = document.getElementById('heatmap-panel');
   const isOpen = panel.style.display !== 'none';
   panel.style.display = isOpen ? 'none' : 'block';
-  if(!isOpen) buildHeatmap();
+  if(!isOpen){ buildHeatmap(); setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}),80); }
 }
 
 function buildHeatmap(){
