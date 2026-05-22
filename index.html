@@ -4163,8 +4163,28 @@ function showOnboardingTip(){
       setStatus('loading', 'Refreshing prices…');
       refreshAll();
     }
+    // Ping Supabase when tab becomes visible, at most once per 3 days
+    if(document.visibilityState === 'visible') pingSupabase();
   });
+
+  // Ping on startup too
+  pingSupabase();
+
+  // Also ping every 4 hours while the tab is open (keeps Supabase warm)
+  setInterval(pingSupabase, 4 * 60 * 60 * 1000);
 })();
+
+// ── SUPABASE KEEP-ALIVE PING ──────────────────────────────
+function pingSupabase(){
+  const PING_KEY = 'last_supabase_ping';
+  const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+  const lastPing = parseInt(localStorage.getItem(PING_KEY)||'0');
+  if(Date.now() - lastPing < THREE_DAYS) return; // too soon
+  localStorage.setItem(PING_KEY, Date.now().toString());
+  fetch('/api/ping').then(r=>r.json()).then(d=>{
+    console.log(`[ping] Supabase: ${d.supabase}, latency: ${d.latency}ms`);
+  }).catch(()=>{});
+}
 
 // ══════════════════════════════════════════════════════════
 //  REBALANCING CALCULATOR
