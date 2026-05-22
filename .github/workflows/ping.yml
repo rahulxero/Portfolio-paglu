@@ -1,0 +1,9 @@
+name: Keep Supabase alive
+on:
+  schedule:
+    - cron: '0 10 */1 * *'  # every 1 days at 10am
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl https://portfoliopaglu.vercel.app/api/ping
