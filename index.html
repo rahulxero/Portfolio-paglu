@@ -195,42 +195,118 @@
     }
     .hdr-btn-wide:hover { background: #fff; color: #000; border-color: #fff; }
     .hdr-btn-sq { width: 56px; height: 52px; font-size: 17px; flex-direction: row; }
-    body.light-mode .hdr-btn { border-color: #ddd; color: #555; }
-    body.light-mode .hdr-btn:hover { background: #f0f0f0; color: #000; border-color: #aaa; }
-    body.light-mode .hdr-btn-label { color: #888; }
-    body.light-mode .hdr-btn-wide { color: #333; }
+    /* ══════════════════════════════════════════════════════
+       LIGHT MODE
+    ══════════════════════════════════════════════════════ */
     body.light-mode {
-      --black: #f5f5f5;
-      --white: #0a0a0a;
-      --border-rule: 1px solid #ddd;
-      --border-thin: 1px solid #e0e0e0;
-      background: #f5f5f5;
-      color: #0a0a0a;
+      --black: #ffffff; --white: #111111; --dim: #333333;
+      --mid: #666666; --ghost: #999999;
+      --border-rule: 1px solid #e2e2e2; --border-thin: 1px solid #ebebeb;
+      background: #f7f8fa; color: #111;
     }
-    body.light-mode .hdr { background: #fff; border-bottom-color: #e0e0e0; }
-    body.light-mode .ticker-bar { background: #fff; border-bottom-color: #e0e0e0; }
-    body.light-mode .hc, body.light-mode .cc { background: #fff; border-color: #e0e0e0; }
-    body.light-mode .trow { border-bottom-color: #f0f0f0; }
-    body.light-mode .trow:hover { background: #fafafa; }
-    body.light-mode .badge { background: #f0f0f0; color: #333; border-color: #ddd; }
-    body.light-mode .btn { border-color: #ddd; color: #333; }
-    body.light-mode .btn:hover { background: #f0f0f0; }
-    body.light-mode .btn-p { background: #0a0a0a; color: #fff; }
-    body.light-mode .an { color: #0a0a0a; }
-    body.light-mode .as { color: #888; }
-    body.light-mode .mv { color: #222; }
-    body.light-mode select, body.light-mode input { background: #fff; border-color: #ddd; color: #0a0a0a; }
-    body.light-mode .login-mo { background: rgba(245,245,245,.97); }
-    body.light-mode .login-card { background: #fff; border-color: #ddd; }
-    body.light-mode .login-card h2 { color: #0a0a0a; }
-    body.light-mode .login-card input { background: #f5f5f5; border-color: #ddd; color: #0a0a0a; }
-    body.light-mode .info-box { background: #f0fff0; border-color: #b0d8b0; }
-    body.light-mode .info-box.info-ok { color: #1a5c1a; }
-    body.light-mode #pie-leg span span[style*="color:#aaa"] { color: #555 !important; }
-    body.light-mode .cc-title { color: #0a0a0a; }
-    body.light-mode .muted { color: #888; }
-    body.light-mode .card-val { color: #0a0a0a; }
-    body.light-mode .sum-card { background: #fff; border-color: #e0e0e0; }
+    body.light-mode .hdr { background:#fff; border-bottom:1px solid #e2e2e2; box-shadow:0 1px 8px rgba(0,0,0,.06); }
+    body.light-mode .ticker-bar { background:#fff; border-bottom:1px solid #e2e2e2; color:#333; }
+    body.light-mode .hc, body.light-mode .cc { background:#fff; border:1px solid #e2e2e2; box-shadow:0 1px 4px rgba(0,0,0,.04); }
+    body.light-mode .sum-card { background:#fff; border:1px solid #e2e2e2; box-shadow:0 1px 4px rgba(0,0,0,.04); }
+    body.light-mode .hero { border-bottom-color:#e2e2e2; }
+    body.light-mode .hero-val { color:#111; }
+    body.light-mode .hero-eyebrow { color:#999; }
+    body.light-mode .hero-eyebrow::before { background:#ddd; }
+    body.light-mode .card-label { color:#888; }
+    body.light-mode .card-val { color:#111; font-weight:600; }
+    body.light-mode .card-chg.muted { color:#bbb; }
+    body.light-mode .trow { border-bottom:1px solid #f0f0f0; }
+    body.light-mode .trow:hover { background:#f9fafb; }
+    body.light-mode .an { color:#111; font-weight:600; }
+    body.light-mode .as { color:#888; }
+    body.light-mode .mv { color:#333; }
+    body.light-mode .muted { color:#bbb; }
+    body.light-mode .badge { background:#f0f0f5; color:#444; border-color:#ddd; }
+    body.light-mode .cp { background:#f5f5f5; }
+    body.light-mode .tok-logo { background:#f0f0f5; color:#555; }
+    body.light-mode .w-grp { background:#f7f8fa; border-bottom:1px solid #e8e8e8; }
+    body.light-mode .w-total { color:#111; font-weight:600; }
+    body.light-mode .btn { border-color:#ddd; color:#333; background:#fff; }
+    body.light-mode .btn:hover { background:#f0f0f5; border-color:#bbb; }
+    body.light-mode .btn-p { background:#111; color:#fff; border-color:#111; }
+    body.light-mode .btn-p:hover { background:#333; border-color:#333; }
+    body.light-mode .hdr-btn { border-color:#e2e2e2; color:#444; background:#fff; }
+    body.light-mode .hdr-btn:hover { background:#f0f0f5; color:#111; border-color:#bbb; }
+    body.light-mode .hdr-btn-label { color:#999; }
+    body.light-mode .hdr-btn-wide { color:#333; border-color:#ddd; }
+    body.light-mode .user-pill { border-color:#e2e2e2 !important; background:#fff; }
+    body.light-mode #currency-sel { background:#fff; border-color:#e2e2e2; color:#333; }
+    body.light-mode select, body.light-mode input, body.light-mode textarea { background:#fff; border-color:#ddd; color:#111; }
+    body.light-mode .tab { color:#666; border-color:#e2e2e2; background:#fff; }
+    body.light-mode .tab:hover { background:#f5f5f5; color:#111; }
+    body.light-mode .tab.on { background:#111; color:#fff; border-color:#111; }
+    body.light-mode .cc-title { color:#111; font-weight:700; }
+    body.light-mode .info-box { background:#f0f8ff; border-color:#c8dff0; color:#336; }
+    body.light-mode .info-box.info-ok { background:#f0fff4; border-color:#b0d8b8; color:#1a5c2a; }
+    body.light-mode .add-panel { background:#fff; border-color:#e2e2e2; }
+    body.light-mode .add-panel-title { color:#111; }
+    body.light-mode label { color:#666; }
+    body.light-mode .ac-drop { background:#fff; border-color:#e2e2e2; box-shadow:0 4px 16px rgba(0,0,0,.1); }
+    body.light-mode .ac-item:hover { background:#f5f5f5; }
+    body.light-mode .login-mo { background:rgba(247,248,250,.97); }
+    body.light-mode .login-card { background:#fff; border-color:#e2e2e2; box-shadow:0 4px 24px rgba(0,0,0,.08); }
+    body.light-mode .login-card h2 { color:#111; }
+    body.light-mode .login-card input { background:#f7f8fa; border-color:#ddd; color:#111; }
+    body.light-mode .logo-text { color:#111; }
+    body.light-mode .notice { background:#fff; border-color:#e2e2e2; }
+    body.light-mode .cache-bar { background:#fff8e1; border-color:#ffe082; color:#666; }
+
+    /* ══════════════════════════════════════════════════════
+       MOBILE RESPONSIVE
+    ══════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .hdr { padding:8px 12px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+      .hdr::-webkit-scrollbar { display:none; }
+      .logo-mark { width:24px !important; height:24px !important; }
+      .logo-mark img { width:24px !important; height:24px !important; }
+      .logo-text { font-size:12px; }
+      .hdr-r { gap:4px; flex-shrink:0; }
+      .hdr-btn { width:40px; height:40px; border-radius:8px; }
+      .hdr-btn-label { display:none; }
+      .hdr-btn-icon { font-size:15px; }
+      .hdr-btn-wide { min-width:72px; font-size:10px; padding:0 8px; height:40px; }
+      .user-pill { padding:0 10px !important; height:40px !important; }
+      #currency-sel { height:40px; min-width:65px; font-size:11px; padding:0 6px; }
+    }
+    @media (max-width: 768px) {
+      .ticker-bar { font-size:11px; }
+      .main { padding:14px 10px 80px; }
+      .hero { margin-bottom:20px; padding-bottom:18px; }
+      .hero-val { font-size:36px !important; }
+      .cgrid { grid-template-columns:repeat(2,1fr) !important; gap:8px; }
+      .sum-card { padding:12px 14px; }
+      .card-val { font-size:13px; }
+      .charts-row { grid-template-columns:1fr !important; }
+      .cc+.cc { border-left:none !important; border-top:var(--border-thin); }
+      .cc { padding:16px 14px; }
+      .hc-hdr { padding:12px 14px; flex-wrap:wrap; gap:8px; }
+      .tab-grp { overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; flex-wrap:nowrap; }
+      .tab-grp::-webkit-scrollbar { display:none; }
+      .tab { white-space:nowrap; padding:8px 11px; font-size:10px; flex-shrink:0; }
+      .trow { padding:10px 10px; }
+      .tok-logo { width:28px; height:28px; font-size:10px; }
+      .an { font-size:12px; }
+      .mv { font-size:11px; }
+      .fg2, .fg3, .fg4 { grid-template-columns:1fr !important; }
+      .add-panel { padding:16px; }
+      .add-panel-title { font-size:13px; }
+    }
+    /* Mobile bottom nav */
+    @media (max-width: 768px) {
+      .mobile-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--black); border-top:var(--border-thin); z-index:200; padding:6px 0 env(safe-area-inset-bottom,6px); }
+      body.light-mode .mobile-nav { background:#fff; border-top-color:#e2e2e2; }
+    }
+    @media (min-width: 769px) { .mobile-nav { display:none; } }
+    .mobile-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px; background:none; border:none; cursor:pointer; color:#555; font-family:var(--mono); font-size:8px; text-transform:uppercase; letter-spacing:.06em; }
+    .mobile-nav-btn.on { color:#00e676; }
+    .mobile-nav-btn span:first-child { font-size:18px; line-height:1; }
+    body.light-mode .mobile-nav-btn { color:#aaa; }
+    body.light-mode .mobile-nav-btn.on { color:#059669; }
 
     /* ── NOTICES ─────────────────────────────────────────── */
     .notice {
@@ -4417,6 +4493,28 @@ function delManualCrypto(id){
   save(); renderHoldings(); updateSummary(); buildPie();
 }
 
+// Mobile bottom nav
+function mobileNav(tab){
+  const tabMap = { crypto:'crypto', indian:'indian', mf:'mf', banks:'banks' };
+  const moreTabs = ['intl','bonds'];
+  if(tab === 'more'){
+    // Cycle through extra tabs on mobile
+    const cur = activeTab;
+    const next = moreTabs[(moreTabs.indexOf(cur)+1) % moreTabs.length];
+    const tabEl = document.querySelector(`.tab[onclick*="${next}"]`);
+    if(tabEl) sw(next, tabEl);
+  } else {
+    const tabEl = document.querySelector(`.tab[onclick*="${tab}"]`);
+    if(tabEl) sw(tab, tabEl);
+  }
+  // Update mobile nav active state
+  document.querySelectorAll('.mobile-nav-btn').forEach(b=>b.classList.remove('on'));
+  const activeBtn = document.getElementById('mnav-'+tab);
+  if(activeBtn) activeBtn.classList.add('on');
+  // Scroll to top smoothly
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
 (function wireLoginModal(){
   const $ = id => document.getElementById(id);
 
@@ -4445,5 +4543,13 @@ function delManualCrypto(id){
 })();
 
 </script>
+<!-- Mobile bottom nav -->
+<nav class="mobile-nav" id="mobile-nav">
+  <button class="mobile-nav-btn on" id="mnav-crypto" onclick="mobileNav('crypto')"><span>₿</span><span>Crypto</span></button>
+  <button class="mobile-nav-btn" id="mnav-indian" onclick="mobileNav('indian')"><span>📈</span><span>Stocks</span></button>
+  <button class="mobile-nav-btn" id="mnav-mf" onclick="mobileNav('mf')"><span>🏦</span><span>Funds</span></button>
+  <button class="mobile-nav-btn" id="mnav-banks" onclick="mobileNav('banks')"><span>💰</span><span>Cash</span></button>
+  <button class="mobile-nav-btn" id="mnav-more" onclick="mobileNav('more')"><span>⋯</span><span>More</span></button>
+</nav>
 </body>
 </html>
