@@ -2322,7 +2322,9 @@ function renderHoldings(){
       const valINR = a.price && a.qty ? a.qty * a.price : null;
       const valUSD = valINR != null ? valINR / (liveRates.inr || USD_INR) : null;
       const investedINR = a.avgCost > 0 ? a.avgCost * a.qty : null;
-      const investedDisp = investedINR ? inrToDisp(investedINR) : lc();
+      const investedDisp = investedINR
+        ? `<span style="color:#888">${inrToDisp(investedINR)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'indian')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasAvgCost = a.avgCost > 0;
       const plINR = (hasAvgCost && valINR != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct  = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
@@ -2347,7 +2349,9 @@ function renderHoldings(){
     D.intl.forEach(a=>{
       const valUSD = a.price && a.qty ? a.qty * a.price : null;
       const investedUSD = a.avgCost > 0 ? a.avgCost * a.qty : null;
-      const investedDisp = investedUSD ? fI(investedUSD) : lc();
+      const investedDisp = investedUSD
+        ? `<span style="color:#888">${fI(investedUSD)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'intl')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasAvgCost = a.avgCost > 0;
       const plUSD = (hasAvgCost && valUSD != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
@@ -2373,7 +2377,9 @@ function renderHoldings(){
       const valUSD = a.nav && a.units ? a.units * a.nav / (liveRates.inr || USD_INR) : null;
       const investedINR = a.navBought > 0 ? a.navBought * a.units : null;
       const investedUSD = investedINR ? investedINR / (liveRates.inr||USD_INR) : null;
-      const investedDisp = investedUSD ? fI(investedUSD) : lc();
+      const investedDisp = investedUSD
+        ? `<span style="color:#888">${fI(investedUSD)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'mf')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasNavBought = a.navBought > 0;
       const plINR = (hasNavBought && a.nav) ? a.units * (a.nav - a.navBought) : null;
       const plUSD = plINR != null ? plINR / (liveRates.inr || USD_INR) : null;
@@ -2519,7 +2525,47 @@ function delBond(id){
   save(); renderHoldings(); updateSummary(); buildPie();
 }
 
-// ── BANK INLINE EDIT ──────────────────────────────────────
+// ── INLINE COST ENTRY ────────────────────────────────────
+// Shows a tiny input right in the invested cell when user clicks "+ add cost"
+function inlineSetCost(e, id, type){
+  e.stopPropagation();
+  const span = e.target;
+  const arr = type==='indian' ? D.indian : type==='intl' ? D.intl : D.mf;
+  const a = arr.find(x=>x.id===id);
+  if(!a) return;
+
+  const isMF = type==='mf';
+  const curQty = isMF ? a.units : a.qty;
+  const sym = type==='intl' ? '$' : '₹';
+
+  // Replace span with inline input
+  const inp = document.createElement('input');
+  inp.type = 'number';
+  inp.placeholder = `Total ${sym} invested`;
+  inp.step = 'any';
+  inp.style.cssText = 'width:100px;font-size:11px;padding:2px 6px;background:#111;border:1px solid #444;color:#fff;font-family:monospace;border-radius:4px;outline:none';
+  span.replaceWith(inp);
+  inp.focus();
+
+  const save = () => {
+    const total = parseFloat(inp.value);
+    if(!total || total <= 0){ inp.replaceWith(span); return; }
+    if(isMF){
+      a.navBought = total / curQty;
+    } else {
+      a.avgCost = total / curQty;
+    }
+    save(); renderHoldings(); updateSummary();
+  };
+
+  inp.addEventListener('keydown', e => {
+    if(e.key === 'Enter') save();
+    if(e.key === 'Escape'){ inp.replaceWith(span); }
+  });
+  inp.addEventListener('blur', save);
+}
+
+// ── BOND INLINE EDIT ──────────────────────────────────────
 // Opens inline edit row to update balance
 function editBank(id){
   const a=D.banks.find(x=>x.id===id); if(!a) return;
