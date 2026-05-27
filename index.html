@@ -974,6 +974,7 @@
             <button class="tf on" onclick="setTF('7d',this)">7D</button>
             <button class="tf" onclick="setTF('30d',this)">30D</button>
             <button class="tf" onclick="setTF('6m',this)">6M</button>
+            <button class="tf" onclick="setTF('1y',this)">1Y</button>
           </div>
         </div>
       </div>
@@ -1986,8 +1987,8 @@ function buildPie(){
 
 // Benchmark returns (approximate annualized, broken into periods)
 const BENCH = {
-  nifty: { '7d':.008, '30d':.032, '6m':.11 },
-  sp500: { '7d':.006, '30d':.025, '6m':.09 },
+  nifty: { '7d':.008, '30d':.032, '6m':.11, '1y':.18 },
+  sp500: { '7d':.006, '30d':.025, '6m':.09, '1y':.16 },
 };
 let _snapCache = null;
 
@@ -2001,7 +2002,7 @@ async function fetchSnapshots(days){
   } catch(e){ return null; }
 }
 
-const TFD={'7d':{days:7,pf:.03},'30d':{days:30,pf:.12},'6m':{days:182,pf:.38}};
+const TFD={'7d':{days:7,pf:.03},'30d':{days:30,pf:.12},'6m':{days:182,pf:.38},'1y':{days:365,pf:.72}};
 async function buildPerf(){
   const v=vals(), ctx=document.getElementById('perfC')?.getContext('2d'), tf=TFD[curTF];
   if(!ctx) return;
