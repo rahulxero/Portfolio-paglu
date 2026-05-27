@@ -2013,36 +2013,41 @@ async function buildPerf(){
   let labels=[], portfolioVals=[];
 
   if(snaps && snaps.length >= 2){
-    // Use real data
+    // Real snapshot data — stored as USD
     snaps.forEach(s=>{
       const d = new Date(s.snapped_at);
       labels.push(d.getDate()+' '+d.toLocaleString('en-IN',{month:'short'}));
-      portfolioVals.push(parseFloat(s.value_usd) * (liveRates.inr||USD_INR));
+      portfolioVals.push(parseFloat(s.value_usd)); // keep in USD
     });
     // Add today's current value
     const todayLabel = new Date().getDate()+' '+new Date().toLocaleString('en-IN',{month:'short'});
     if(labels[labels.length-1] !== todayLabel){
       labels.push(todayLabel);
-      portfolioVals.push(v.tot * (liveRates.inr||USD_INR));
+      portfolioVals.push(v.tot); // v.tot is already in USD
     }
   } else {
-    // Simulated with seeded random
-    const end=v.tot*(liveRates.inr||USD_INR)||1000000, start=end/(1+tf.pf);
-    let seed=777; const sr=()=>{seed=(seed*1664525+1013904223)&0xffffffff;return(seed>>>0)/0xffffffff;};
+    // No snapshots yet — flat line at current value with small noise
+    // Show a message instead of misleading simulated data
+    const cur = v.tot || 0;
     for(let i=0;i<=tf.days;i++){
-      const d=new Date();d.setDate(d.getDate()-(tf.days-i));
+      const d=new Date(); d.setDate(d.getDate()-(tf.days-i));
       labels.push(d.getDate()+' '+d.toLocaleString('en-IN',{month:'short'}));
-      portfolioVals.push(Math.round(start+(end-start)*(i/tf.days)+(sr()-.5)*start*.012));
+      portfolioVals.push(cur); // flat — we don't know history yet
     }
   }
 
   const startVal = portfolioVals[0]||1;
   const endVal = portfolioVals[portfolioVals.length-1];
-  const ret = endVal - startVal;
+  const ret = endVal - startVal; // in USD
   const retPct = ret / startVal * 100;
+  const hasRealData = snaps && snaps.length >= 2;
 
-  document.getElementById('tf-r').innerHTML=`<span class="${pc(ret)}">${ret>=0?'+':''}${fI(Math.abs(ret))}</span>`;
-  document.getElementById('tf-p').innerHTML=`<span class="${pc(retPct)}">${retPct>=0?'+':''}${retPct.toFixed(2)}%</span>`;
+  document.getElementById('tf-r').innerHTML = hasRealData
+    ? `<span class="${pc(ret)}">${ret>=0?'+':''}${fI(Math.abs(ret))}</span>`
+    : `<span style="color:#444">— No history yet</span>`;
+  document.getElementById('tf-p').innerHTML = hasRealData
+    ? `<span class="${pc(retPct)}">${retPct>=0?'+':''}${retPct.toFixed(2)}%</span>`
+    : `<span style="color:#444">Refresh daily to build history</span>`;
 
   // Build benchmark line (normalized to same start)
   const benchPct = (BENCH[benchType]||BENCH.nifty)[curTF]||0.05;
@@ -2084,11 +2089,11 @@ async function buildPerf(){
           callbacks:{
             label:c=>`${c.dataset.label}: ${fI(c.raw)}`,
             afterBody: items => {
-              if(items.length>=2){
+              if(items.length>=2 && showBench){
                 const myPct = ((items[0].raw-startVal)/startVal*100).toFixed(1);
-                const bPct = ((items[1].raw-startVal)/startVal*100).toFixed(1);
-                const diff = (parseFloat(myPct)-parseFloat(bPct)).toFixed(1);
-                return [`You: ${myPct>=0?'+':''}${myPct}% vs Nifty: +${bPct}%`, `Alpha: ${diff>=0?'+':''}${diff}%`];
+                const bPct  = ((items[1].raw-startVal)/startVal*100).toFixed(1);
+                const diff  = (parseFloat(myPct)-parseFloat(bPct)).toFixed(1);
+                return [`You: ${myPct>=0?'+':''}${myPct}% vs ${benchName}: +${bPct}%`, `Alpha: ${diff>=0?'+':''}${diff}%`];
               }
               return [];
             }
@@ -2097,7 +2102,7 @@ async function buildPerf(){
       },
       scales:{
         x:{ticks:{maxTicksLimit:6,font:{size:10,family:"'JetBrains Mono'"},color:'#444'},grid:{color:'#111'},border:{color:'#222'}},
-        y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:'#444',callback:v=>'₹'+(v/100000).toFixed(1)+'L'},grid:{color:'#111'},border:{color:'#222'}}
+        y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:'#444',callback:v=>fI(v)},grid:{color:'#111'},border:{color:'#222'}}
       }
     }
   });
