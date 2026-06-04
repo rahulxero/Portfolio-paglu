@@ -32,11 +32,12 @@ module.exports = async function handler(req, res) {
   const { indianSymbols = [], intlSymbols = [] } = req.body || {};
   if (!indianSymbols.length && !intlSymbols.length) return res.status(400).json({ error: 'No symbols' });
 
-  const prompt = `Search for today's current stock prices. Return ONLY a JSON object, no markdown.
-Indian NSE stocks (INR price): ${indianSymbols.join(', ')}
-US stocks (USD price): ${intlSymbols.join(', ')}
-Include USD_INR exchange rate.
-Example: {"RELIANCE":2680,"TCS":4120,"AAPL":192,"NVDA":875,"USD_INR":84}`;
+  const prompt = `Search NSE India for current prices of these Indian stocks: ${indianSymbols.join(', ')}
+Also search for these US/global stocks: ${intlSymbols.join(', ')}
+Return ONLY a raw JSON object, no markdown, no backticks.
+Keys = exact ticker symbols as given, values = current price as number.
+Also include USD_INR exchange rate.
+Example: {"RELIANCE":2680,"ZYDUSLIFE":1075,"HDFCBANK":1820,"AAPL":192,"USD_INR":84}`;
 
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {

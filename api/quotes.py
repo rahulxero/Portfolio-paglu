@@ -3,10 +3,41 @@ import json
 
 # Common NSE ticker aliases — maps what users type to actual yfinance ticker
 NSE_ALIASES = {
-    'SBI':    'SBIN',
-    'M&M':    'M%26M',   # URL-encode the &
-    'L&T':    'LT',
-    'BAJAJ':  'BAJAJFINSV',
+    'SBI':        'SBIN',
+    'M&M':        'M%26M',   # URL-encode the &
+    'L&T':        'LT',
+    'BAJAJ':      'BAJAJFINSV',
+    'ZYDUS':      'ZYDUSLIFE',
+    'CADILA':     'ZYDUSLIFE',
+    'WIPRO':      'WIPRO',
+    'HDFCBANK':   'HDFCBANK',
+    'ICICIBANK':  'ICICIBANK',
+    'KOTAKBANK':  'KOTAKBANK',
+    'RELIANCE':   'RELIANCE',
+    'TCS':        'TCS',
+    'INFY':       'INFY',
+    'BHARTIARTL': 'BHARTIARTL',
+    'AIRTEL':     'BHARTIARTL',
+    'TATAMOTORS': 'TATAMOTORS',
+    'TATASTEEL':  'TATASTEEL',
+    'AXISBANK':   'AXISBANK',
+    'SUNPHARMA':  'SUNPHARMA',
+    'ITC':        'ITC',
+    'BAJFINANCE': 'BAJFINANCE',
+    'MARUTI':     'MARUTI',
+    'HINDUNILVR': 'HINDUNILVR',
+    'HUL':        'HINDUNILVR',
+    'ULTRACEMCO': 'ULTRACEMCO',
+    'NESTLEIND':  'NESTLEIND',
+    'TITAN':      'TITAN',
+    'ASIANPAINT': 'ASIANPAINT',
+    'POWERGRID':  'POWERGRID',
+    'NTPC':       'NTPC',
+    'ONGC':       'ONGC',
+    'COALINDIA':  'COALINDIA',
+    'BPCL':       'BPCL',
+    'GESHIPPING': 'GESHIPPING',
+    'GESHIN':     'GESHIPPING',
 }
 
 class handler(BaseHTTPRequestHandler):
@@ -77,8 +108,8 @@ class handler(BaseHTTPRequestHandler):
                         continue
 
                 if not fetched:
-                    # Return error info so the UI can show it
-                    result[sym + '_err'] = f'Not found. Try the exact NSE ticker (e.g. SBIN for SBI)'
+                    tried = ', '.join(attempts[:2])
+                    result[sym + '_err'] = f'Price not found. Tried: {tried}. Check the exact NSE ticker on NSE India.'
 
             # ── International stocks (NASDAQ / NYSE) ───────
             for sym in intl_symbols:
