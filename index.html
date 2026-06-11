@@ -429,12 +429,10 @@
     .tab:hover { background: #111; color: var(--white); }
     .tab.on { background: var(--white); color: var(--black); font-weight: 700; }
     .badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      font-size: 9px; padding: 4px 8px;
-      background: #1a1a1a; color: #777;
+      display: inline-block; font-size: 9px; padding: 2px 7px;
+      background: #1a1a1a; color: var(--mid);
       font-family: var(--mono); border: var(--border-rule);
-      letter-spacing: .06em; border-radius: 3px;
-      min-width: 45px; text-align: center;
+      letter-spacing: .06em;
     }
     .src-tag {
       font-size: 9px; padding: 2px 8px;
@@ -446,25 +444,21 @@
     .hbody { padding: 0 20px 20px; }
     .thd {
       font-size: 10px; text-transform: uppercase;
-      letter-spacing: .12em; color: #555;
+      letter-spacing: .1em; color: var(--mid);
       font-family: var(--mono);
-      padding: 14px 8px 10px;
-      border-bottom: 1px solid #222;
-      font-weight: 500;
-      display: grid;
-      gap: 8px;
-      align-items: center;
+      padding: 10px 8px 8px;
+      border-bottom: var(--border-rule);
     }
     .trow {
-      padding: 12px 8px;
-      border-bottom: 1px solid #0f0f0f;
-      transition: background .12s ease, border-color .12s ease;
+      padding: 11px 8px;
+      border-bottom: 1px solid #1a1a1a;
+      transition: background .1s;
     }
     .trow:last-child { border-bottom: none; }
-    .trow:hover { background: #0a0a0a; border-bottom-color: #1a1a1a; }
-    .an { font-weight: 600; font-size: 13px; letter-spacing: -.005em; color: #fff; }
-    .as { font-size: 11px; color: #666; margin-top: 2px; font-family: var(--mono); }
-    .mv { font-family: var(--mono); font-size: 12px; color: #bbb; text-align: right; }
+    .trow:hover { background: #0d0d0d; }
+    .an { font-weight: 600; font-size: 13px; letter-spacing: -.01em; color: #fff; }
+    .as { font-size: 11px; color: var(--ghost); margin-top: 2px; font-family: var(--mono); }
+    .mv { font-family: var(--mono); font-size: 12px; color: #ccc; }
     .lv { color: #555; }
 
     /* ── WALLET GROUP ────────────────────────────────────── */
@@ -1565,7 +1559,6 @@ async function fetchWalletPositions(wallet){
         } catch(e) {
           console.warn('Zerion failed:', e.message);
           wallet._zerionError = e.message;
-          // Fallback: try to get ETH balance
           try {
             const bal = await fetchETHNative(wallet.address);
             return { zerion: [{id:'eth-native',symbol:'ETH',name:'Ethereum',chain:'ethereum',balance:bal,priceUSD:0,valueUSD:0,ch24:null,logo:'',_fallback:true}] };
@@ -1614,7 +1607,6 @@ async function fetchWalletPositions(wallet){
       })()
     ]);
 
-    // Merge all position results
     let positions = [];
     results.forEach(result => {
       if(result.status === 'fulfilled' && result.value) {
@@ -1755,14 +1747,15 @@ async function refreshAll(){
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
-  // ✅ PARALLEL: Fetch all wallets concurrently instead of sequentially
-  // This is 3-5x faster than waiting for each wallet one at a time
+  // ✅ PARALLEL: Fetch all wallets concurrently (not sequentially)
   await Promise.all(D.wallets.map(w =>
     fetchWalletPositions(w).catch(e=>{ errs.push(w.label+': '+e.message); w.fetching=false; })
   ));
   await Promise.all(D.btc.map(a=>
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
+  // Fetch SOL / XRP / ADA / TRX balances
+  // Fetch SOL / TRX / HL balances
   D.others.filter(a=>a.type==='sol'||a.type==='hl').forEach(a=>{a.fetching=true;});
   renderHoldings();
   await Promise.all(D.others.map(a=>fetchOtherWallet(a).then(()=>{a.fetching=false;}).catch(e=>{a.fetching=false;errs.push(`${a.type.toUpperCase()}: ${e.message}`);})));
@@ -2347,10 +2340,10 @@ function renderHoldings(){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0; // 0=₹, 1=%, 2=XIRR(todo)
     const plLabel=['P&L ('+curSym+')','P&L (%)','XIRR'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:1.8fr 0.75fr 0.65fr 1.1fr 1.2fr 0.8fr 1.1fr auto;gap:8px;padding:14px 8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#555;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #222;font-weight:500;align-items:center;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtI=window._stockSort||{col:null,dir:1};
-    const shI=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtI.col===col&&srtI.tab==='indian'?'#fff':'#555'}" onclick="toggleStockSort('${col}','indian')">${lbl}${srtI.col===col&&srtI.tab==='indian'?(srtI.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Stock</span><span>Exch</span><span style="text-align:right">Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span style="text-align:right">24h</span><span style="cursor:pointer;color:#666;border-bottom:1px dashed #333;text-align:right" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle P&L view">${plLabel} ↻</span><span></span>`;
+    const shI=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtI.col===col&&srtI.tab==='indian'?'#fff':'#444'}" onclick="toggleStockSort('${col}','indian')">${lbl}${srtI.col===col&&srtI.tab==='indian'?(srtI.dir===-1?' ↓':' ↑'):''}</span>`;
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle P&L view">${plLabel} ↻</span><span></span>`;
     // Apply sort
     let indArr=[...D.indian];
     const ss=window._stockSort;
@@ -2367,8 +2360,8 @@ function renderHoldings(){
       const valUSD = valINR != null ? valINR / (liveRates.inr || USD_INR) : null;
       const investedINR = a.avgCost > 0 ? a.avgCost * a.qty : null;
       const investedDisp = investedINR
-        ? `<span style="color:#888;text-align:right;display:block">${inrToDisp(investedINR)}</span>`
-        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'indian')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px;display:block;text-align:right">+ add</span>`;
+        ? `<span style="color:#888">${inrToDisp(investedINR)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'indian')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasAvgCost = a.avgCost > 0;
       const plINR = (hasAvgCost && valINR != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct  = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
@@ -2377,21 +2370,21 @@ function renderHoldings(){
       if(!plSane){
         plHtml=`<span style="color:#ff8800;font-size:10px;cursor:pointer" onclick="editStockCost(${a.id},'indian')">⚠ Fix cost</span>`;
       } else if(plMode===1){
-        plHtml = plPct!=null ? `<span class="${pc(plPct)}" style="display:block;text-align:right">${plPct>=0?'+':''}${plPct.toFixed(2)}%</span>` : lc();
+        plHtml = plPct!=null ? `<span class="${pc(plPct)}">${plPct>=0?'+':''}${plPct.toFixed(2)}%</span>` : lc();
       } else {
         const plDisp = plINR!=null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:1.8fr 0.75fr 0.65fr 1.1fr 1.2fr 0.8fr 1.1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px;text-align:center;justify-self:center">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['P&L ('+curSym+')','P&L (%)'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:1.8fr 0.75fr 0.65fr 1.1fr 1.2fr 0.8fr 1.1fr auto;gap:8px;padding:14px 8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#555;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #222;font-weight:500;align-items:center;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtX=window._stockSort||{col:null,dir:1};
-    const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#555'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Stock</span><span>Exch</span><span style="text-align:right">Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span style="text-align:right">24h</span><span style="cursor:pointer;color:#666;border-bottom:1px dashed #333;text-align:right" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
+    const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
     let intlArr=[...D.intl];
     const ssx=window._stockSort;
     if(ssx&&ssx.col&&ssx.tab==='intl'){
@@ -2406,8 +2399,8 @@ function renderHoldings(){
       const valUSD = a.price && a.qty ? a.qty * a.price : null;
       const investedUSD = a.avgCost > 0 ? a.avgCost * a.qty : null;
       const investedDisp = investedUSD
-        ? `<span style="color:#888;text-align:right;display:block">${fI(investedUSD)}</span>`
-        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'intl')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px;display:block;text-align:right">+ add</span>`;
+        ? `<span style="color:#888">${fI(investedUSD)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'intl')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasAvgCost = a.avgCost > 0;
       const plUSD = (hasAvgCost && valUSD != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
@@ -2416,12 +2409,12 @@ function renderHoldings(){
       if(!plSane){
         plHtml=`<span style="color:#ff8800;font-size:10px;cursor:pointer" onclick="editStockCost(${a.id},'intl')">⚠ Fix cost</span>`;
       } else if(plMode===1){
-        plHtml = plPct!=null ? `<span class="${pc(plPct)}" style="display:block;text-align:right">${plPct>=0?'+':''}${plPct.toFixed(2)}%</span>` : lc();
+        plHtml = plPct!=null ? `<span class="${pc(plPct)}">${plPct>=0?'+':''}${plPct.toFixed(2)}%</span>` : lc();
       } else {
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:1.8fr 0.75fr 0.65fr 1.1fr 1.2fr 0.8fr 1.1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px;text-align:center;justify-self:center">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -4276,9 +4269,8 @@ function showOnboardingTip(){
     const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
     if(hasCachedPrices || hasAny){
       const age = cacheAge(); const lbl = cacheAgeLabel();
-      // ✅ REMOVED: No auto-refresh on page load
-      // Now just show cached data status - user must manually click refresh button
-      showCacheBar(false, lbl); 
+      // ✅ NO AUTO-REFRESH: Just show cached data, user clicks refresh button when ready
+      showCacheBar(false,lbl); 
       setStatus('ok',`Cached · ${lbl} · Click ⟳ to refresh`);
     } else {
       setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`);
@@ -4286,9 +4278,8 @@ function showOnboardingTip(){
     }
   }
 
-  // Only refresh when user switches to tab AND manually requests it (removed auto-refresh)
   document.addEventListener('visibilitychange', ()=>{
-    // User switches to tab - just ping Supabase, don't auto-refresh
+    // ✅ NO AUTO-REFRESH on tab switch: Just ping Supabase, user controls refresh
     if(document.visibilityState === 'visible') pingSupabase();
   });
 
