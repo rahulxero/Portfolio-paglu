@@ -2324,7 +2324,7 @@ function renderHoldings(){
     const plLabel=['P&L ('+curSym+')','P&L (%)','XIRR'][plMode]||'P&L';
     head.style.cssText=`display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtI=window._stockSort||{col:null,dir:1};
-    const shI=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtI.col===col&&srtI.tab==='indian'?'#fff':'#444'}" onclick="toggleStockSort('${col}','indian')">${lbl}${srtI.col===col&&srtI.tab==='indian'?(srtI.dir>0?' ↑':' ↓'):''}</span>`;
+    const shI=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtI.col===col&&srtI.tab==='indian'?'#fff':'#444'}" onclick="toggleStockSort('${col}','indian')">${lbl}${srtI.col===col&&srtI.tab==='indian'?(srtI.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle P&L view">${plLabel} ↻</span><span></span>`;
     // Apply sort
     let indArr=[...D.indian];
@@ -2332,9 +2332,9 @@ function renderHoldings(){
     if(ss&&ss.col&&ss.tab==='indian'){
       indArr.sort((a,b)=>{
         let va=0,vb=0;
-        if(ss.col==='invested'){va=a.avgCost>0?a.avgCost*a.qty:0;vb=b.avgCost>0?b.avgCost*b.qty:0;}
-        if(ss.col==='value'){va=a.price>0?a.price*a.qty:0;vb=b.price>0?b.price*b.qty:0;}
-        return (va-vb)*ss.dir;
+        if(ss.col==='invested'){va=a.avgCost>0?a.avgCost*a.qty:-Infinity;vb=b.avgCost>0?b.avgCost*b.qty:-Infinity;}
+        if(ss.col==='value'){va=a.price>0?a.price*a.qty:-Infinity;vb=b.price>0?b.price*b.qty:-Infinity;}
+        return (vb-va)*ss.dir;
       });
     }
     indArr.forEach(a=>{
@@ -2365,16 +2365,16 @@ function renderHoldings(){
     const plLabel=['P&L ('+curSym+')','P&L (%)'][plMode]||'P&L';
     head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtX=window._stockSort||{col:null,dir:1};
-    const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir>0?' ↑':' ↓'):''}</span>`;
+    const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
     let intlArr=[...D.intl];
     const ssx=window._stockSort;
     if(ssx&&ssx.col&&ssx.tab==='intl'){
       intlArr.sort((a,b)=>{
         let va=0,vb=0;
-        if(ssx.col==='invested'){va=a.avgCost>0?a.avgCost*a.qty:0;vb=b.avgCost>0?b.avgCost*b.qty:0;}
-        if(ssx.col==='value'){va=a.price>0?a.price*a.qty:0;vb=b.price>0?b.price*b.qty:0;}
-        return (va-vb)*ssx.dir;
+        if(ssx.col==='invested'){va=a.avgCost>0?a.avgCost*a.qty:-Infinity;vb=b.avgCost>0?b.avgCost*b.qty:-Infinity;}
+        if(ssx.col==='value'){va=a.price>0?a.price*a.qty:-Infinity;vb=b.price>0?b.price*b.qty:-Infinity;}
+        return (vb-va)*ssx.dir;
       });
     }
     intlArr.forEach(a=>{
@@ -2404,16 +2404,16 @@ function renderHoldings(){
     const plLabel=['Gain/Loss ('+curSym+')','Gain/Loss (%)'][plMode]||'Gain/Loss';
     head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtMF=window._stockSort||{col:null,dir:1};
-    const shMF=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtMF.col===col&&srtMF.tab==='mf'?'#fff':'#444'}" onclick="toggleStockSort('${col}','mf')">${lbl}${srtMF.col===col&&srtMF.tab==='mf'?(srtMF.dir>0?' ↑':' ↓'):''}</span>`;
+    const shMF=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtMF.col===col&&srtMF.tab==='mf'?'#fff':'#444'}" onclick="toggleStockSort('${col}','mf')">${lbl}${srtMF.col===col&&srtMF.tab==='mf'?(srtMF.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
     let mfArr=[...D.mf];
     const ssMF=window._stockSort;
     if(ssMF&&ssMF.col&&ssMF.tab==='mf'){
       mfArr.sort((a,b)=>{
         let va=0,vb=0;
-        if(ssMF.col==='invested'){va=a.navBought>0?a.navBought*a.units:0;vb=b.navBought>0?b.navBought*b.units:0;}
-        if(ssMF.col==='value'){va=a.nav>0?a.nav*a.units:0;vb=b.nav>0?b.nav*b.units:0;}
-        return (va-vb)*ssMF.dir;
+        if(ssMF.col==='invested'){va=a.navBought>0?a.navBought*a.units:-Infinity;vb=b.navBought>0?b.navBought*b.units:-Infinity;}
+        if(ssMF.col==='value'){va=a.nav>0?a.nav*a.units:-Infinity;vb=b.nav>0?b.nav*b.units:-Infinity;}
+        return (vb-va)*ssMF.dir;
       });
     }
     mfArr.forEach(a=>{
@@ -3980,12 +3980,12 @@ async function refreshTicker() {
 // ══════════════════════════════════════════════════════════
 // ── STOCK SORT ────────────────────────────────────────────
 function toggleStockSort(col, tab){
-  const cur = window._stockSort || {col:null, dir:1, tab:null};
+  const cur = window._stockSort || {col:null, dir:null, tab:null};
   if(cur.col === col && cur.tab === tab){
-    if(cur.dir === 1) window._stockSort = {col, dir:-1, tab};
-    else window._stockSort = {col:null, dir:1, tab:null}; // 3rd click = reset
+    if(cur.dir === -1) window._stockSort = {col, dir:1, tab};      // 2nd click: low→high
+    else window._stockSort = {col:null, dir:null, tab:null};        // 3rd click: reset
   } else {
-    window._stockSort = {col, dir:-1, tab}; // default: high → low first
+    window._stockSort = {col, dir:-1, tab};  // 1st click: high→low
   }
   renderHoldings();
 }
