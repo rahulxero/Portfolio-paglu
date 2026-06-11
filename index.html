@@ -2333,7 +2333,7 @@ function renderHoldings(){
       indArr.sort((a,b)=>{
         let va=0,vb=0;
         if(ss.col==='invested'){va=a.avgCost>0?a.avgCost*a.qty:0;vb=b.avgCost>0?b.avgCost*b.qty:0;}
-        if(ss.col==='value'){va=a.price>0?a.price*a.qty/(liveRates.inr||USD_INR):0;vb=b.price>0?b.price*b.qty/(liveRates.inr||USD_INR):0;}
+        if(ss.col==='value'){va=a.price>0?a.price*a.qty:0;vb=b.price>0?b.price*b.qty:0;}
         return (va-vb)*ss.dir;
       });
     }
@@ -2412,7 +2412,7 @@ function renderHoldings(){
       mfArr.sort((a,b)=>{
         let va=0,vb=0;
         if(ssMF.col==='invested'){va=a.navBought>0?a.navBought*a.units:0;vb=b.navBought>0?b.navBought*b.units:0;}
-        if(ssMF.col==='value'){va=a.nav>0?a.nav*a.units/(liveRates.inr||USD_INR):0;vb=b.nav>0?b.nav*b.units/(liveRates.inr||USD_INR):0;}
+        if(ssMF.col==='value'){va=a.nav>0?a.nav*a.units:0;vb=b.nav>0?b.nav*b.units:0;}
         return (va-vb)*ssMF.dir;
       });
     }
