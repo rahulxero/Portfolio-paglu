@@ -1271,9 +1271,9 @@ let D={
       D.btc=o.btc||[];
       D.others=o.others||[];
       D.banks=o.banks||[];
-      D.indian=(o.indian||[]).map(a=>({...a,avgCost:0}));
-      D.intl=(o.intl||[]).map(a=>({...a,avgCost:0}));
-      D.mf=(o.mf||[]).map(a=>({...a,navBought:0}));
+      D.indian=(o.indian||[]).map(a=>({...a,avgCost:a.avgCost||0}));
+      D.intl=(o.intl||[]).map(a=>({...a,avgCost:a.avgCost||0}));
+      D.mf=(o.mf||[]).map(a=>({...a,navBought:a.navBought||0}));
       localStorage.setItem('nestegg_d6',JSON.stringify(D));
       return;
     }
