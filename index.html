@@ -1547,83 +1547,62 @@ async function fetchWalletPositions(wallet){
   wallet.fetching=true; wallet.positions=[]; wallet.totalUSD=0;
   renderHoldings();
 
-  try {
-    // ✅ PARALLEL: Fetch Zerion, Hyperliquid, and Polymarket concurrently
-    const results = await Promise.allSettled([
-      // Zerion (EVM positions)
-      (async () => {
-        try {
-          const positions = await zerionGetPositions(wallet.address);
-          wallet._zerionError = null;
-          return { zerion: positions };
-        } catch(e) {
-          console.warn('Zerion failed:', e.message);
-          wallet._zerionError = e.message;
-          try {
-            const bal = await fetchETHNative(wallet.address);
-            return { zerion: [{id:'eth-native',symbol:'ETH',name:'Ethereum',chain:'ethereum',balance:bal,priceUSD:0,valueUSD:0,ch24:null,logo:'',_fallback:true}] };
-          } catch(e2) {
-            return { zerion: [] };
-          }
-        }
-      })(),
-      
-      // Hyperliquid (HyperCore + HyperEVM)
-      (async () => {
-        if(!wallet.includeHL) return { hl: [] };
-        try {
-          const r = await fetch('/api/hyperliquid', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ address: wallet.address }),
-            signal: makeSig(20000),
-          });
-          if(r.ok){ const d=await r.json(); return { hl: d.positions||[] }; }
-          return { hl: [] };
-        } catch(e) {
-          console.warn('Hyperliquid fetch failed:', e.message);
-          return { hl: [] };
-        }
-      })(),
-      
-      // Polymarket positions
-      (async () => {
-        if(!wallet.includeHL) return { poly: [] };
-        try {
-          const r = await fetch('/api/polymarket', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ address: wallet.address }),
-            signal: makeSig(15000),
-          });
-          if(r.ok){
-            const d = await r.json();
-            wallet._polyTotal = d.totalValue || 0;
-            return { poly: (d.positions||[]).filter(p=>p.currentValue>0.1) };
-          }
-          return { poly: [] };
-        } catch(e) {
-          console.warn('Polymarket fetch failed:', e.message);
-          return { poly: [] };
-        }
-      })()
-    ]);
-
-    let positions = [];
-    results.forEach(result => {
-      if(result.status === 'fulfilled' && result.value) {
-        if(result.value.zerion) positions.push(...result.value.zerion);
-        if(result.value.hl) positions.push(...result.value.hl);
-        if(result.value.poly) positions.push(...result.value.poly);
-      }
-    });
-
-    wallet.positions = positions;
-    wallet.totalUSD = wallet.positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
-  } catch(e) {
-    console.error('Wallet fetch error:', e);
+  // ── Zerion (EVM positions) ────────────────────────────────
+  let evmPositions = [];
+  const hadCachedPositions = wallet.positions?.length > 0;
+  try{
+    evmPositions = await zerionGetPositions(wallet.address);
+    wallet._zerionError = null;
+  }catch(e){
+    console.warn('Zerion failed:', e.message);
+    if(e.message.includes('429') && hadCachedPositions){
+      // Rate limited — keep existing cached positions, just note the error
+      wallet._zerionError = 'Rate limited — showing cached data';
+      wallet.fetching = false;
+      renderHoldings();
+      return;
+    }
+    try {
+      const bal = await fetchETHNative(wallet.address);
+      evmPositions = [{id:'eth-native',symbol:'ETH',name:'Ethereum',chain:'ethereum',balance:bal,priceUSD:0,valueUSD:0,ch24:null,logo:'',_fallback:true}];
+    } catch(e2) {}
     wallet._zerionError = e.message;
-  } finally {
-    wallet.fetching = false;
   }
+
+  // ── Hyperliquid (HyperCore + HyperEVM) ───────────────────
+  let hlPositions = [];
+  if(wallet.includeHL){
+    try{
+      const r = await fetch('/api/hyperliquid', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ address: wallet.address }),
+        signal: makeSig(20000),
+      });
+      if(r.ok){ const d=await r.json(); hlPositions = d.positions||[]; }
+    }catch(e){ console.warn('Hyperliquid fetch failed:', e.message); }
+  }
+
+  // ── Polymarket positions ──────────────────────────────────
+  let polyPositions = [];
+  if(wallet.includeHL){ // includeHL wallets also check Polymarket (same EVM address)
+    try{
+      const r = await fetch('/api/polymarket', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ address: wallet.address }),
+        signal: makeSig(15000),
+      });
+      if(r.ok){
+        const d = await r.json();
+        polyPositions = (d.positions||[]).filter(p=>p.currentValue>0.1);
+        wallet._polyTotal = d.totalValue || 0;
+      }
+    }catch(e){ console.warn('Polymarket fetch failed:', e.message); }
+  }
+
+  // Merge all positions
+  wallet.positions = [...evmPositions, ...hlPositions, ...polyPositions];
+  wallet.totalUSD = wallet.positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
+  wallet.fetching = false;
 }
 
 // ── COINGECKO ─────────────────────────────────────────────
@@ -1747,17 +1726,18 @@ async function refreshAll(){
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
-  // Fetch EVM wallets sequentially with small delay to avoid Zerion rate limits
-  // This ensures ALL wallets are fetched (not just highest balance)
+  // Fetch EVM wallets sequentially to avoid Zerion rate limits
   for(const w of D.wallets){
     try{ await fetchWalletPositions(w); }
     catch(e){ errs.push(w.label+': '+e.message); w.fetching=false; }
-    // Small delay between wallets to avoid 429 rate limit
-    if(D.wallets.indexOf(w) < D.wallets.length-1) await new Promise(r=>setTimeout(r,1000));
+    // Small delay between wallets to avoid 429
+    if(D.wallets.indexOf(w) < D.wallets.length-1) await new Promise(r=>setTimeout(r,1500));
   }
   await Promise.all(D.btc.map(a=>
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
+  // Fetch SOL / XRP / ADA / TRX balances
+  // Fetch SOL / TRX / HL balances
   D.others.filter(a=>a.type==='sol'||a.type==='hl').forEach(a=>{a.fetching=true;});
   renderHoldings();
   await Promise.all(D.others.map(a=>fetchOtherWallet(a).then(()=>{a.fetching=false;}).catch(e=>{a.fetching=false;errs.push(`${a.type.toUpperCase()}: ${e.message}`);})));
@@ -1766,7 +1746,7 @@ async function refreshAll(){
   setStatus('loading','Enriching prices from CoinGecko…');
   try{await enrichCoinGecko(); const t=document.getElementById('src-tag');t.textContent='live';t.classList.add('live');}
   catch(e){errs.push('CoinGecko: '+e.message);}
-  renderHoldings(); updateSummary(); buildPie(); buildPerf();
+  renderHoldings(); updateSummary(); buildPie(); // rebuild pie — liveRates.inr now populated
 
   setStatus('loading','Fetching MF NAVs from MFApi.in…');
   try{await fetchMF();}catch(e){errs.push('MF: '+e.message);}
@@ -2134,8 +2114,8 @@ function setTF(tf,btn){curTF=tf;document.querySelectorAll('.tf').forEach(b=>b.cl
 //  HOLDINGS TABLE
 // ══════════════════════════════════════════════════════════
 const COLS_TOK='grid-template-columns:28px 2fr 1fr 1fr 1fr .9fr';
-const COLS_STK='grid-template-columns:2fr .55fr .6fr 1fr .95fr 1fr';
-const COLS_MF ='grid-template-columns:2fr .85fr .85fr 1fr .95fr 1fr';
+const COLS_STK='grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr';
+const COLS_MF ='grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr';
 
 function chainPill(chain){
   const cl='cp-'+(chain||'unknown').toLowerCase().replace(/[\s_]+/g,'-');
@@ -2377,13 +2357,13 @@ function renderHoldings(){
         const plDisp = plINR!=null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2.2fr 65px 0.65fr 1.1fr 1.1fr 0.75fr 1.2fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px;text-align:center;justify-self:center">${a.exchange}</span><span class="mv" style="text-align:right">${a.qty}</span><span class="mv" style="color:#888;text-align:right">${investedDisp}</span><span class="mv" style="text-align:right">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}" style="text-align:right">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}" style="text-align:right">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['P&L ('+curSym+')','P&L (%)'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:2.2fr 65px 0.65fr 1.1fr 1.1fr 0.75fr 1.2fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr 0.5fr 0.6fr 1fr 1fr 0.8fr 1.2fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtX=window._stockSort||{col:null,dir:1};
     const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
@@ -2416,13 +2396,13 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2.2fr 65px 0.65fr 1.1fr 1.1fr 0.75fr 1.2fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px;text-align:center;justify-self:center">${a.exchange}</span><span class="mv" style="text-align:right">${a.qty}</span><span class="mv" style="color:#888;text-align:right">${investedDisp}</span><span class="mv" style="text-align:right">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}" style="text-align:right">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}" style="text-align:right">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 0.5fr 0.6fr 1fr 1fr 0.8fr 1.2fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['Gain/Loss ('+curSym+')','Gain/Loss (%)'][plMode]||'Gain/Loss';
-    head.style.cssText=`display:grid;grid-template-columns:2.2fr 1fr 0.85fr 1.1fr 1.1fr 0.75fr 1.2fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtMF=window._stockSort||{col:null,dir:1};
     const shMF=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtMF.col===col&&srtMF.tab==='mf'?'#fff':'#444'}" onclick="toggleStockSort('${col}','mf')">${lbl}${srtMF.col===col&&srtMF.tab==='mf'?(srtMF.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
@@ -2454,7 +2434,7 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2.2fr 1fr 0.85fr 1.1fr 1.1fr 0.75fr 1.2fr auto;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -4271,9 +4251,8 @@ function showOnboardingTip(){
     const hasAny = D.wallets.length||D.btc.length||D.others.length||D.indian.length||D.intl.length||D.mf.length||D.banks.length;
     if(hasCachedPrices || hasAny){
       const age = cacheAge(); const lbl = cacheAgeLabel();
-      // ✅ NO AUTO-REFRESH: Just show cached data, user clicks refresh button when ready
-      showCacheBar(false,lbl); 
-      setStatus('ok',`Cached · ${lbl} · Click ⟳ to refresh`);
+      if(age < CACHE_TTL){ showCacheBar(false,lbl); setStatus('ok',`Cached · ${lbl}`); }
+      else { showCacheBar(age>CACHE_MAX,lbl); setStatus('loading',`Refreshing… (${lbl})`); refreshAll(); }
     } else {
       setStatus('ok',`Welcome, ${currentUser.name}! Add your first holding using + Add`);
       setTimeout(showOnboardingTip, 600);
@@ -4281,7 +4260,11 @@ function showOnboardingTip(){
   }
 
   document.addEventListener('visibilitychange', ()=>{
-    // ✅ NO AUTO-REFRESH on tab switch: Just ping Supabase, user controls refresh
+    if(document.visibilityState === 'visible' && cacheAge() > CACHE_TTL && !loading){
+      setStatus('loading', 'Refreshing prices…');
+      refreshAll();
+    }
+    // Ping Supabase when tab becomes visible, at most once per 3 days
     if(document.visibilityState === 'visible') pingSupabase();
   });
 
