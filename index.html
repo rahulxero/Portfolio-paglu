@@ -1747,15 +1747,21 @@ async function refreshAll(){
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
-  // ✅ PARALLEL: Fetch all wallets concurrently (not sequentially)
-  await Promise.all(D.wallets.map(w =>
-    fetchWalletPositions(w).catch(e=>{ errs.push(w.label+': '+e.message); w.fetching=false; })
-  ));
+  // ✅ SMART PARALLEL: Fetch wallets in batches to avoid Zerion rate limit
+  // Fetch 2 wallets at a time with small delay between batches
+  const batchSize = 2;
+  for(let i = 0; i < D.wallets.length; i += batchSize) {
+    const batch = D.wallets.slice(i, i + batchSize);
+    await Promise.all(batch.map(w =>
+      fetchWalletPositions(w).catch(e=>{ errs.push(w.label+': '+e.message); w.fetching=false; })
+    ));
+    // Small delay between batches to avoid rate limiting
+    if(i + batchSize < D.wallets.length) await new Promise(r=>setTimeout(r, 800));
+  }
+  
   await Promise.all(D.btc.map(a=>
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
-  // Fetch SOL / XRP / ADA / TRX balances
-  // Fetch SOL / TRX / HL balances
   D.others.filter(a=>a.type==='sol'||a.type==='hl').forEach(a=>{a.fetching=true;});
   renderHoldings();
   await Promise.all(D.others.map(a=>fetchOtherWallet(a).then(()=>{a.fetching=false;}).catch(e=>{a.fetching=false;errs.push(`${a.type.toUpperCase()}: ${e.message}`);})));
