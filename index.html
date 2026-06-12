@@ -1747,18 +1747,14 @@ async function refreshAll(){
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
-  // ✅ SMART PARALLEL: Fetch wallets in batches to avoid Zerion rate limit
-  // Fetch 2 wallets at a time with small delay between batches
-  const batchSize = 2;
-  for(let i = 0; i < D.wallets.length; i += batchSize) {
-    const batch = D.wallets.slice(i, i + batchSize);
-    await Promise.all(batch.map(w =>
-      fetchWalletPositions(w).catch(e=>{ errs.push(w.label+': '+e.message); w.fetching=false; })
-    ));
-    // Small delay between batches to avoid rate limiting
-    if(i + batchSize < D.wallets.length) await new Promise(r=>setTimeout(r, 800));
+  // Fetch EVM wallets sequentially with small delay to avoid Zerion rate limits
+  // This ensures ALL wallets are fetched (not just highest balance)
+  for(const w of D.wallets){
+    try{ await fetchWalletPositions(w); }
+    catch(e){ errs.push(w.label+': '+e.message); w.fetching=false; }
+    // Small delay between wallets to avoid 429 rate limit
+    if(D.wallets.indexOf(w) < D.wallets.length-1) await new Promise(r=>setTimeout(r,1000));
   }
-  
   await Promise.all(D.btc.map(a=>
     fetchBTC(a.address).then(b=>a.balance=b).catch(e=>errs.push('BTC: '+e.message))
   ));
