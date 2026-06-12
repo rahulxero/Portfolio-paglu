@@ -2134,8 +2134,8 @@ function setTF(tf,btn){curTF=tf;document.querySelectorAll('.tf').forEach(b=>b.cl
 //  HOLDINGS TABLE
 // ══════════════════════════════════════════════════════════
 const COLS_TOK='grid-template-columns:28px 2fr 1fr 1fr 1fr .9fr';
-const COLS_STK='grid-template-columns:2fr .7fr .7fr 1fr .9fr 1fr';
-const COLS_MF ='grid-template-columns:2fr 1fr .85fr 1fr .9fr 1fr';
+const COLS_STK='grid-template-columns:2fr .55fr .6fr 1fr .95fr 1fr';
+const COLS_MF ='grid-template-columns:2fr .85fr .85fr 1fr .95fr 1fr';
 
 function chainPill(chain){
   const cl='cp-'+(chain||'unknown').toLowerCase().replace(/[\s_]+/g,'-');
@@ -2383,7 +2383,7 @@ function renderHoldings(){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['P&L ('+curSym+')','P&L (%)'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .55fr .6fr 1fr .95fr .8fr 1.2fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtX=window._stockSort||{col:null,dir:1};
     const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
@@ -2416,13 +2416,13 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .55fr .6fr 1fr .95fr .8fr 1.2fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['Gain/Loss ('+curSym+')','Gain/Loss (%)'][plMode]||'Gain/Loss';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr .85fr 1.1fr .95fr .8fr 1.2fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtMF=window._stockSort||{col:null,dir:1};
     const shMF=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtMF.col===col&&srtMF.tab==='mf'?'#fff':'#444'}" onclick="toggleStockSort('${col}','mf')">${lbl}${srtMF.col===col&&srtMF.tab==='mf'?(srtMF.dir===-1?' ↓':' ↑'):''}</span>`;
     head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle">${plLabel} ↻</span><span></span>`;
@@ -2454,7 +2454,7 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr .85fr 1.1fr .95fr .8fr 1.2fr auto;gap:8px;align-items:center;"><div><span class="an">${a.name}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:`AMFI ${a.code}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
 
   }else if(activeTab==='banks'){
