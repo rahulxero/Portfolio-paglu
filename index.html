@@ -98,6 +98,7 @@
     .btn-icon { padding: 7px 10px; }
     .btn-xs { padding: 3px 10px; font-size: 10px; }
     .btn-ghost { border-color: #222; color: var(--ghost); font-size: 11px; padding: 3px 8px; }
+    .trow > span:last-child, .w-grp > .btn-ghost { justify-self: start; width: fit-content; align-self: center; }
     .btn-ghost:hover { background: #111; color: var(--white); border-color: #444; }
 
     /* ── LAYOUT ──────────────────────────────────────────── */
@@ -148,22 +149,16 @@
     #currency-sel { height: 52px; border-radius: 8px !important; padding: 0 12px; font-size: 12px; border: 1px solid #2a2a2a; min-width: 80px; }
     *, *::before, *::after { border-radius: 0; }
     .btn, .hdr-btn, .hdr-r select,
-    .insights-strip {
-      display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-      gap:10px; margin:14px 0 4px;
-    }
-    .insight-card {
-      background:#0b0b0b; border:1px solid #1a1a1a; border-radius:10px;
-      padding:13px 15px; font-family:'JetBrains Mono',monospace;
-    }
-    .insight-lbl { font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:#555; margin-bottom:7px; }
-    .insight-main { font-size:14px; color:#eee; font-weight:600; line-height:1.35; }
-    .insight-sub { font-size:11px; color:#777; margin-top:4px; line-height:1.4; }
-    .insight-flag { color:#ff9800; }
-    .insight-bar { height:5px; border-radius:3px; background:#1a1a1a; margin-top:8px; overflow:hidden; display:flex; }
-    .insight-bar > span { height:100%; display:block; }
-    body.light-mode .insight-card { background:#fff; border:1px solid #e2e2e2; box-shadow:0 1px 4px rgba(0,0,0,.04); }
-    body.light-mode .insight-main { color:#111; }
+    .insights-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0 4px;}
+    .insight-card{background:#0b0b0b;border:1px solid #1a1a1a;border-radius:10px;padding:13px 15px;font-family:'JetBrains Mono',monospace;}
+    .insight-lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:7px;}
+    .insight-main{font-size:14px;color:#eee;font-weight:600;line-height:1.35;}
+    .insight-sub{font-size:11px;color:#777;margin-top:4px;line-height:1.4;}
+    .insight-flag{color:#ff9800;}
+    .insight-bar{height:5px;border-radius:3px;background:#1a1a1a;margin-top:8px;overflow:hidden;display:flex;}
+    .insight-bar>span{height:100%;display:block;}
+    body.light-mode .insight-card{background:#fff;border:1px solid #e2e2e2;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+    body.light-mode .insight-main{color:#111;}
     .hc, .cc, .sum-card, .add-panel,
     input, select, textarea,
     .ac-drop, .ac-item, .login-card,
@@ -958,8 +953,6 @@
     <div class="hero-val" id="tot-val">—</div>
     <div class="hero-chg" id="tot-chg"><span class="muted">—</span></div>
   </div>
-
-  <!-- Insights strip -->
   <div id="insights-strip" class="insights-strip" style="display:none"></div>
 
   <!-- Metric cards -->
@@ -1907,97 +1900,64 @@ function setStatus(type,msg){
 }
 
 
-// ══════════════════════════════════════════════════════════════════
-// PORTFOLIO INSIGHTS — Today's change, concentration, currency exposure
-// ══════════════════════════════════════════════════════════════════
 function portfolioInsights(){
-  const rate = liveRates.inr || USD_INR || 96;
-  const v = vals(); const tot = v.tot;
-  if(!(tot>0)) return null;
-  const assetUSD = {};
-  const add = (k,u)=>{ if(u>0) assetUSD[k]=(assetUSD[k]||0)+u; };
-  D.indian.forEach(a=>{ const u=a.price&&a.qty?a.qty*a.price/rate:0; add('IN:'+a.symbol,u); });
-  D.intl.forEach(a=>{ const u=a.price&&a.qty?a.qty*a.price:0; add('GL:'+a.symbol,u); });
-  D.mf.forEach(a=>{ const u=a.nav&&a.units?a.units*a.nav/rate:0; add('MF:'+a.name,u); });
-  let cryptoTop = {sym:null, usd:0}, cryptoTotal = v.c + v.s;
-  const tally = (sym,u)=>{ if(u>0){ add('CR:'+sym,u); if(!isStable(sym)&&u>cryptoTop.usd) cryptoTop={sym,usd:u}; } };
-  D.wallets.forEach(w=>(w.positions||[]).forEach(p=>tally(p.symbol, p.valueUSD||0)));
-  D.others.forEach(a=>(a.positions||[]).forEach(p=>tally(p.symbol, p.valueUSD||0)));
+  const rate=liveRates.inr||USD_INR||96,v=vals(),tot=v.tot;if(!(tot>0))return null;
+  const assetUSD={};const add=(k,u)=>{if(u>0)assetUSD[k]=(assetUSD[k]||0)+u;};
+  D.indian.forEach(a=>{const u=a.price&&a.qty?a.qty*a.price/rate:0;add('IN:'+a.symbol,u);});
+  D.intl.forEach(a=>{const u=a.price&&a.qty?a.qty*a.price:0;add('GL:'+a.symbol,u);});
+  D.mf.forEach(a=>{const u=a.nav&&a.units?a.units*a.nav/rate:0;add('MF:'+a.name,u);});
+  let cryptoTop={sym:null,usd:0},cryptoTotal=v.c+v.s;
+  const tally=(sym,u)=>{if(u>0){add('CR:'+sym,u);if(!isStable(sym)&&u>cryptoTop.usd)cryptoTop={sym,usd:u};}};
+  D.wallets.forEach(w=>(w.positions||[]).forEach(p=>tally(p.symbol,p.valueUSD||0)));
+  D.others.forEach(a=>(a.positions||[]).forEach(p=>tally(p.symbol,p.valueUSD||0)));
   (D.manualCrypto||[]).forEach(a=>tally(a.sym,(a.priceUSD||0)*a.qty));
-  D.btc.forEach(a=>tally('BTC', a.priceUSD&&a.balance?a.balance*a.priceUSD:0));
-  let topAsset = {key:null, usd:0};
-  Object.entries(assetUSD).forEach(([k,u])=>{ if(u>topAsset.usd) topAsset={key:k,usd:u}; });
-  const topAssetName = topAsset.key ? topAsset.key.split(':').slice(1).join(':') : null;
-  const usdExposure = v.c + v.s + v.x;
-  const inrExposure = v.i + v.m + v.b + v.bn;
-  const curRows = [{cur:'USD',usd:usdExposure},{cur:'INR',usd:inrExposure}]
-    .filter(r=>r.usd>0).sort((a,b)=>b.usd-a.usd);
-  return {
-    tot, rate,
-    stablePct: (v.s/tot)*100,
-    topAsset: topAssetName ? {name:topAssetName, pct:(topAsset.usd/tot)*100} : null,
-    cryptoTop: (cryptoTop.sym&&cryptoTotal>0) ? {sym:cryptoTop.sym, pctOfCrypto:(cryptoTop.usd/cryptoTotal)*100} : null,
-    currencies: curRows.map(r=>({cur:r.cur, pct:(r.usd/tot)*100})),
-  };
+  D.btc.forEach(a=>tally('BTC',a.priceUSD&&a.balance?a.balance*a.priceUSD:0));
+  let topAsset={key:null,usd:0};Object.entries(assetUSD).forEach(([k,u])=>{if(u>topAsset.usd)topAsset={key:k,usd:u};});
+  const topName=topAsset.key?topAsset.key.split(':').slice(1).join(':'):null;
+  const usdExp=v.c+v.s+v.x,inrExp=v.i+v.m+v.b+v.bn;
+  const curRows=[{cur:'USD',usd:usdExp},{cur:'INR',usd:inrExp}].filter(r=>r.usd>0).sort((a,b)=>b.usd-a.usd);
+  return{tot,stablePct:(v.s/tot)*100,
+    topAsset:topName?{name:topName,pct:(topAsset.usd/tot)*100}:null,
+    cryptoTop:(cryptoTop.sym&&cryptoTotal>0)?{sym:cryptoTop.sym,pctOfCrypto:(cryptoTop.usd/cryptoTotal)*100}:null,
+    currencies:curRows.map(r=>({cur:r.cur,pct:(r.usd/tot)*100}))};
 }
 function dailyMovers(){
-  const rate = liveRates.inr || USD_INR || 96;
-  const items = [];
-  const push = (name,valUSD,ch24)=>{ if(valUSD>0&&ch24!=null){ items.push({name, impactUSD:valUSD*(ch24/100), ch24}); } };
-  D.indian.forEach(a=>push(a.symbol, a.price&&a.qty?a.qty*a.price/rate:0, a.ch24));
-  D.intl.forEach(a=>push(a.symbol, a.price&&a.qty?a.qty*a.price:0, a.ch24));
-  D.wallets.forEach(w=>(w.positions||[]).forEach(p=>{ if(!isStable(p.symbol)) push(p.symbol, p.valueUSD||0, p.ch24); }));
-  D.others.forEach(a=>(a.positions||[]).forEach(p=>{ if(!isStable(p.symbol)) push(p.symbol, p.valueUSD||0, p.ch24); }));
-  D.btc.forEach(a=>push('BTC', a.priceUSD&&a.balance?a.balance*a.priceUSD:0, a.ch24));
-  items.sort((a,b)=>Math.abs(b.impactUSD)-Math.abs(a.impactUSD));
-  return items;
+  const rate=liveRates.inr||USD_INR||96,items=[];
+  const push=(n,v,c)=>{if(v>0&&c!=null)items.push({name:n,impactUSD:v*(c/100),ch24:c});};
+  D.indian.forEach(a=>push(a.symbol,a.price&&a.qty?a.qty*a.price/rate:0,a.ch24));
+  D.intl.forEach(a=>push(a.symbol,a.price&&a.qty?a.qty*a.price:0,a.ch24));
+  D.wallets.forEach(w=>(w.positions||[]).forEach(p=>{if(!isStable(p.symbol))push(p.symbol,p.valueUSD||0,p.ch24);}));
+  D.others.forEach(a=>(a.positions||[]).forEach(p=>{if(!isStable(p.symbol))push(p.symbol,p.valueUSD||0,p.ch24);}));
+  D.btc.forEach(a=>push('BTC',a.priceUSD&&a.balance?a.balance*a.priceUSD:0,a.ch24));
+  items.sort((a,b)=>Math.abs(b.impactUSD)-Math.abs(a.impactUSD));return items;
 }
-function renderInsights(weighted24h){
-  const el = document.getElementById('insights-strip');
-  if(!el) return;
-  const ins = portfolioInsights();
-  if(!ins){ el.style.display='none'; return; }
-  const cards = [];
-  // Card 1: Today
-  if(weighted24h!=null){
-    const dayUSD = ins.tot * (weighted24h/100);
-    const movers = dailyMovers();
-    const up = movers.find(m=>m.impactUSD>0);
-    const down = movers.find(m=>m.impactUSD<0);
-    let sub = '';
-    if(up)   sub += `<span class="pos">▲ ${esc(up.name)}</span> ${fI(Math.abs(up.impactUSD))}`;
-    if(up&&down) sub += '  ·  ';
-    if(down) sub += `<span class="neg">▼ ${esc(down.name)}</span> ${fI(Math.abs(down.impactUSD))}`;
-    cards.push(`<div class="insight-card"><div class="insight-lbl">Today</div>
-      <div class="insight-main ${weighted24h>=0?'pos':'neg'}">${weighted24h>=0?'+':''}${fI(Math.abs(dayUSD))} <span style="color:#555;font-size:11px">(${weighted24h>=0?'+':''}${weighted24h.toFixed(2)}%)</span></div>
-      ${sub?`<div class="insight-sub">${sub}</div>`:''}</div>`);
+function renderInsights(w24){
+  const el=document.getElementById('insights-strip');if(!el)return;
+  const ins=portfolioInsights();if(!ins){el.style.display='none';return;}
+  const cards=[];
+  if(w24!=null){
+    const dayUSD=ins.tot*(w24/100),mv=dailyMovers(),up=mv.find(m=>m.impactUSD>0),dn=mv.find(m=>m.impactUSD<0);
+    let sub='';
+    if(up)sub+=`<span class="pos">▲ ${esc(up.name)}</span> ${fI(Math.abs(up.impactUSD))}`;
+    if(up&&dn)sub+='  ·  ';
+    if(dn)sub+=`<span class="neg">▼ ${esc(dn.name)}</span> ${fI(Math.abs(dn.impactUSD))}`;
+    cards.push(`<div class="insight-card"><div class="insight-lbl">Today</div><div class="insight-main ${w24>=0?'pos':'neg'}">${w24>=0?'+':''}${fI(Math.abs(dayUSD))} <span style="color:#555;font-size:11px">(${w24>=0?'+':''}${w24.toFixed(2)}%)</span></div>${sub?`<div class="insight-sub">${sub}</div>`:''}</div>`);
   }
-  // Card 2: Concentration
-  {
-    let main='', sub='', flag=false;
-    if(ins.topAsset){
-      flag = ins.topAsset.pct >= 25;
-      main = `${esc(ins.topAsset.name)} <span style="color:#777;font-size:12px">${ins.topAsset.pct.toFixed(0)}%</span>`;
-      sub = `Largest single holding${flag?' <span class="insight-flag">· heavy concentration</span>':''}`;
-    }
-    let stableLine = ins.stablePct >= 15 ? `<div class="insight-sub">Stablecoins / cash-like: <span class="insight-flag">${ins.stablePct.toFixed(0)}%</span> idle</div>` : '';
-    let cryptoLine = (ins.cryptoTop && ins.cryptoTop.pctOfCrypto >= 50) ? `<div class="insight-sub"><span class="insight-flag">${ins.cryptoTop.pctOfCrypto.toFixed(0)}%</span> of crypto is ${esc(ins.cryptoTop.sym)}</div>` : '';
-    if(main) cards.push(`<div class="insight-card"><div class="insight-lbl">Concentration</div>
-      <div class="insight-main">${main}</div>
-      <div class="insight-sub">${sub}</div>${cryptoLine}${stableLine}</div>`);
+  if(ins.topAsset){
+    const flag=ins.topAsset.pct>=25;
+    let html=`<div class="insight-card"><div class="insight-lbl">Concentration</div><div class="insight-main">${esc(ins.topAsset.name)} <span style="color:#777;font-size:12px">${ins.topAsset.pct.toFixed(0)}%</span></div><div class="insight-sub">Largest single holding${flag?' <span class="insight-flag">· heavy concentration</span>':''}</div>`;
+    if(ins.cryptoTop&&ins.cryptoTop.pctOfCrypto>=50)html+=`<div class="insight-sub"><span class="insight-flag">${ins.cryptoTop.pctOfCrypto.toFixed(0)}%</span> of crypto is ${esc(ins.cryptoTop.sym)}</div>`;
+    if(ins.stablePct>=15)html+=`<div class="insight-sub">Stablecoins: <span class="insight-flag">${ins.stablePct.toFixed(0)}%</span> idle</div>`;
+    cards.push(html+'</div>');
   }
-  // Card 3: Currency Exposure
   if(ins.currencies.length){
-    const palette={USD:'#4d9fff', INR:'#ff9f4d', EUR:'#9f7dff', GBP:'#4dffb0', other:'#777'};
-    const bar = ins.currencies.map(c=>`<span style="width:${c.pct.toFixed(1)}%;background:${palette[c.cur]||palette.other}"></span>`).join('');
-    const legend = ins.currencies.map(c=>`${c.cur} ${c.pct.toFixed(0)}%`).join('  ·  ');
-    cards.push(`<div class="insight-card"><div class="insight-lbl">Currency Exposure</div>
-      <div class="insight-main" style="font-size:12px;font-weight:500;color:#aaa">${legend}</div>
-      <div class="insight-bar">${bar}</div></div>`);
+    const pal={USD:'#4d9fff',INR:'#ff9f4d',other:'#777'};
+    const bar=ins.currencies.map(c=>`<span style="width:${c.pct.toFixed(1)}%;background:${pal[c.cur]||pal.other}"></span>`).join('');
+    const leg=ins.currencies.map(c=>`${c.cur} ${c.pct.toFixed(0)}%`).join('  ·  ');
+    cards.push(`<div class="insight-card"><div class="insight-lbl">Currency Exposure</div><div class="insight-main" style="font-size:12px;font-weight:500;color:#aaa">${leg}</div><div class="insight-bar">${bar}</div></div>`);
   }
-  if(!cards.length){ el.style.display='none'; return; }
-  el.innerHTML = cards.join('');
-  el.style.display = 'grid';
+  if(!cards.length){el.style.display='none';return;}
+  el.innerHTML=cards.join('');el.style.display='grid';
 }
 
 function updateSummary(){
@@ -2238,55 +2198,27 @@ function chainPill(chain){
 }
 
 
-// ══════════════════════════════════════════════════════════════════
-// XIRR — annualized money-weighted return from dated cash flows.
-// flows: [{amount, when(ms)}]  negative=invested, positive=current value.
-// Newton's method with bisection fallback. Returns % or null.
-// ══════════════════════════════════════════════════════════════════
 function xirr(flows){
-  if(!flows || flows.length < 2) return null;
-  const t0 = Math.min(...flows.map(f=>f.when));
-  const yr = f => (f.when - t0) / (365.25*24*3600*1000);
-  const npv = r => flows.reduce((s,f)=>s + f.amount/Math.pow(1+r, yr(f)), 0);
-  if(!(flows.some(f=>f.amount<0) && flows.some(f=>f.amount>0))) return null;
-  let r = 0.1;
-  for(let i=0;i<100;i++){
-    const dr = 1e-5;
-    const f0 = npv(r), f1 = npv(r+dr);
-    const deriv = (f1-f0)/dr;
-    if(Math.abs(deriv) < 1e-12) break;
-    const rn = r - f0/deriv;
-    if(!isFinite(rn)) break;
-    if(Math.abs(rn-r) < 1e-7){ r = rn; break; }
-    r = rn;
-    if(r <= -0.999) r = -0.99;
-  }
-  if(!isFinite(r) || Math.abs(npv(r)) > 1){
-    let lo=-0.99, hi=10, flo=npv(lo);
-    if(flo*npv(hi) > 0) return null;
-    for(let i=0;i<200;i++){
-      const mid=(lo+hi)/2, fm=npv(mid);
-      if(Math.abs(fm)<1e-6){ r=mid; break; }
-      if(flo*fm<0){ hi=mid; } else { lo=mid; flo=fm; }
-      r=mid;
-    }
-  }
-  const pct = r*100;
-  if(!isFinite(pct) || Math.abs(pct) > 100000) return null;
-  return pct;
+  if(!flows||flows.length<2)return null;
+  const t0=Math.min(...flows.map(f=>f.when));
+  const yr=f=>(f.when-t0)/(365.25*24*3600*1000);
+  const npv=r=>flows.reduce((s,f)=>s+f.amount/Math.pow(1+r,yr(f)),0);
+  if(!(flows.some(f=>f.amount<0)&&flows.some(f=>f.amount>0)))return null;
+  let r=0.1;
+  for(let i=0;i<100;i++){const dr=1e-5,f0=npv(r),f1=npv(r+dr),dv=(f1-f0)/dr;if(Math.abs(dv)<1e-12)break;const rn=r-f0/dv;if(!isFinite(rn))break;if(Math.abs(rn-r)<1e-7){r=rn;break;}r=rn;if(r<=-0.999)r=-0.99;}
+  if(!isFinite(r)||Math.abs(npv(r))>1){let lo=-0.99,hi=10,flo=npv(lo);if(flo*npv(hi)>0)return null;for(let i=0;i<200;i++){const mid=(lo+hi)/2,fm=npv(mid);if(Math.abs(fm)<1e-6){r=mid;break;}if(flo*fm<0){hi=mid;}else{lo=mid;flo=fm;}r=mid;}}
+  const pct=r*100;if(!isFinite(pct)||Math.abs(pct)>100000)return null;return pct;
 }
-// Per-holding XIRR. invAmt/curAmt same currency; addedMs from position id timestamp.
-// Industry convention: don't annualize under 30 days.
-function holdingXirr(invAmt, curAmt, addedMs){
-  if(!(invAmt>0) || !(curAmt>0) || !addedMs) return null;
-  if(Date.now() - addedMs < 30*24*3600*1000) return null;
-  return xirr([{amount:-invAmt, when:addedMs}, {amount:curAmt, when:Date.now()}]);
+function holdingXirr(inv,cur,ms){
+  if(!(inv>0)||!(cur>0)||!ms)return null;
+  if(Date.now()-ms<30*24*3600*1000)return null;
+  return xirr([{amount:-inv,when:ms},{amount:cur,when:Date.now()}]);
 }
 function xirrCell(pct){
-  if(pct==null) return `<span class="muted sm" title="Needs cost basis + at least 30 days since position was added">—</span>`;
-  const cls = pct>=0?'pos':'neg';
-  const disp = pct>999 ? '>999' : pct<-99 ? '<-99' : (pct>=0?'+':'')+pct.toFixed(1);
-  return `<span class="${cls}" title="Annualized return since added to tracker">${disp}%<span style="color:#555;font-size:9px"> p.a.</span></span>`;
+  if(pct==null)return`<span class="muted sm" title="Needs cost basis + 30 days">—</span>`;
+  const cls=pct>=0?'pos':'neg';
+  const d=pct>999?'>999':pct<-99?'<-99':(pct>=0?'+':'')+pct.toFixed(1);
+  return`<span class="${cls}" title="Annualized return since added to tracker">${d}%<span style="color:#555;font-size:9px"> p.a.</span></span>`;
 }
 
 function renderHoldings(){
@@ -2403,7 +2335,7 @@ function renderHoldings(){
         const plHtml = plUSD!=null
           ? `<span class="${pc(plUSD)}">${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span></span>`
           : `<span style="color:#555">—</span>`;
-        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr max-content;gap:8px;align-items:center;">
+        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;">
           <div>
             <span class="an">${a.sym}</span>
             <span style="font-size:9px;padding:1px 5px;background:#1a1000;color:#ff9800;border:1px solid #3a2000;font-family:'JetBrains Mono',monospace;margin-left:6px;border-radius:4px">${a.network}</span>
@@ -2413,7 +2345,7 @@ function renderHoldings(){
           <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
           <span class="mv">${valUSD>0?fI(valUSD):lc()}</span>
           <span class="mv sm">${plHtml}</span>
-          <span style="display:inline-flex;gap:4px">
+          <span style="display:flex;gap:4px">
             <button class="btn btn-ghost" onclick="editManualCrypto(${a.id})" style="padding:2px 6px;font-size:11px" title="Edit">✎</button>
             <button class="btn btn-ghost" onclick="delManualCrypto(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button>
           </span>
@@ -2489,10 +2421,10 @@ function renderHoldings(){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0; // 0=₹, 1=%, 2=XIRR(todo)
     const plLabel=['P&L ('+curSym+')','P&L (%)','XIRR'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtI=window._stockSort||{col:null,dir:1};
     const shI=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtI.col===col&&srtI.tab==='indian'?'#fff':'#444'}" onclick="toggleStockSort('${col}','indian')">${lbl}${srtI.col===col&&srtI.tab==='indian'?(srtI.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="Click to cycle: ₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle P&L view">${plLabel} ↻</span><span></span>`;
     // Apply sort
     let indArr=[...D.indian];
     const ss=window._stockSort;
@@ -2526,16 +2458,16 @@ function renderHoldings(){
         const plDisp = plINR!=null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:inline-flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['P&L ('+curSym+')','P&L (%)','XIRR'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtX=window._stockSort||{col:null,dir:1};
     const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="Click to cycle: ₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
     let intlArr=[...D.intl];
     const ssx=window._stockSort;
     if(ssx&&ssx.col&&ssx.tab==='intl'){
@@ -2567,16 +2499,16 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:inline-flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['Gain/Loss ('+curSym+')','Gain/Loss (%)','XIRR'][plMode]||'Gain/Loss';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr max-content;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
     const srtMF=window._stockSort||{col:null,dir:1};
     const shMF=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtMF.col===col&&srtMF.tab==='mf'?'#fff':'#444'}" onclick="toggleStockSort('${col}','mf')">${lbl}${srtMF.col===col&&srtMF.tab==='mf'?(srtMF.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="Click to cycle: ₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
+    head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
     let mfArr=[...D.mf];
     const ssMF=window._stockSort;
     if(ssMF&&ssMF.col&&ssMF.tab==='mf'){
@@ -2602,13 +2534,13 @@ function renderHoldings(){
       if(plMode===1){
         plHtml = plPct!=null ? `<span class="${pc(plPct)}">${plPct>=0?'+':''}${plPct.toFixed(2)}%</span>` : lc();
       } else if(plMode===2){
-        const invUSD = a.navBought>0 ? a.navBought*a.units/(liveRates.inr||USD_INR) : null;
+        const invUSD=a.navBought>0?a.navBought*a.units/(liveRates.inr||USD_INR):null;
         plHtml = xirrCell(holdingXirr(invUSD, valUSD, a.id));
       } else {
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${esc(a.name)}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${esc(a._err)}</span>`:`AMFI ${esc(a.code)}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:inline-flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${esc(a.name)}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${esc(a._err)}</span>`:`AMFI ${esc(a.code)}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -2646,7 +2578,7 @@ function renderHoldings(){
     }
   }else if(activeTab==='bonds'){
     const BOND_TYPES = { govt:'Govt Bond', corporate:'Corp Bond', fd:'Fixed Deposit', ppf:'PPF', sgb:'Sovereign Gold Bond', nsc:'NSC', epf:'EPF', nps:'NPS', other:'Other' };
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr max-content;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
     head.innerHTML=`<span>Bond / Instrument</span><span>Type</span><span>Invested</span><span>Cur. Value</span><span>Rate</span><span>Maturity</span><span></span>`;
     if(!D.bonds?.length){
       rows+=`<div style="padding:40px 16px;text-align:center">
@@ -2666,14 +2598,14 @@ function renderHoldings(){
         const investedUSD = b.invested ? b.invested / (liveRates.inr||USD_INR) : valueUSD;
         const pnlUSD = valueUSD - investedUSD;
         const pnlPct = investedUSD > 0 ? (pnlUSD/investedUSD*100) : 0;
-        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr max-content;gap:8px;align-items:center">
+        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;align-items:center">
           <div><span class="an">${b.name}</span><div class="as">${b.issuer||''}</div></div>
           <span class="badge" style="font-size:9px;color:#ffd700;border-color:#4a3a00;background:#1a1000">${BOND_TYPES[b.type]||b.type}</span>
           <span class="mv" style="color:#888">${fI(investedUSD)}</span>
           <span class="mv">${fI(valueUSD)}</span>
           <span class="mv" style="color:#00e676">${rate}</span>
           <span class="mv" style="font-size:10px;color:#555">${maturity}</span>
-          <span style="display:inline-flex;gap:4px">
+          <span style="display:flex;gap:4px">
             <button class="btn btn-ghost" onclick="editBond(${b.id})" style="padding:2px 6px;font-size:11px">✎</button>
             <button class="btn btn-ghost" onclick="delBond(${b.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
           </span>
@@ -2791,7 +2723,7 @@ function editBank(id){
     <div style="display:grid;grid-template-columns:2fr 1fr 28px;gap:8px;align-items:center;padding:8px;">
       <div style="font-size:12px;font-weight:600">${esc(a.name)} <span style="font-size:10px;color:#555;font-weight:400">${bankTypeLabel(a.type)}</span></div>
       <input type="number" id="edit-bal-${id}" value="${a.balance||''}" placeholder="Current balance (₹)" style="font-size:12px;padding:6px 10px;background:#000;border:1px solid #fff;color:#fff;font-family:'JetBrains Mono',monospace;width:100%" step="1" onkeydown="if(event.key==='Enter')saveBank(${id})">
-      <div style="display:inline-flex;gap:4px">
+      <div style="display:flex;gap:4px">
         <button class="btn btn-ghost" onclick="saveBank(${id})" style="padding:3px 8px;font-size:10px;color:#00e676;border-color:#1a3a2a">✓</button>
         <button class="btn btn-ghost" onclick="renderHoldings()" style="padding:3px 6px;font-size:10px">✕</button>
       </div>
