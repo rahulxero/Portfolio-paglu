@@ -2413,7 +2413,7 @@ function renderHoldings(){
           <span class="mv">${a.priceUSD?fI(a.priceUSD):lc()}</span>
           <span class="mv">${valUSD>0?fI(valUSD):lc()}</span>
           <span class="mv sm">${plHtml}</span>
-          <span style="display:flex;gap:4px">
+          <span style="display:inline-flex;gap:4px">
             <button class="btn btn-ghost" onclick="editManualCrypto(${a.id})" style="padding:2px 6px;font-size:11px" title="Edit">✎</button>
             <button class="btn btn-ghost" onclick="delManualCrypto(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button>
           </span>
@@ -2526,7 +2526,7 @@ function renderHoldings(){
         const plDisp = plINR!=null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:inline-flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -2567,7 +2567,7 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:inline-flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
@@ -2608,7 +2608,7 @@ function renderHoldings(){
         const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${esc(a.name)}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${esc(a._err)}</span>`:`AMFI ${esc(a.code)}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr max-content;gap:8px;align-items:center;"><div><span class="an">${esc(a.name)}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${esc(a._err)}</span>`:`AMFI ${esc(a.code)}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:inline-flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
 
   }else if(activeTab==='banks'){
@@ -2673,7 +2673,7 @@ function renderHoldings(){
           <span class="mv">${fI(valueUSD)}</span>
           <span class="mv" style="color:#00e676">${rate}</span>
           <span class="mv" style="font-size:10px;color:#555">${maturity}</span>
-          <span style="display:flex;gap:4px">
+          <span style="display:inline-flex;gap:4px">
             <button class="btn btn-ghost" onclick="editBond(${b.id})" style="padding:2px 6px;font-size:11px">✎</button>
             <button class="btn btn-ghost" onclick="delBond(${b.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
           </span>
@@ -2791,7 +2791,7 @@ function editBank(id){
     <div style="display:grid;grid-template-columns:2fr 1fr 28px;gap:8px;align-items:center;padding:8px;">
       <div style="font-size:12px;font-weight:600">${esc(a.name)} <span style="font-size:10px;color:#555;font-weight:400">${bankTypeLabel(a.type)}</span></div>
       <input type="number" id="edit-bal-${id}" value="${a.balance||''}" placeholder="Current balance (₹)" style="font-size:12px;padding:6px 10px;background:#000;border:1px solid #fff;color:#fff;font-family:'JetBrains Mono',monospace;width:100%" step="1" onkeydown="if(event.key==='Enter')saveBank(${id})">
-      <div style="display:flex;gap:4px">
+      <div style="display:inline-flex;gap:4px">
         <button class="btn btn-ghost" onclick="saveBank(${id})" style="padding:3px 8px;font-size:10px;color:#00e676;border-color:#1a3a2a">✓</button>
         <button class="btn btn-ghost" onclick="renderHoldings()" style="padding:3px 6px;font-size:10px">✕</button>
       </div>
