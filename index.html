@@ -1834,6 +1834,8 @@ function walletUSD(w){
 const STABLE_SYMS = new Set(['USDC','USDT','DAI','BUSD','TUSD','FDUSD','USDP','GUSD','USDD','FRAX','LUSD','CRVUSD','PYUSD','USDS','USDE','USDN','XUSD','SUSD','NUSD','EURC','AGEUR','MIM','DOLA','UST']);
 
 function isStable(sym) { return STABLE_SYMS.has((sym||'').toUpperCase()); }
+// Gold ETFs detected by symbol containing 'GOLD' (covers GOLDCASE, GOLDBEES, AXISGOLD, HDFCGOLD etc.)
+const isGoldETF = sym => (sym||'').toUpperCase().includes('GOLD');
 
 function walletStableUSD(w){
   return (w.positions||[]).reduce((s,p)=>s+(isStable(p.symbol)?(p.valueUSD||0):0),0);
@@ -1883,12 +1885,13 @@ function vals(){
 
   const c = cryptoUSD;
   const s = stableUSD;
-  const i = safe(inrToUSD(D.indian.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0)));
+  const i = safe(inrToUSD(D.indian.filter(a=>!isGoldETF(a.symbol)).reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0)));
+  const g = safe(inrToUSD(D.indian.filter(a=>isGoldETF(a.symbol)).reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0)));
   const x = safe(D.intl.reduce((s,a)=>s+safe(a.price&&a.qty?a.qty*a.price:0),0));
   const m = safe(inrToUSD(D.mf.reduce((s,a)=>s+safe(a.nav&&a.units?a.units*a.nav:0),0)));
   const b = safe(inrToUSD(D.banks.reduce((s,a)=>s+safe(a.balance||0),0)));
   const bn = safe(inrToUSD((D.bonds||[]).reduce((s,x)=>s+safe(x.value||0),0)));
-  return{c,s,i,x,m,b,bn,tot:c+s+i+x+m+b+bn};
+  return{c,s,i,x,m,g,b,bn,tot:c+s+i+x+m+g+b+bn};
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
@@ -1915,7 +1918,7 @@ function portfolioInsights(){
   D.btc.forEach(a=>tally('BTC',a.priceUSD&&a.balance?a.balance*a.priceUSD:0));
   let topAsset={key:null,usd:0};Object.entries(assetUSD).forEach(([k,u])=>{if(u>topAsset.usd)topAsset={key:k,usd:u};});
   const topName=topAsset.key?topAsset.key.split(':').slice(1).join(':'):null;
-  const usdExp=v.c+v.s+v.x,inrExp=v.i+v.m+v.b+v.bn;
+  const usdExp=v.c+v.s+v.x,inrExp=v.i+v.g+v.m+v.b+v.bn;
   const curRows=[{cur:'USD',usd:usdExp},{cur:'INR',usd:inrExp}].filter(r=>r.usd>0).sort((a,b)=>b.usd-a.usd);
   return{tot,stablePct:(v.s/tot)*100,
     topAsset:topName?{name:topName,pct:(topAsset.usd/tot)*100}:null,
@@ -1998,8 +2001,8 @@ function updateSummary(){
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#2196f3','#ffd700'];
-const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Bank & Cash','Bonds'];
+const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#DAA520','#2196f3','#ffd700'];
+const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Gold','Bank & Cash','Bonds'];
 
 function buildPie(){
   const v=vals();
@@ -2012,7 +2015,7 @@ function buildPie(){
     return;
   }
 
-  const raw=[v.c, v.s, v.i, v.x, v.m, v.b, v.bn];
+  const raw=[v.c, v.s, v.i, v.x, v.m, v.g, v.b, v.bn];
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0.001);
   if(!slices.length) return;
 
