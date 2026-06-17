@@ -3381,11 +3381,23 @@ async function doAddMF(){
 
   const navBought = totalInvested / units;
 
+  // Guard against double-submit while a request is already in flight
+  if(window._mfAdding) return;
+  window._mfAdding = true;
+  const addBtn = document.querySelector('button[onclick="doAddMF()"]');
+  if(addBtn) addBtn.disabled = true;
+
   setFetchSt('loading','Verifying fund and fetching NAV…');
   try{
-    const r=await fetch(`https://api.mfapi.in/mf/${code}`,{signal:makeSig(8000)});
-    if(!r.ok) throw new Error(`Could not fetch fund data. Try searching again.`);
-    const d=await r.json();
+    // Reuse the data already fetched when the fund was selected from the dropdown —
+    // avoids hitting mfapi.in a second time for the same fund (it rate-limits repeat calls).
+    const cache = window._mfPreviewCache;
+    const cacheFresh = cache && cache.code === code && (Date.now() - cache.fetchedAt) < 5*60*1000;
+    const d = cacheFresh ? cache.data : await (async () => {
+      const r = await fetch(`https://api.mfapi.in/mf/${code}`, { signal: makeSig(8000) });
+      if(!r.ok) throw new Error(`Could not fetch fund data. Try searching again.`);
+      return r.json();
+    })();
     if(!d.data?.length) throw new Error(`No NAV data found for this fund.`);
     const fundName=d.meta?.scheme_name||name;
     const nav=parseFloat(d.data[0].nav);
@@ -3396,6 +3408,9 @@ async function doAddMF(){
     save(); renderHoldings(); updateSummary(); buildPie();
   }catch(e){
     setFetchSt('err',e.message);
+  }finally{
+    window._mfAdding = false;
+    if(addBtn) addBtn.disabled = false;
   }
 }
 
@@ -4195,6 +4210,7 @@ function selectMFFund(code, name) {
   document.getElementById('f-code').value = code;
   document.getElementById('f-fn').value = name;
   document.getElementById('ac-mf').style.display = 'none';
+  window._mfPreviewCache = null; // reset cache for new selection
 
   // Show selected fund card
   const card = document.getElementById('mf-selected');
@@ -4206,13 +4222,16 @@ function selectMFFund(code, name) {
     card.style.display = 'block';
   }
 
-  // Fetch and preview current NAV
+  // Fetch and preview current NAV — cache result so Add Fund doesn't re-fetch
   fetch(`https://api.mfapi.in/mf/${code}`, { signal: makeSig(5000) })
     .then(r => r.json())
     .then(d => {
-      if (d.data?.length && metaEl) {
-        const nav = parseFloat(d.data[0].nav);
-        metaEl.textContent = `AMFI ${code} · Current NAV: ₹${nav.toFixed(2)}`;
+      if (d.data?.length){
+        window._mfPreviewCache = { code, data: d, fetchedAt: Date.now() };
+        if(metaEl){
+          const nav = parseFloat(d.data[0].nav);
+          metaEl.textContent = `AMFI ${code} · Current NAV: ₹${nav.toFixed(2)}`;
+        }
       }
     }).catch(()=>{});
 }
