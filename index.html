@@ -962,7 +962,10 @@
     <div class="card"><p class="card-lbl">Indian Equity</p><p class="card-val" id="i-val">—</p><p class="card-chg" id="i-chg">—</p></div>
     <div class="card"><p class="card-lbl">International</p><p class="card-val" id="x-val">—</p><p class="card-chg" id="x-chg">—</p></div>
     <div class="card"><p class="card-lbl">Mutual Funds</p><p class="card-val" id="m-val">—</p><p class="card-chg" id="m-chg">—</p></div>
+    <div class="card"><p class="card-lbl">Gold</p><p class="card-val" id="g-val">—</p><p class="card-chg" id="g-chg">—</p></div>
     <div class="card"><p class="card-lbl">Bank & Cash</p><p class="card-val" id="b-val">—</p><p class="card-chg" id="b-chg" style="font-size:10px">—</p></div>
+    <div class="card"><p class="card-lbl">Bonds</p><p class="card-val" id="bn-val">—</p><p class="card-chg" id="bn-chg">—</p></div>
+    <div class="card"><p class="card-lbl">ULIP</p><p class="card-val" id="ul-val">—</p><p class="card-chg" id="ul-chg">—</p></div>
   </div>
 
   <!-- Charts -->
@@ -1023,6 +1026,7 @@
         <button class="tab" onclick="sw('mf',this)">Mutual Funds</button>
         <button class="tab" id="tab-banks" onclick="sw('banks',this)">Bank & Cash</button>
         <button class="tab" onclick="sw('bonds',this)">Bonds</button>
+        <button class="tab" onclick="sw('ulip',this)">ULIP</button>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <label class="toggle-wrap" title="Hide positions under $1">
@@ -1264,7 +1268,7 @@ const GECKO={
 };
 
 let D={
-  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[], bonds:[],
+  wallets:[], btc:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ulip:[],
   manualCrypto:[], // [{id, sym, network, qty, priceUSD, ch24, cgId, invested, updatedAt}]
   others:[]
 };
@@ -1891,7 +1895,8 @@ function vals(){
   const m = safe(inrToUSD(D.mf.reduce((s,a)=>s+safe(a.nav&&a.units?a.units*a.nav:0),0)));
   const b = safe(inrToUSD(D.banks.reduce((s,a)=>s+safe(a.balance||0),0)));
   const bn = safe(inrToUSD((D.bonds||[]).reduce((s,x)=>s+safe(x.value||0),0)));
-  return{c,s,i,x,m,g,b,bn,tot:c+s+i+x+m+g+b+bn};
+  const ul = safe(inrToUSD((D.ulip||[]).reduce((s,x)=>s+safe(x.value||0),0)));
+  return{c,s,i,x,m,g,b,bn,ul,tot:c+s+i+x+m+g+b+bn+ul};
 }
 function wAvg(items,vFn,cFn){const tot=items.reduce((s,a)=>s+vFn(a),0);if(!tot)return null;return items.reduce((s,a)=>{const v=vFn(a),ch=cFn(a);return(v&&ch!=null)?s+ch*v/tot:s;},0);}
 
@@ -1918,7 +1923,7 @@ function portfolioInsights(){
   D.btc.forEach(a=>tally('BTC',a.priceUSD&&a.balance?a.balance*a.priceUSD:0));
   let topAsset={key:null,usd:0};Object.entries(assetUSD).forEach(([k,u])=>{if(u>topAsset.usd)topAsset={key:k,usd:u};});
   const topName=topAsset.key?topAsset.key.split(':').slice(1).join(':'):null;
-  const usdExp=v.c+v.s+v.x,inrExp=v.i+v.g+v.m+v.b+v.bn;
+  const usdExp=v.c+v.s+v.x,inrExp=v.i+v.g+v.m+v.b+v.bn+v.ul;
   const curRows=[{cur:'USD',usd:usdExp},{cur:'INR',usd:inrExp}].filter(r=>r.usd>0).sort((a,b)=>b.usd-a.usd);
   return{tot,stablePct:(v.s/tot)*100,
     topAsset:topName?{name:topName,pct:(topAsset.usd/tot)*100}:null,
@@ -1978,15 +1983,36 @@ function updateSummary(){
     }),
   ].filter(x=>x.v>0);
   const cC=wAvg(allCrypto,x=>x.v,x=>x.ch);
-  const iC=wAvg(D.indian,a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
+  const iC=wAvg(D.indian.filter(a=>!isGoldETF(a.symbol)),a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
+  const gC=wAvg(D.indian.filter(a=>isGoldETF(a.symbol)),a=>a.price&&a.qty?inrToUSD(a.qty*a.price):0,a=>a.ch24);
   const xC=wAvg(D.intl,a=>a.price&&a.qty?a.qty*a.price:0,a=>a.ch24);
   const mC=wAvg(D.mf,a=>a.nav&&a.units?inrToUSD(a.units*a.nav):0,a=>a.ch24);
-  const segs=[{v:v.c+v.s,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC},{v:v.b,ch:null}].filter(s=>s.v>0);
+  const segs=[{v:v.c+v.s,ch:cC},{v:v.i,ch:iC},{v:v.x,ch:xC},{v:v.m,ch:mC},{v:v.g,ch:gC},{v:v.b,ch:null}].filter(s=>s.v>0);
   const tC=segs.length?wAvg(segs.filter(s=>s.ch!=null),s=>s.v,s=>s.ch):null;
   document.getElementById('tot-chg').innerHTML=tC!=null?`<span class="${pc(tC)}">${fP(tC)}</span> <span class="muted sm"> · weighted 24h return</span>`:'<span class="muted">—</span>';
   renderInsights(tC);
   function uc(vi,ci,val,chg){document.getElementById(vi).textContent=val>0?fI(val):'—';const el=document.getElementById(ci);el.textContent=fP(chg);el.className='card-chg '+(chg!=null?pc(chg):'muted');}
-  uc('c-val','c-chg',v.c+v.s,cC);uc('i-val','i-chg',v.i,iC);uc('x-val','x-chg',v.x,xC);uc('m-val','m-chg',v.m,mC);
+  uc('c-val','c-chg',v.c+v.s,cC);uc('i-val','i-chg',v.i,iC);uc('x-val','x-chg',v.x,xC);uc('m-val','m-chg',v.m,mC);uc('g-val','g-chg',v.g,gC);
+  // Bonds card — no daily price feed, show overall unrealized P&L% instead of a 24h change
+  document.getElementById('bn-val').textContent=v.bn>0?fI(v.bn):'—';
+  const bnChgEl=document.getElementById('bn-chg');
+  if(!D.bonds?.length){bnChgEl.textContent='No bonds added';bnChgEl.className='card-chg muted';}
+  else{
+    const bInv=(D.bonds||[]).reduce((s,x)=>s+(x.invested||0),0), bVal=(D.bonds||[]).reduce((s,x)=>s+(x.value||0),0);
+    const bnPct=bInv>0?((bVal-bInv)/bInv*100):null;
+    bnChgEl.textContent=bnPct!=null?`${bnPct>=0?'+':''}${bnPct.toFixed(1)}% overall`:'—';
+    bnChgEl.className='card-chg '+(bnPct!=null?pc(bnPct):'muted');
+  }
+  // ULIP card — same pattern as Bonds (insurer-declared NAV, no daily feed)
+  document.getElementById('ul-val').textContent=v.ul>0?fI(v.ul):'—';
+  const ulChgEl=document.getElementById('ul-chg');
+  if(!D.ulip?.length){ulChgEl.textContent='No ULIPs added';ulChgEl.className='card-chg muted';}
+  else{
+    const uInv=(D.ulip||[]).reduce((s,x)=>s+(x.invested||0),0), uVal=(D.ulip||[]).reduce((s,x)=>s+(x.value||0),0);
+    const ulPct=uInv>0?((uVal-uInv)/uInv*100):null;
+    ulChgEl.textContent=ulPct!=null?`${ulPct>=0?'+':''}${ulPct.toFixed(1)}% overall`:'—';
+    ulChgEl.className='card-chg '+(ulPct!=null?pc(ulPct):'muted');
+  }
   // Bank card
   document.getElementById('b-val').textContent=v.b>0?fI(v.b):'—';
   const bChgEl=document.getElementById('b-chg');
@@ -2001,8 +2027,8 @@ function updateSummary(){
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#DAA520','#2196f3','#ffd700'];
-const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Gold','Bank & Cash','Bonds'];
+const PIE_COLORS=['#ffffff','#44d7b6','#00e676','#7c4dff','#ff9800','#DAA520','#2196f3','#ffd700','#e91e8c'];
+const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Gold','Bank & Cash','Bonds','ULIP'];
 
 function buildPie(){
   const v=vals();
@@ -2015,7 +2041,7 @@ function buildPie(){
     return;
   }
 
-  const raw=[v.c, v.s, v.i, v.x, v.m, v.g, v.b, v.bn];
+  const raw=[v.c, v.s, v.i, v.x, v.m, v.g, v.b, v.bn, v.ul];
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0.001);
   if(!slices.length) return;
 
@@ -2616,6 +2642,39 @@ function renderHoldings(){
         </div>`;
       });
     }
+  }else if(activeTab==='ulip'){
+    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
+    head.innerHTML=`<span>Plan</span><span>Premium Paid</span><span>Cur. Value</span><span>P&L</span><span>Policy Term</span><span></span>`;
+    if(!D.ulip?.length){
+      rows+=`<div style="padding:40px 16px;text-align:center">
+        <div style="font-size:32px;margin-bottom:12px">🛡️</div>
+        <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Track your ULIP plans</div>
+        <div style="color:#555;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
+          Unit Linked Insurance Plans aren't on mfapi.in (insurer-declared NAV)<br>
+          Enter fund value manually from your policy statement
+        </div>
+        <button class="btn btn-p" onclick="toggleAdd()" style="margin-top:16px">+ Add ULIP</button>
+      </div>`;
+    }else{
+      (D.ulip||[]).forEach(u=>{
+        const valueUSD = u.value / (liveRates.inr||USD_INR);
+        const investedUSD = u.invested ? u.invested / (liveRates.inr||USD_INR) : valueUSD;
+        const pnlUSD = valueUSD - investedUSD;
+        const pnlPct = investedUSD > 0 ? (pnlUSD/investedUSD*100) : 0;
+        const term = u.term ? esc(u.term) : '—';
+        rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center">
+          <div><span class="an">${esc(u.name)}</span><div class="as">${esc(u.insurer||'')}</div></div>
+          <span class="mv" style="color:#888">${fI(investedUSD)}</span>
+          <span class="mv">${fI(valueUSD)}</span>
+          <span class="mv sm ${pc(pnlUSD)}">${pnlUSD>=0?'+':''}${fI(Math.abs(pnlUSD))} <span style="color:#555;font-size:10px">(${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%)</span></span>
+          <span class="mv" style="font-size:10px;color:#555">${term}</span>
+          <span style="display:flex;gap:4px">
+            <button class="btn btn-ghost" onclick="editUlip(${u.id})" style="padding:2px 6px;font-size:11px">✎</button>
+            <button class="btn btn-ghost" onclick="delUlip(${u.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
+          </span>
+        </div>`;
+      });
+    }
   }
   list.innerHTML=rows||`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
 }
@@ -2675,6 +2734,62 @@ function editBond(id){
 function delBond(id){
   if(!confirm('Remove this bond?')) return;
   D.bonds=(D.bonds||[]).filter(x=>x.id!==id);
+  save(); renderHoldings(); updateSummary(); buildPie();
+}
+
+// ── ULIP ──────────────────────────────────────────────────
+function doAddUlip(){
+  const name=(document.getElementById('f-ulipname')?.value||'').trim();
+  const insurer=(document.getElementById('f-ulipinsurer')?.value||'').trim();
+  const term=(document.getElementById('f-ulipterm')?.value||'').trim();
+  const invested=parseFloat(document.getElementById('f-ulipinvested')?.value||0);
+  const value=parseFloat(document.getElementById('f-ulipvalue')?.value||0)||invested;
+  const notes=(document.getElementById('f-ulipnotes')?.value||'').trim();
+  if(!name){ alert('Enter a name for this ULIP plan'); return; }
+  if(!invested||invested<=0){ alert('Enter the premium paid till date'); return; }
+  if(!D.ulip) D.ulip=[];
+  D.ulip.push({ id:Date.now(), name, insurer, term, value, invested, notes });
+  save(); renderHoldings(); updateSummary(); buildPie();
+  toggleAdd();
+}
+
+function editUlip(id){
+  const u=(D.ulip||[]).find(x=>x.id===id); if(!u) return;
+  const modal=document.createElement('div');
+  modal.id='edit-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center';
+  const inner=document.createElement('div');
+  inner.style.cssText='background:#0a0a0a;border:1px solid #222;padding:28px;width:480px;max-width:95vw;border-radius:8px';
+  inner.innerHTML=[
+    `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit ULIP</div>`,
+    `<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:20px">${esc(u.name)}</div>`,
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Premium Paid (₹)</div><input type="number" id="eu-invested" value="${u.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Current Fund Value (₹)</div><input type="number" id="eu-value" value="${u.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Policy Term</div><input type="text" id="eu-term" value="${esc(u.term||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Insurer</div><input type="text" id="eu-insurer" value="${esc(u.insurer||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `</div>`,
+    `<div style="display:flex;gap:8px;margin-top:4px">`,
+    `<button id="eu-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;border-radius:6px">Save</button>`,
+    `<button id="eu-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
+    `</div>`
+  ].join('');
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+  document.getElementById('eu-save').onclick=()=>{
+    u.invested=parseFloat(document.getElementById('eu-invested').value)||u.invested;
+    u.value=parseFloat(document.getElementById('eu-value').value)||u.value;
+    u.term=document.getElementById('eu-term').value||u.term;
+    u.insurer=document.getElementById('eu-insurer').value||u.insurer;
+    modal.remove(); save(); renderHoldings(); updateSummary(); buildPie();
+  };
+  document.getElementById('eu-cancel').onclick=()=>modal.remove();
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+
+function delUlip(id){
+  if(!confirm('Remove this ULIP plan?')) return;
+  D.ulip=(D.ulip||[]).filter(x=>x.id!==id);
   save(); renderHoldings(); updateSummary(); buildPie();
 }
 
@@ -3205,6 +3320,20 @@ function renderAddForm(){
     </div>
     <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ Balance is entered manually. Update current value periodically to track growth.</div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddBond()">Add Bond</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
+  }else if(activeTab==='ulip'){
+    h=`<p class="add-panel-title">Add ULIP</p>
+    <div class="fg fg3" style="margin-bottom:12px">
+      <div><label>Plan Name</label><input type="text" id="f-ulipname" placeholder="e.g. HDFC Click2Wealth"></div>
+      <div><label>Insurer</label><input type="text" id="f-ulipinsurer" placeholder="e.g. HDFC Life, ICICI Pru Life"></div>
+      <div><label>Policy Term (optional)</label><input type="text" id="f-ulipterm" placeholder="e.g. 10 yr / matures 2032"></div>
+    </div>
+    <div class="fg fg3" style="margin-bottom:12px">
+      <div><label>Premium Paid Till Date (₹)</label><input type="number" id="f-ulipinvested" placeholder="e.g. 100000" step="1" min="0"></div>
+      <div><label>Current Fund Value (₹)</label><input type="number" id="f-ulipvalue" placeholder="e.g. 112000" step="1" min="0"></div>
+      <div><label>Notes (optional)</label><input type="text" id="f-ulipnotes" placeholder="e.g. Equity fund, locked-in"></div>
+    </div>
+    <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ ULIP NAV is declared by the insurer, not available on mfapi.in. Update the fund value here periodically from your policy statement.</div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddUlip()">Add ULIP</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }
   p.innerHTML=h;
 }
@@ -3594,7 +3723,7 @@ async function loadCloudPortfolio() {
     const raw = localStorage.getItem('nestegg_d6');
     if (raw) {
       const parsed = JSON.parse(raw);
-      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], manualCrypto:[], ...parsed };
+      D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ulip:[], manualCrypto:[], ...parsed };
     }
   } catch(e) {}
 
@@ -3622,7 +3751,7 @@ async function loadCloudPortfolio() {
     if (data.error) throw new Error(data.error);
 
     // Cloud data loaded — merge with empty defaults
-    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], manualCrypto:[], ...data.data };
+    D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ulip:[], manualCrypto:[], ...data.data };
     if (data.currency) {
       activeCurrency = data.currency;
       document.getElementById('currency-sel').value = data.currency;
@@ -3881,7 +4010,7 @@ async function deleteAlert(id){
 function doLogout() {
   if(_fbAuth) _fbAuth.signOut();
   currentUser = null; supaToken = null;
-  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], manualCrypto:[] };
+  D = { wallets:[], btc:[], others:[], indian:[], intl:[], mf:[], banks:[], bonds:[], ulip:[], manualCrypto:[] };
   try {
     localStorage.removeItem('nestegg_d6');
     localStorage.removeItem(CACHE_KEY);
