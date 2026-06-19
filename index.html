@@ -641,6 +641,26 @@
     .ac-sym { color: #fff; font-weight: 600; }
     .ac-name { color: #666; font-size: 10px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #pie-leg { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; font-size: 11px; font-family: var(--mono); }
+    .pie-leg-row {
+      cursor: default;
+      padding: 6px 8px 6px 10px;
+      margin: 0 -8px;
+      border-radius: 8px;
+      border-left: 2px solid transparent;
+      transition: background .18s ease, border-color .18s ease, transform .18s ease;
+    }
+    .pie-leg-row:hover {
+      background: rgba(255,255,255,.06);
+      transform: translateX(2px);
+    }
+    .pie-leg-dot {
+      transition: box-shadow .18s ease, transform .18s ease;
+    }
+    .pie-leg-row:hover .pie-leg-dot {
+      transform: scale(1.35);
+      filter: drop-shadow(0 0 5px currentColor) brightness(1.15);
+    }
+    body.light-mode .pie-leg-row:hover { background: rgba(0,0,0,.05); }
 
     /* ── LOAD ANIMATION ──────────────────────────────────── */
     @keyframes fadeUp {
@@ -2027,7 +2047,7 @@ function updateSummary(){
 // ══════════════════════════════════════════════════════════
 //  CHARTS — monochrome palette
 // ══════════════════════════════════════════════════════════
-const PIE_COLORS=['#ffffff','#22d3ee','#22c55e','#a78bfa','#fb923c','#fbbf24','#3b82f6','#a16207','#ec4899'];
+const PIE_COLORS=['#ffffff','#00b0ff','#00e676','#d500f9','#ff9100','#ffd600','#2979ff','#ff1744','#ff4081'];
 const PIE_LABELS=['Crypto','Stablecoins','Indian Equity','International','Mutual Funds','Gold','Bank & Cash','Bonds','ULIP'];
 
 function buildPie(){
@@ -2045,11 +2065,11 @@ function buildPie(){
   const slices=raw.map((val,i)=>({label:PIE_LABELS[i],val,color:PIE_COLORS[i]})).filter(s=>s.val>0.001);
   if(!slices.length) return;
 
-  if(leg) leg.innerHTML=slices.map(s=>`
-    <span style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+  if(leg) leg.innerHTML=slices.map((s,idx)=>`
+    <span class="pie-leg-row" data-idx="${idx}" onmouseenter="pieLegHover(${idx})" onmouseleave="pieLegHover(-1)" style="display:flex;align-items:center;justify-content:space-between;">
       <span style="display:flex;align-items:center;gap:8px;">
-        <span style="width:8px;height:8px;background:${s.color};border-radius:2px;flex-shrink:0;display:inline-block;"></span>
-        <span style="color:#aaa;font-size:11px;">${s.label}</span>
+        <span class="pie-leg-dot" style="width:8px;height:8px;background:${s.color};color:${s.color};border-radius:2px;flex-shrink:0;display:inline-block;"></span>
+        <span style="color:#aaa;font-size:11px;">${esc(s.label)}</span>
       </span>
       <span style="color:#fff;font-size:11px;font-weight:500;">${(s.val/v.tot*100).toFixed(1)}%</span>
     </span>`).join('');
@@ -2064,7 +2084,9 @@ function buildPie(){
         backgroundColor:slices.map(s=>s.color),
         borderColor:'#000',
         borderWidth:3,
-        hoverOffset:8,
+        hoverOffset:14,
+        hoverBorderColor:'#fff',
+        hoverBorderWidth:2,
       }]
     },
     options:{
@@ -2072,6 +2094,14 @@ function buildPie(){
       maintainAspectRatio:false,
       cutout:'72%',
       animation:{ animateRotate:true, duration:600 },
+      transitions:{ active:{ animation:{ duration:200, easing:'easeOutQuart' } } },
+      onHover:(evt,active)=>{
+        document.querySelectorAll('.pie-leg-row').forEach(r=>r.style.background='');
+        if(active?.length){
+          const row=leg?.querySelector(`.pie-leg-row[data-idx="${active[0].index}"]`);
+          if(row) row.style.background='rgba(255,255,255,.06)';
+        }
+      },
       plugins:{
         legend:{display:false},
         tooltip:{
@@ -2088,6 +2118,14 @@ function buildPie(){
       }
     }
   });
+}
+
+// Hovering a legend row pops the matching donut slice out, mirroring native chart hover
+function pieLegHover(idx){
+  if(!pieInst) return;
+  if(idx<0){ pieInst.setActiveElements([]); pieInst.tooltip.setActiveElements([],{x:0,y:0}); pieInst.update(); return; }
+  pieInst.setActiveElements([{datasetIndex:0,index:idx}]);
+  pieInst.update();
 }
 
 // Benchmark returns (approximate annualized, broken into periods)
