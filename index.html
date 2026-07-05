@@ -1054,6 +1054,7 @@
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-lbl">Hide &lt;$1</span>
         </label>
+        <button class="btn btn-ghost" id="privacy-btn" onclick="togglePrivacy()" title="Hide all amounts" style="padding:4px 9px;font-size:13px;line-height:1">👁</button>
         <span class="src-tag live" id="src-tag">LIVE</span>
         <button class="btn btn-ghost" id="add-btn-main" onclick="toggleAdd()">+ Add</button>
       </div>
@@ -1831,11 +1832,20 @@ async function refreshAll(){
 // fC — format an amount in USD into the active display currency
 function fI(usdAmount) {
   const cfg = CURRENCY_CONFIG[activeCurrency] || CURRENCY_CONFIG.INR;
+  if (window._privacy) return cfg.sym + '****';
   const rate = liveRates[cfg.gecko] || cfg.perUSD;
   const amount = usdAmount * rate;
   const dec = cfg.decimals;
   const locale = activeCurrency === 'INR' ? 'en-IN' : 'en-US';
   return cfg.sym + amount.toLocaleString(locale, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+// Privacy mode: mask all monetary values with **** (percentages stay visible)
+function togglePrivacy(){
+  window._privacy = !window._privacy;
+  localStorage.setItem('privacy_mode', window._privacy ? '1' : '0');
+  const btn = document.getElementById('privacy-btn');
+  if(btn) btn.textContent = window._privacy ? '🙈' : '👁';
+  renderHoldings(); updateSummary(); buildPie(); buildPerf();
 }
 // inrToDisp — convert stored INR value to display currency
 function inrToDisp(inr) {
@@ -2666,18 +2676,28 @@ function renderHoldings(){
       </div>`;
     }else{
       (D.bonds||[]).forEach(b=>{
-        const rate = b.rate ? `${b.rate}% p.a.` : '—';
-        const maturity = b.maturity ? new Date(b.maturity).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '—';
+        const isNPS = b.type === 'nps';
+        const rate = isNPS ? '—' : (b.rate ? `${b.rate}% p.a.` : '—');
+        const maturity = isNPS ? 'Retire @ 60' : (b.maturity ? new Date(b.maturity).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : '—');
         const valueUSD = b.value / (liveRates.inr||USD_INR);
         const investedUSD = b.invested ? b.invested / (liveRates.inr||USD_INR) : valueUSD;
         const pnlUSD = valueUSD - investedUSD;
         const pnlPct = investedUSD > 0 ? (pnlUSD/investedUSD*100) : 0;
+        // NPS sub-line: Tier, PFM, E/C/G split
+        let subLine = esc(b.issuer||'');
+        if(isNPS && b.nps){
+          const n = b.nps;
+          const tierLabel = n.tier==='2' ? 'Tier II' : 'Tier I';
+          const pfm = n.pfm ? esc(n.pfm) : '';
+          const alloc = (n.e||n.c||n.g) ? `E${n.e}·C${n.c}·G${n.g}` : '';
+          subLine = [tierLabel, pfm, alloc].filter(Boolean).join(' · ');
+        }
         rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;align-items:center">
-          <div><span class="an">${b.name}</span><div class="as">${b.issuer||''}</div></div>
-          <span class="badge" style="font-size:9px;color:#ffd700;border-color:#4a3a00;background:#1a1000">${BOND_TYPES[b.type]||b.type}</span>
+          <div><span class="an">${esc(b.name)}</span><div class="as">${subLine}</div></div>
+          <span class="badge" style="font-size:9px;color:#fcd34d;border-color:#4a3a00;background:#1a1000">${BOND_TYPES[b.type]||b.type}</span>
           <span class="mv" style="color:#888">${fI(investedUSD)}</span>
           <span class="mv">${fI(valueUSD)}</span>
-          <span class="mv" style="color:#00e676">${rate}</span>
+          <span class="mv" style="${isNPS?'color:#555':'color:#4ade80'}">${rate}</span>
           <span class="mv" style="font-size:10px;color:#555">${maturity}</span>
           <span style="display:flex;gap:4px">
             <button class="btn btn-ghost" onclick="editBond(${b.id})" style="padding:2px 6px;font-size:11px">✎</button>
@@ -2723,6 +2743,27 @@ function renderHoldings(){
   list.innerHTML=rows||`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
 }
 
+// ── NPS form helpers ───────────────────────────────────────
+function onBondTypeChange(){
+  const type = document.getElementById('f-bndtype')?.value;
+  const isNPS = type === 'nps';
+  document.getElementById('nps-fields').style.display = isNPS ? 'block' : 'none';
+  document.getElementById('bnd-rate-wrap').style.display = isNPS ? 'none' : 'block';
+  document.getElementById('bnd-maturity-wrap').style.display = isNPS ? 'none' : 'grid';
+  document.getElementById('bnd-notes-nps-wrap').style.display = isNPS ? 'block' : 'none';
+}
+function npsAllocCheck(){
+  const e = parseFloat(document.getElementById('f-npse')?.value||0);
+  const c = parseFloat(document.getElementById('f-npsc')?.value||0);
+  const g = parseFloat(document.getElementById('f-npsg')?.value||0);
+  const total = e + c + g;
+  const el = document.getElementById('nps-alloc-status');
+  if(!el) return;
+  if(!e && !c && !g){ el.textContent=''; return; }
+  if(Math.abs(total-100)<0.01){ el.textContent='✓ Allocation sums to 100%'; el.style.color='#4ade80'; }
+  else { el.textContent=`⚠ Total is ${total}%, should be 100%`; el.style.color='#fb7185'; }
+}
+
 // ── BONDS ─────────────────────────────────────────────────
 function doAddBond(){
   const name=(document.getElementById('f-bndname')?.value||'').trim();
@@ -2730,13 +2771,27 @@ function doAddBond(){
   const type=document.getElementById('f-bndtype')?.value||'other';
   const invested=parseFloat(document.getElementById('f-bndinvested')?.value||0);
   const value=parseFloat(document.getElementById('f-bndvalue')?.value||0)||invested;
-  const rate=parseFloat(document.getElementById('f-bndrate')?.value||0);
-  const maturity=document.getElementById('f-bndmaturity')?.value||'';
-  const notes=(document.getElementById('f-bndnotes')?.value||'').trim();
+  const isNPS = type === 'nps';
+  const rate = isNPS ? null : parseFloat(document.getElementById('f-bndrate')?.value||0);
+  const maturity = isNPS ? '' : (document.getElementById('f-bndmaturity')?.value||'');
+  const notes = isNPS
+    ? (document.getElementById('f-bndnotes-nps')?.value||'').trim()
+    : (document.getElementById('f-bndnotes')?.value||'').trim();
   if(!name){ alert('Enter a name for this bond'); return; }
   if(!invested||invested<=0){ alert('Enter the amount invested'); return; }
+  const entry = { id:Date.now(), name, issuer, type, value, invested, rate, maturity, notes };
+  if(isNPS){
+    entry.nps = {
+      tier: document.getElementById('f-npstier')?.value||'1',
+      pfm: document.getElementById('f-npspfm')?.value||'',
+      e: parseFloat(document.getElementById('f-npse')?.value||0)||0,
+      c: parseFloat(document.getElementById('f-npsc')?.value||0)||0,
+      g: parseFloat(document.getElementById('f-npsg')?.value||0)||0,
+      pran: (document.getElementById('f-npspran')?.value||'').trim(),
+    };
+  }
   if(!D.bonds) D.bonds=[];
-  D.bonds.push({ id:Date.now(), name, issuer, type, value, invested, rate, maturity, notes });
+  D.bonds.push(entry);
   save(); renderHoldings(); updateSummary(); buildPie();
   toggleAdd();
 }
@@ -3337,10 +3392,10 @@ function renderAddForm(){
   }else if(activeTab==='bonds'){
     h=`<p class="add-panel-title">Add Bond / Fixed Income</p>
     <div class="fg fg3" style="margin-bottom:12px">
-      <div><label>Name</label><input type="text" id="f-bndname" placeholder="e.g. SBI 7.2% Bonds 2029"></div>
+      <div><label>Name / Label</label><input type="text" id="f-bndname" placeholder="e.g. SBI Tier I NPS"></div>
       <div><label>Issuer / Bank</label><input type="text" id="f-bndissuer" placeholder="e.g. SBI, Govt of India"></div>
       <div><label>Type</label>
-        <select id="f-bndtype">
+        <select id="f-bndtype" onchange="onBondTypeChange()">
           <option value="govt">Government Bond</option>
           <option value="corporate">Corporate Bond</option>
           <option value="fd">Fixed Deposit (FD)</option>
@@ -3353,14 +3408,76 @@ function renderAddForm(){
         </select>
       </div>
     </div>
+
+    <!-- NPS-specific fields: shown only when type=nps -->
+    <div id="nps-fields" style="display:none;background:#0a1a0a;border:1px solid #1a3a1a;border-radius:8px;padding:14px;margin-bottom:12px">
+      <div style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#4ade80;margin-bottom:12px">🏛️ NPS Details</div>
+      <div class="fg" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label>Account Tier</label>
+          <select id="f-npstier">
+            <option value="1">Tier I — Pension (locked till 60)</option>
+            <option value="2">Tier II — Savings (withdrawable)</option>
+          </select>
+        </div>
+        <div>
+          <label>Pension Fund Manager</label>
+          <select id="f-npspfm">
+            <option value="">Select PFM</option>
+            <option value="SBI">SBI Pension Funds</option>
+            <option value="LIC">LIC Pension Fund</option>
+            <option value="HDFC">HDFC Pension Management</option>
+            <option value="ICICI Pru">ICICI Prudential Pension</option>
+            <option value="Kotak">Kotak Mahindra Pension</option>
+            <option value="UTI">UTI Retirement Solutions</option>
+            <option value="Aditya Birla">Aditya Birla Sun Life Pension</option>
+            <option value="Max Life">Max Life Pension Fund</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#555;margin-bottom:8px;font-family:'JetBrains Mono',monospace">FUND ALLOCATION (E + C + G should total 100)</div>
+      <div class="fg fg3" style="margin-bottom:8px">
+        <div>
+          <label style="display:flex;align-items:center;gap:6px">
+            <span style="display:inline-block;width:8px;height:8px;background:#4ade80;border-radius:2px"></span>
+            E — Equity %
+          </label>
+          <input type="number" id="f-npse" placeholder="e.g. 75" min="0" max="100" step="1" oninput="npsAllocCheck()">
+        </div>
+        <div>
+          <label style="display:flex;align-items:center;gap:6px">
+            <span style="display:inline-block;width:8px;height:8px;background:#38bdf8;border-radius:2px"></span>
+            C — Corp Bond %
+          </label>
+          <input type="number" id="f-npsc" placeholder="e.g. 15" min="0" max="100" step="1" oninput="npsAllocCheck()">
+        </div>
+        <div>
+          <label style="display:flex;align-items:center;gap:6px">
+            <span style="display:inline-block;width:8px;height:8px;background:#facc15;border-radius:2px"></span>
+            G — Govt Sec %
+          </label>
+          <input type="number" id="f-npsg" placeholder="e.g. 10" min="0" max="100" step="1" oninput="npsAllocCheck()">
+        </div>
+      </div>
+      <div id="nps-alloc-status" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;margin-bottom:4px"></div>
+      <div style="margin-top:8px">
+        <label>PRAN Number (optional)</label>
+        <input type="text" id="f-npspran" placeholder="e.g. 110012345678" maxlength="12" style="font-family:'JetBrains Mono',monospace">
+      </div>
+    </div>
+
+    <!-- Generic fields: hidden when type=nps since NPS is market-linked with no fixed rate/maturity -->
     <div class="fg fg3" style="margin-bottom:12px">
       <div><label>Amount Invested (₹)</label><input type="number" id="f-bndinvested" placeholder="e.g. 100000" step="1" min="0"></div>
-      <div><label>Current Value (₹)</label><input type="number" id="f-bndvalue" placeholder="e.g. 108000" step="1" min="0"></div>
-      <div><label>Interest Rate (% p.a.)</label><input type="number" id="f-bndrate" placeholder="e.g. 7.2" step="0.01" min="0"></div>
+      <div><label>Current Value / Corpus (₹)</label><input type="number" id="f-bndvalue" placeholder="e.g. 108000" step="1" min="0"></div>
+      <div id="bnd-rate-wrap"><label>Interest Rate (% p.a.)</label><input type="number" id="f-bndrate" placeholder="e.g. 7.2" step="0.01" min="0"></div>
     </div>
-    <div class="fg" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+    <div class="fg" id="bnd-maturity-wrap" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div><label>Maturity Date</label><input type="date" id="f-bndmaturity" style="font-family:'JetBrains Mono',monospace"></div>
       <div><label>Notes (optional)</label><input type="text" id="f-bndnotes" placeholder="e.g. Locked-in, auto-renew"></div>
+    </div>
+    <div id="bnd-notes-nps-wrap" style="display:none;margin-bottom:12px">
+      <label>Notes (optional)</label><input type="text" id="f-bndnotes-nps" placeholder="e.g. Auto-choice, switched from Active to Auto">
     </div>
     <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ Balance is entered manually. Update current value periodically to track growth.</div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddBond()">Add Bond</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
@@ -4526,6 +4643,10 @@ function showOnboardingTip(){
 // ── INIT — async Supabase-aware startup ───────────────────
 (async function init(){
   document.getElementById('currency-sel').value = activeCurrency;
+  // Restore privacy mode
+  window._privacy = localStorage.getItem('privacy_mode') === '1';
+  const pbtn = document.getElementById('privacy-btn');
+  if(pbtn) pbtn.textContent = window._privacy ? '🙈' : '👁';
   // Restore hide-small toggle state
   const hideSmallSaved = localStorage.getItem('hide_small');
   if (hideSmallSaved === '1') {
