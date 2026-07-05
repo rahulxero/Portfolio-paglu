@@ -971,7 +971,10 @@
   <!-- Hero -->
   <div class="hero">
     <div class="hero-eyebrow">Total Portfolio Value</div>
-    <div class="hero-val" id="tot-val">—</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="hero-val" id="tot-val">—</div>
+      <button id="privacy-btn" onclick="togglePrivacy()" title="Hide all amounts" style="background:transparent;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;font-size:16px;line-height:1;cursor:pointer;color:#888;transition:all .15s" onmouseover="this.style.borderColor='#444';this.style.background='#111'" onmouseout="this.style.borderColor='#2a2a2a';this.style.background='transparent'">👁</button>
+    </div>
     <div class="hero-chg" id="tot-chg"><span class="muted">—</span></div>
   </div>
   <div id="insights-strip" class="insights-strip" style="display:none"></div>
@@ -1054,7 +1057,6 @@
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-lbl">Hide &lt;$1</span>
         </label>
-        <button class="btn btn-ghost" id="privacy-btn" onclick="togglePrivacy()" title="Hide all amounts" style="padding:4px 9px;font-size:13px;line-height:1">👁</button>
         <span class="src-tag live" id="src-tag">LIVE</span>
         <button class="btn btn-ghost" id="add-btn-main" onclick="toggleAdd()">+ Add</button>
       </div>
