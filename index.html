@@ -2710,7 +2710,7 @@ function renderHoldings(){
     }
   }else if(activeTab==='ulip'){
     head.style.cssText=`display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
-    head.innerHTML=`<span>Plan</span><span>Premium Paid</span><span>Cur. Value</span><span>P&L</span><span>Policy Term</span><span></span>`;
+    head.innerHTML=`<span>Plan</span><span>Premium Paid</span><span>Cur. Value</span><span>P&L</span><span>Last Updated</span><span></span>`;
     if(!D.ulip?.length){
       rows+=`<div style="padding:40px 16px;text-align:center">
         <div style="font-size:32px;margin-bottom:12px">🛡️</div>
@@ -2722,20 +2722,33 @@ function renderHoldings(){
         <button class="btn btn-p" onclick="toggleAdd()" style="margin-top:16px">+ Add ULIP</button>
       </div>`;
     }else{
+      const staleCount = (D.ulip||[]).filter(u=>u.updatedAt && (Date.now()-u.updatedAt) > 30*24*3600*1000).length + (D.ulip||[]).filter(u=>!u.updatedAt).length;
+      if(staleCount>0){
+        rows+=`<div style="background:#1a1400;border:1px solid #4a3a00;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:11px;font-family:'JetBrains Mono',monospace;color:#fbbf24;display:flex;align-items:center;justify-content:space-between">
+          <span>⚠ ${staleCount} plan${staleCount>1?'s':''} need a value update</span>
+          <span style="color:#886600;font-size:10px">Check your insurer portal · click ✎ to update</span>
+        </div>`;
+      }
       (D.ulip||[]).forEach(u=>{
         const valueUSD = u.value / (liveRates.inr||USD_INR);
         const investedUSD = u.invested ? u.invested / (liveRates.inr||USD_INR) : valueUSD;
         const pnlUSD = valueUSD - investedUSD;
         const pnlPct = investedUSD > 0 ? (pnlUSD/investedUSD*100) : 0;
-        const term = u.term ? esc(u.term) : '—';
+        const term = u.term ? esc(u.term) : '';
+        const unitInfo = (u.units && u.nav) ? `${u.units.toLocaleString('en-IN')} units × ₹${u.nav}` : '';
+        const sub = [esc(u.insurer||''), unitInfo, term].filter(Boolean).join(' · ');
+        // Staleness: ULIP NAVs update daily; nudge amber after 30 days since last manual update
+        const age = u.updatedAt ? Date.now()-u.updatedAt : null;
+        const isStale = age==null || age > 30*24*3600*1000;
+        const ageStr = age==null ? 'never updated' : ageLbl(age);
         rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center">
-          <div><span class="an">${esc(u.name)}</span><div class="as">${esc(u.insurer||'')}</div></div>
+          <div><span class="an">${esc(u.name)}</span><div class="as">${sub}</div></div>
           <span class="mv" style="color:#888">${fI(investedUSD)}</span>
           <span class="mv">${fI(valueUSD)}</span>
           <span class="mv sm ${pc(pnlUSD)}">${pnlUSD>=0?'+':''}${fI(Math.abs(pnlUSD))} <span style="color:#555;font-size:10px">(${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%)</span></span>
-          <span class="mv" style="font-size:10px;color:#555">${term}</span>
+          <span class="mv" style="font-size:10px;${isStale?'color:#fbbf24':'color:#555'}" title="${isStale?'ULIP value may be out of date — update from your policy statement':'Recently updated'}">${isStale?'⚠ ':''}${ageStr}</span>
           <span style="display:flex;gap:4px">
-            <button class="btn btn-ghost" onclick="editUlip(${u.id})" style="padding:2px 6px;font-size:11px">✎</button>
+            <button class="btn btn-ghost" onclick="editUlip(${u.id})" style="padding:2px 6px;font-size:11px" title="Update value">✎</button>
             <button class="btn btn-ghost" onclick="delUlip(${u.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
           </span>
         </div>`;
@@ -2844,29 +2857,43 @@ function doAddUlip(){
   const insurer=(document.getElementById('f-ulipinsurer')?.value||'').trim();
   const term=(document.getElementById('f-ulipterm')?.value||'').trim();
   const invested=parseFloat(document.getElementById('f-ulipinvested')?.value||0);
-  const value=parseFloat(document.getElementById('f-ulipvalue')?.value||0)||invested;
+  const units=parseFloat(document.getElementById('f-ulipunits')?.value||0)||null;
+  const nav=parseFloat(document.getElementById('f-ulipnav')?.value||0)||null;
+  const value = (units && nav) ? units*nav : (parseFloat(document.getElementById('f-ulipvalue')?.value||0)||invested);
   const notes=(document.getElementById('f-ulipnotes')?.value||'').trim();
   if(!name){ alert('Enter a name for this ULIP plan'); return; }
   if(!invested||invested<=0){ alert('Enter the premium paid till date'); return; }
   if(!D.ulip) D.ulip=[];
-  D.ulip.push({ id:Date.now(), name, insurer, term, value, invested, notes });
+  D.ulip.push({ id:Date.now(), name, insurer, term, value, invested, units, nav, notes, updatedAt:Date.now() });
   save(); renderHoldings(); updateSummary(); buildPie();
   toggleAdd();
 }
 
 function editUlip(id){
   const u=(D.ulip||[]).find(x=>x.id===id); if(!u) return;
+  const hasUnits = u.units && u.units>0;
   const modal=document.createElement('div');
   modal.id='edit-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center';
   const inner=document.createElement('div');
   inner.style.cssText='background:#0a0a0a;border:1px solid #222;padding:28px;width:480px;max-width:95vw;border-radius:8px';
+  // Unit-tracked plans: update only the NAV (value auto-computes). Manual plans: edit value directly.
+  const valueField = hasUnits
+    ? `<div style="grid-column:span 2;background:#0a1a0a;border:1px solid #1a3a1a;border-radius:6px;padding:12px;margin-bottom:4px">
+         <div style="font-size:10px;color:#4ade80;text-transform:uppercase;margin-bottom:8px">📈 Update NAV only — value recalculates</div>
+         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+           <div><div style="font-size:10px;color:#555;margin-bottom:6px">Units Held</div><input type="number" id="eu-units" value="${u.units}" step="any" oninput="euNavCalc()" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>
+           <div><div style="font-size:10px;color:#4ade80;margin-bottom:6px">Current NAV (₹)</div><input type="number" id="eu-nav" value="${u.nav||''}" step="any" oninput="euNavCalc()" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #2a4a2a;color:#fff;font-family:monospace;box-sizing:border-box"></div>
+         </div>
+         <div id="eu-navcalc" style="font-size:11px;font-family:monospace;color:#4ade80;margin-top:8px"></div>
+       </div>`
+    : `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Current Fund Value (₹)</div><input type="number" id="eu-value" value="${u.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`;
   inner.innerHTML=[
     `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit ULIP</div>`,
     `<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:20px">${esc(u.name)}</div>`,
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
+    valueField,
     `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Premium Paid (₹)</div><input type="number" id="eu-invested" value="${u.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Current Fund Value (₹)</div><input type="number" id="eu-value" value="${u.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Policy Term</div><input type="text" id="eu-term" value="${esc(u.term||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Insurer</div><input type="text" id="eu-insurer" value="${esc(u.insurer||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     `</div>`,
@@ -2877,9 +2904,27 @@ function editUlip(id){
   ].join('');
   modal.appendChild(inner);
   document.body.appendChild(modal);
+  window._euCalc = ()=>{ // live recompute inside the modal
+    const un=parseFloat(document.getElementById('eu-units')?.value||0);
+    const nv=parseFloat(document.getElementById('eu-nav')?.value||0);
+    const el=document.getElementById('eu-navcalc');
+    if(el) el.textContent = (un>0&&nv>0) ? `= ₹${(un*nv).toLocaleString('en-IN',{maximumFractionDigits:2})} fund value` : '';
+  };
+  window.euNavCalc = window._euCalc;
+  if(hasUnits) window._euCalc();
   document.getElementById('eu-save').onclick=()=>{
+    let newVal;
+    if(hasUnits){
+      const un=parseFloat(document.getElementById('eu-units').value)||u.units;
+      const nv=parseFloat(document.getElementById('eu-nav').value)||u.nav;
+      newVal = un*nv;
+      u.units=un; u.nav=nv;
+    } else {
+      newVal = parseFloat(document.getElementById('eu-value').value)||u.value;
+    }
+    if(newVal !== u.value) u.updatedAt = Date.now(); // only bump timestamp when value actually changes
     u.invested=parseFloat(document.getElementById('eu-invested').value)||u.invested;
-    u.value=parseFloat(document.getElementById('eu-value').value)||u.value;
+    u.value=newVal;
     u.term=document.getElementById('eu-term').value||u.term;
     u.insurer=document.getElementById('eu-insurer').value||u.insurer;
     modal.remove(); save(); renderHoldings(); updateSummary(); buildPie();
@@ -3490,15 +3535,36 @@ function renderAddForm(){
       <div><label>Insurer</label><input type="text" id="f-ulipinsurer" placeholder="e.g. HDFC Life, ICICI Pru Life"></div>
       <div><label>Policy Term (optional)</label><input type="text" id="f-ulipterm" placeholder="e.g. 10 yr / matures 2032"></div>
     </div>
-    <div class="fg fg3" style="margin-bottom:12px">
+    <div class="fg fg3" style="margin-bottom:8px">
+      <div><label>Units Held</label><input type="number" id="f-ulipunits" placeholder="e.g. 1295.28254" step="any" min="0" oninput="ulipCalc()"></div>
+      <div><label>Current NAV (₹)</label><input type="number" id="f-ulipnav" placeholder="e.g. 44.0075" step="any" min="0" oninput="ulipCalc()"></div>
       <div><label>Premium Paid Till Date (₹)</label><input type="number" id="f-ulipinvested" placeholder="e.g. 100000" step="1" min="0"></div>
-      <div><label>Current Fund Value (₹)</label><input type="number" id="f-ulipvalue" placeholder="e.g. 112000" step="1" min="0"></div>
-      <div><label>Notes (optional)</label><input type="text" id="f-ulipnotes" placeholder="e.g. Equity fund, locked-in"></div>
     </div>
-    <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ ULIP NAV is declared by the insurer, not available on mfapi.in. Update the fund value here periodically from your policy statement.</div>
+    <div id="ulip-calc-hint" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#4ade80;margin-bottom:8px;min-height:14px"></div>
+    <div class="fg fg3" style="margin-bottom:12px">
+      <div><label>Current Fund Value (₹) <span style="color:#555;font-size:9px">— auto if units × NAV given</span></label><input type="number" id="f-ulipvalue" placeholder="e.g. 112000" step="1" min="0"></div>
+      <div style="grid-column:span 2"><label>Notes (optional)</label><input type="text" id="f-ulipnotes" placeholder="e.g. Discovery Fund, equity mandate"></div>
+    </div>
+    <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ Enter <b>Units + NAV</b> and the value is calculated for you — then each month you only update the NAV from your policy portal. Or leave them blank and enter the fund value directly. ULIP NAVs aren't on any public feed, so this stays manual.</div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddUlip()">Add ULIP</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
   }
   p.innerHTML=h;
+}
+
+// Live units × NAV → fund value for the ULIP form
+function ulipCalc(){
+  const units = parseFloat(document.getElementById('f-ulipunits')?.value||0);
+  const nav = parseFloat(document.getElementById('f-ulipnav')?.value||0);
+  const hint = document.getElementById('ulip-calc-hint');
+  const valEl = document.getElementById('f-ulipvalue');
+  if(units>0 && nav>0){
+    const val = units*nav;
+    if(valEl){ valEl.value = val.toFixed(2); valEl.readOnly = true; valEl.style.opacity='.6'; }
+    if(hint) hint.textContent = `= ${units.toLocaleString('en-IN')} units × ₹${nav} = ₹${val.toLocaleString('en-IN',{maximumFractionDigits:2})}`;
+  } else {
+    if(valEl){ valEl.readOnly = false; valEl.style.opacity='1'; }
+    if(hint) hint.textContent = '';
+  }
 }
 
 function setFetchSt(type,msg){const el=document.getElementById('fetch-st');if(!el)return;if(type==='loading')el.innerHTML=`<span class="spin-sm"></span> ${msg}`;else if(type==='ok')el.innerHTML=`<span class="fok">✓</span> ${msg}`;else el.innerHTML=`<span class="ferr">✗</span> ${msg}`;}
