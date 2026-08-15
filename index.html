@@ -1182,6 +1182,17 @@
       <div><p class="mc-title">Alpha</p><p class="mc-sub" id="alpha-sub">The 25 largest listed companies.</p></div>
       <button class="btn btn-icon" onclick="document.getElementById('alpha-mo').classList.remove('open')">&#10005;</button>
     </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+      <div style="display:flex;gap:4px">
+        <button class="tf on" id="av-size"  onclick="alphaView('size',this)">Size</button>
+        <button class="tf"    id="av-value" onclick="alphaView('value',this)">Valuation</button>
+        <button class="tf"    id="av-qual"  onclick="alphaView('quality',this)">Quality</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim);cursor:pointer;text-transform:uppercase;letter-spacing:.08em">
+        <input type="checkbox" id="alpha-group" onchange="renderAlpha()" style="width:13px;height:13px;cursor:pointer"> Group by sector
+      </label>
+      <span id="alpha-legend" style="margin-left:auto;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim2)"></span>
+    </div>
     <div style="overflow-x:auto">
       <div id="alpha-head"></div>
       <div id="alpha-rows"></div>
@@ -1922,19 +1933,98 @@ function aCap(n){
 }
 const aNum=n=>n==null?null:n.toFixed(1);
 const aPct=n=>n==null?null:n.toFixed(2)+'%';
+const aPct1=n=>n==null?null:n.toFixed(1)+'%';
 const aDash=v=>v==null?'<span style="color:var(--t-low)">—</span>':v;
 
-const ALPHA_GRID='grid-template-columns:1.7fr .85fr .85fr .85fr .55fr .6fr .55fr .8fr';
+let alphaViewMode='size';
+
+// Three column sets rather than one very wide table. Fifteen columns is a
+// spreadsheet; eight you can actually read at a glance.
+const ALPHA_VIEWS={
+  size:   {grid:'1.7fr .9fr .9fr .9fr .7fr .6fr 1fr',
+           cols:[['market_cap','Market Cap'],['revenue','Revenue'],['earnings','Net Profit'],
+                 ['net_margin','Margin'],['pe','P/E'],['sector','Sector']]},
+  value:  {grid:'1.7fr .9fr .6fr .65fr .7fr .75fr .6fr 1fr',
+           cols:[['market_cap','Market Cap'],['pe','P/E'],['forward_pe','Fwd P/E'],
+                 ['fcf_yield','FCF Yld'],['ev_ebitda','EV/EBITDA'],['dividend_yield','Div %'],
+                 ['sector','Sector']]},
+  quality:{grid:'1.7fr .9fr .7fr .7fr .7fr .7fr 1fr',
+           cols:[['market_cap','Market Cap'],['net_margin','Margin'],['roe','ROE'],
+                 ['fcf_yield','FCF Yld'],['ps','P/S'],['sector','Sector']]},
+};
+
+function alphaView(mode,btn){
+  alphaViewMode=mode;
+  document.querySelectorAll('#av-size,#av-value,#av-qual').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  renderAlpha();
+}
+
+// P/E only means something against peers. Aramco at 8.8x looks cheap beside
+// NVIDIA at 28.8x, but oil majors always trade single-digit — the comparison
+// that matters is against its own sector.
+function sectorMedians(list,key){
+  const by={};
+  list.forEach(c=>{ const v=c[key]; if(v!=null&&c.sector){ (by[c.sector]=by[c.sector]||[]).push(v); } });
+  const med={};
+  for(const k in by){ const a=by[k].sort((x,y)=>x-y); med[k]=a[Math.floor(a.length/2)]; }
+  return med;
+}
+function relColour(v,median,lowerIsCheap=true){
+  if(v==null||median==null||median<=0)return '';
+  const r=v/median;
+  const cheap=lowerIsCheap?r<0.8:r>1.2;
+  const rich =lowerIsCheap?r>1.25:r<0.8;
+  if(cheap)return 'color:#00e676';
+  if(rich)return 'color:#ff6b6b';
+  return '';
+}
+
+function alphaCell(c,key,ctx){
+  if(key==='sector')  return `<span class="as" style="white-space:nowrap">${esc(c.sector||c.country||'')}</span>`;
+  if(key==='market_cap'){
+    const w=ctx.maxCap?((c.market_cap||0)/ctx.maxCap*100).toFixed(1):0;
+    return `<span class="mv" style="position:relative">
+      <span style="position:absolute;right:0;top:-4px;bottom:-4px;width:${w}%;background:#ffffff0d;border-right:2px solid #ffffff33"></span>
+      <span style="position:relative">${aDash(aCap(c.market_cap))}</span></span>`;
+  }
+  if(key==='revenue')  return `<span class="mv sm" style="color:var(--t-soft)">${aDash(aCap(c.revenue))}</span>`;
+  if(key==='earnings') return `<span class="mv sm">${aDash(aCap(c.earnings))}</span>`;
+  if(key==='pe')       return `<span class="mv sm" style="${relColour(c.pe,ctx.medPE[c.sector])}">${aDash(aNum(c.pe))}</span>`;
+  if(key==='forward_pe')return `<span class="mv sm" style="${relColour(c.forward_pe,ctx.medFPE[c.sector])}">${aDash(aNum(c.forward_pe))}</span>`;
+  if(key==='ev_ebitda')return `<span class="mv sm" style="${relColour(c.ev_ebitda,ctx.medEV[c.sector])}">${aDash(aNum(c.ev_ebitda))}</span>`;
+  if(key==='ps')       return `<span class="mv sm" style="${relColour(c.ps,ctx.medPS[c.sector])}">${aDash(aNum(c.ps))}</span>`;
+  // Above ~5% FCF yield is genuinely cheap; below ~2% is priced for growth.
+  if(key==='fcf_yield')return `<span class="mv sm" style="${c.fcf_yield==null?'':(c.fcf_yield>=5?'color:#00e676':c.fcf_yield<2?'color:#ff6b6b':'')}">${aDash(aPct(c.fcf_yield))}</span>`;
+  if(key==='net_margin')return `<span class="mv sm" style="${c.net_margin==null?'':(c.net_margin>=25?'color:#00e676':c.net_margin<8?'color:var(--t-soft)':'')}">${aDash(aPct1(c.net_margin))}</span>`;
+  if(key==='roe')      return `<span class="mv sm" style="${c.roe==null?'':(c.roe>=20?'color:#00e676':'')}">${aDash(aPct1(c.roe))}</span>`;
+  if(key==='dividend_yield')return `<span class="mv sm" style="color:var(--t-soft)">${aDash(aPct(c.dividend_yield))}</span>`;
+  return `<span class="mv sm">${aDash(c[key])}</span>`;
+}
+
+function alphaRow(c,view,ctx){
+  const initials=(c.ticker||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
+  const fb=`<span style="display:grid;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`;
+  const mark=c.logo
+    ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:3px;object-fit:contain;background:#111;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
+    : fb;
+  return `<div class="trow" style="display:grid;grid-template-columns:${view.grid};gap:8px;align-items:center;min-width:760px">
+    <div style="display:flex;align-items:center;gap:9px;min-width:0">${mark}
+      <div style="min-width:0"><span class="an">${esc(c.name)}</span><div class="as">${esc(c.ticker)}</div></div></div>
+    ${view.cols.map(([k])=>alphaCell(c,k,ctx)).join('')}
+  </div>`;
+}
 
 function renderAlpha(){
   const head=document.getElementById('alpha-head'), body=document.getElementById('alpha-rows');
   if(!head||!body)return;
+  const view=ALPHA_VIEWS[alphaViewMode]||ALPHA_VIEWS.size;
 
-  const sh=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${alphaSort.col===col?'#fff':'#444'}" onclick="sortAlpha('${col}')">${lbl}${alphaSort.col===col?(alphaSort.dir===-1?' \u2193':' \u2191'):''}</span>`;
-  head.style.cssText=`display:grid;${ALPHA_GRID};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);min-width:760px`;
-  head.innerHTML=`${sh('name','Company')}${sh('market_cap','Market Cap')}${sh('revenue','Revenue')}${sh('earnings','Net Profit')}${sh('pe','P/E')}${sh('forward_pe','Fwd P/E')}${sh('dividend_yield','Div %')}${sh('country','Origin')}`;
+  const sh=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${alphaSort.col===col?'#fff':'var(--t-dim2)'}" onclick="sortAlpha('${col}')">${lbl}${alphaSort.col===col?(alphaSort.dir===-1?' \u2193':' \u2191'):''}</span>`;
+  head.style.cssText=`display:grid;grid-template-columns:${view.grid};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);min-width:760px`;
+  head.innerHTML=sh('name','Company')+view.cols.map(([k,l])=>sh(k,l)).join('');
 
-  const sub=document.getElementById('alpha-sub');
+  const sub=document.getElementById('alpha-sub'), leg=document.getElementById('alpha-legend');
   let rows='';
 
   if(alphaState==='loading'||alphaState==='idle'){
@@ -1945,52 +2035,44 @@ function renderAlpha(){
       <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Market data unavailable</div>
       <div style="color:var(--t-dim);font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
         alpha.json is missing or failed to load.<br>
-        Run <span style="color:var(--t-soft)">python scripts/scrape.py</span> and commit the result.
-      </div>
-    </div>`;
+        Run <span style="color:var(--t-soft)">python scripts/scrape.py</span> and commit the result.</div></div>`;
   }else{
-    const list_=[...ALPHA.companies].sort((a,b)=>{
+    const all=ALPHA.companies;
+    const ctx={
+      maxCap:Math.max(...all.map(c=>c.market_cap||0)),
+      medPE:sectorMedians(all,'pe'), medFPE:sectorMedians(all,'forward_pe'),
+      medEV:sectorMedians(all,'ev_ebitda'), medPS:sectorMedians(all,'ps'),
+    };
+    const cmp=(a,b)=>{
       let x=a[alphaSort.col],y=b[alphaSort.col];
       if(typeof x==='string'||typeof y==='string')return String(x||'').localeCompare(String(y||''))*alphaSort.dir;
-      if(x==null)return 1;
-      if(y==null)return -1;
+      if(x==null)return 1; if(y==null)return -1;
       return (x-y)*alphaSort.dir;
-    });
-    const maxCap=Math.max(...ALPHA.companies.map(c=>c.market_cap||0));
-    const total=ALPHA.companies.reduce((t,c)=>t+(c.market_cap||0),0);
+    };
+
+    if(document.getElementById('alpha-group')?.checked){
+      const groups={};
+      all.forEach(c=>{ const k=c.sector||'Other'; (groups[k]=groups[k]||[]).push(c); });
+      Object.entries(groups)
+        .sort((a,b)=>b[1].reduce((t,c)=>t+(c.market_cap||0),0)-a[1].reduce((t,c)=>t+(c.market_cap||0),0))
+        .forEach(([sector,list])=>{
+          const cap=list.reduce((t,c)=>t+(c.market_cap||0),0);
+          rows+=`<div style="display:flex;justify-content:space-between;padding:14px 8px 6px;font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--t-soft);border-bottom:1px solid var(--rule-2);min-width:760px">
+            <span>${esc(sector)} \u00b7 ${list.length}</span><span>${aCap(cap)}</span></div>`;
+          [...list].sort(cmp).forEach(c=>rows+=alphaRow(c,view,ctx));
+        });
+    }else{
+      [...all].sort(cmp).forEach(c=>rows+=alphaRow(c,view,ctx));
+    }
+
+    const total=all.reduce((t,c)=>t+(c.market_cap||0),0);
     const when=ALPHA.updated?ageLbl(Date.now()-new Date(ALPHA.updated).getTime()):'unknown';
     if(sub)sub.innerHTML=`Combined ${aCap(total)} \u00b7 ${ALPHA.seed?'<span style="color:#fbbf24">seed data</span> \u00b7 ':''}updated ${when}`;
-
-    list_.forEach(c=>{
-      const initials=(c.ticker||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
-      const fb=`<span style="display:grid;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`;
-      const mark=c.logo
-        ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:3px;object-fit:contain;background:#111;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
-        : fb;
-      // Bar behind the market cap turns the column into a chart of relative size.
-      const barW=maxCap?((c.market_cap||0)/maxCap*100).toFixed(1):0;
-      rows+=`<div class="trow" style="display:grid;${ALPHA_GRID};gap:8px;align-items:center;min-width:760px">
-        <div style="display:flex;align-items:center;gap:9px;min-width:0">
-          ${mark}
-          <div style="min-width:0"><span class="an">${esc(c.name)}</span><div class="as">${esc(c.ticker)}</div></div>
-        </div>
-        <span class="mv" style="position:relative">
-          <span style="position:absolute;right:0;top:-4px;bottom:-4px;width:${barW}%;background:#ffffff0d;border-right:2px solid #ffffff33"></span>
-          <span style="position:relative">${aDash(aCap(c.market_cap))}</span>
-        </span>
-        <span class="mv sm" style="color:var(--t-soft)">${aDash(aCap(c.revenue))}</span>
-        <span class="mv sm">${aDash(aCap(c.earnings))}</span>
-        <span class="mv sm">${aDash(aNum(c.pe))}</span>
-        <span class="mv sm">${aDash(aNum(c.forward_pe))}</span>
-        <span class="mv sm" style="color:var(--t-soft)">${aDash(aPct(c.dividend_yield))}</span>
-        <span class="as" style="white-space:nowrap">${esc(c.country)}</span>
-      </div>`;
-    });
+    if(leg)leg.innerHTML=`<span style="color:#00e676">green</span> cheap vs sector \u00b7 <span style="color:#ff6b6b">red</span> rich`;
 
     rows+=`<div style="padding:14px 8px 4px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim2);line-height:1.7">
-      Rankings and fundamentals from companiesmarketcap.com \u00b7 forward P/E and dividend yield from Yahoo Finance.<br>
-      Logos belong to their owners and are shown for identification only. Figures are delayed \u2014 reference, not trading data.
-    </div>`;
+      Multiples are coloured against the median of their own sector in this list, not an absolute standard \u2014 a small sample, so treat it as a prompt to look closer, not a verdict.<br>
+      Rankings from companiesmarketcap.com \u00b7 fundamentals from Yahoo Finance \u00b7 logos belong to their owners. Figures are delayed.</div>`;
   }
   body.innerHTML=rows;
 }
