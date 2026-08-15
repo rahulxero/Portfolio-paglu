@@ -3,8 +3,5 @@
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/p/:slug", "destination": "/index.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
-  "crons": [
-    { "path": "/api/check-alerts", "schedule": "*/30 * * * *" }
   ]
 }
