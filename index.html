@@ -259,6 +259,30 @@
       .hdr-menu{ min-width:210px; }
     }
 
+    /* Filter checkbox. The native control renders as a pale blob on dark, so
+       it's hidden and a styled box is drawn in its place. */
+    .a-check{
+      display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
+      font-size:10px; font-family:'JetBrains Mono',monospace; letter-spacing:.08em;
+      text-transform:uppercase; color:var(--t-soft); transition:color .14s;
+    }
+    .a-check:hover{ color:#e8e8e8; }
+    .a-check input{ position:absolute; opacity:0; width:0; height:0; }
+    .a-box{
+      width:15px; height:15px; flex:none; border-radius:4px;
+      border:1.5px solid #3a3a3a; background:#141414;
+      display:grid; place-items:center; transition:all .15s;
+    }
+    .a-box::after{
+      content:''; width:7px; height:3.5px; margin-top:-2px;
+      border-left:2px solid #04140a; border-bottom:2px solid #04140a;
+      transform:rotate(-45deg) scale(.4); opacity:0; transition:all .15s;
+    }
+    .a-check:hover .a-box{ border-color:#00c853; }
+    .a-check input:checked + .a-box{ background:#00c853; border-color:#00c853; }
+    .a-check input:checked + .a-box::after{ opacity:1; transform:rotate(-45deg) scale(1); }
+    .a-check input:focus-visible + .a-box{ outline:2px solid #00e676; outline-offset:2px; }
+
     /* Semantic greys. The generated markup uses these instead of hard-coded
        hex values, so a single override flips every label, caption and rule. */
     :root{
@@ -1188,8 +1212,10 @@
         <button class="tf"    id="av-value" onclick="alphaView('value',this)">Valuation</button>
         <button class="tf"    id="av-qual"  onclick="alphaView('quality',this)">Quality</button>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim);cursor:pointer;text-transform:uppercase;letter-spacing:.08em">
-        <input type="checkbox" id="alpha-group" onchange="renderAlpha()" style="width:13px;height:13px;cursor:pointer"> Group by sector
+      <label class="a-check">
+        <input type="checkbox" id="alpha-group" onchange="renderAlpha()">
+        <span class="a-box"></span>
+        <span>Group by sector</span>
       </label>
       <span id="alpha-legend" style="margin-left:auto;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim2)"></span>
     </div>
