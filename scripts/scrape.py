@@ -219,6 +219,7 @@ def enrich_from_yahoo(companies):
 
 
 def main():
+    os.makedirs(LOGO_DIR, exist_ok=True)   # so `git add logos` never fails in CI
     print("Fetching rankings from companiesmarketcap.com")
 
     caps = parse_ranking(PAGES["market_cap"], "market cap")[:TOP_N]
