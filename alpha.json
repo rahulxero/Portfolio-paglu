@@ -13,7 +13,13 @@
       "pe": 28.76,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": 74.9,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 2,
@@ -26,7 +32,13 @@
       "pe": 30.23,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": 32.6,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 3,
@@ -39,7 +51,13 @@
       "pe": 21.49,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Communication Services",
+      "net_margin": 46.3,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 4,
@@ -52,7 +70,13 @@
       "pe": 23.88,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": 48.5,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 5,
@@ -65,7 +89,13 @@
       "pe": 24.23,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Consumer Cyclical",
+      "net_margin": 15.9,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 6,
@@ -78,7 +108,13 @@
       "pe": 34.16,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": 53.6,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 7,
@@ -91,7 +127,13 @@
       "pe": 59.1,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 8,
@@ -104,7 +146,13 @@
       "pe": null,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Industrials",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 9,
@@ -117,7 +165,13 @@
       "pe": 8.75,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Energy",
+      "net_margin": 42.5,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 10,
@@ -130,7 +184,13 @@
       "pe": 16.69,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Communication Services",
+      "net_margin": 42.2,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 11,
@@ -143,7 +203,13 @@
       "pe": null,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Consumer Cyclical",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 12,
@@ -156,7 +222,13 @@
       "pe": 18.86,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": 25.0,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 13,
@@ -169,7 +241,13 @@
       "pe": 17.56,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Financial Services",
+      "net_margin": 16.0,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 14,
@@ -182,7 +260,13 @@
       "pe": 34.61,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Healthcare",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 15,
@@ -195,7 +279,13 @@
       "pe": 18.08,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 16,
@@ -208,7 +298,13 @@
       "pe": 12.93,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Financial Services",
+      "net_margin": 39.9,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 17,
@@ -221,7 +317,13 @@
       "pe": 27.51,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Consumer Defensive",
+      "net_margin": 4.6,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 18,
@@ -234,7 +336,13 @@
       "pe": 12.88,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": 70.0,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 19,
@@ -247,7 +355,13 @@
       "pe": null,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 20,
@@ -260,7 +374,13 @@
       "pe": 48.88,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 21,
@@ -273,7 +393,13 @@
       "pe": 25.8,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Financial Services",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 22,
@@ -286,7 +412,13 @@
       "pe": 17.8,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Energy",
+      "net_margin": 11.2,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 23,
@@ -299,7 +431,13 @@
       "pe": 24.32,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Healthcare",
+      "net_margin": 27.0,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 24,
@@ -312,7 +450,13 @@
       "pe": null,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     },
     {
       "rank": 25,
@@ -325,7 +469,13 @@
       "pe": null,
       "forward_pe": null,
       "dividend_yield": null,
-      "logo": null
+      "logo": null,
+      "sector": "Technology",
+      "net_margin": null,
+      "fcf_yield": null,
+      "ev_ebitda": null,
+      "ps": null,
+      "roe": null
     }
   ]
 }
