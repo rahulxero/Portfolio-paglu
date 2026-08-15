@@ -1050,6 +1050,7 @@
         <button class="tab" id="tab-banks" onclick="sw('banks',this)">Bank & Cash</button>
         <button class="tab" onclick="sw('bonds',this)">Bonds</button>
         <button class="tab" onclick="sw('ulip',this)">ULIP</button>
+        <button class="tab" onclick="sw('alpha',this)">Alpha</button>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <label class="toggle-wrap" title="Hide positions under $1">
@@ -1858,6 +1859,45 @@ function fP(n){if(n==null)return'—';return(n>=0?'▲ +':'▼ ')+Math.abs(n).to
 function pc(n){return n==null?'':n>=0?'pos':'neg';}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
 const lc=()=>'<span class="lv">—</span>';
+// ── Alpha: the 25 largest listed companies ─────────────────────
+// Data is scraped by scripts/scrape.py into alpha.json and committed. It is not
+// fetched from companiesmarketcap at page load — that site sends no CORS headers,
+// so the browser would block the request.
+let ALPHA=null, alphaState='idle', alphaSort={col:'market_cap',dir:-1};
+
+async function loadAlpha(){
+  if(alphaState==='loading'||alphaState==='done')return;
+  alphaState='loading';
+  try{
+    const r=await fetch('/alpha.json?v='+Date.now());
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    ALPHA=await r.json();
+    alphaState='done';
+  }catch(e){
+    console.error('alpha.json failed:',e);
+    alphaState='error';
+  }
+  if(activeTab==='alpha')renderHoldings();
+}
+
+function sortAlpha(col){
+  if(alphaSort.col===col)alphaSort.dir*=-1;
+  else alphaSort={col,dir:(col==='name'||col==='country')?1:-1};
+  renderHoldings();
+}
+
+function aCap(n){
+  if(n==null)return null;
+  const a=Math.abs(n);
+  if(a>=1e12)return '$'+(n/1e12).toFixed(2)+'T';
+  if(a>=1e9)return '$'+(n/1e9).toFixed(1)+'B';
+  if(a>=1e6)return '$'+(n/1e6).toFixed(0)+'M';
+  return '$'+n.toFixed(0);
+}
+const aNum=n=>n==null?null:n.toFixed(1);
+const aPct=n=>n==null?null:n.toFixed(2)+'%';
+const aDash=v=>v==null?'<span style="color:#333">—</span>':v;
+
 function ageLbl(ms){const m=Math.floor(ms/60000);if(m<2)return'just now';if(m<60)return`${m}m ago`;const h=Math.floor(m/60);if(h<24)return`${h}h ago`;const d=Math.floor(h/24);if(d<30)return`${d}d ago`;const mo=Math.floor(d/30);return`${mo}mo ago`;}
 function bankTypeLabel(t){return{savings:'Savings',current:'Current',fd:'Fixed Deposit',rd:'Recurring Deposit',ppf:'PPF',nps:'NPS',wallet:'Digital Wallet',other:'Other'}[t]||'Savings';}
 // walletUSD — total USD value of a wallet's positions (Zerion gives USD natively)
@@ -2754,6 +2794,69 @@ function renderHoldings(){
         </div>`;
       });
     }
+  }else if(activeTab==='alpha'){
+    const sh=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${alphaSort.col===col?'#fff':'#444'}" onclick="sortAlpha('${col}')">${lbl}${alphaSort.col===col?(alphaSort.dir===-1?' \u2193':' \u2191'):''}</span>`;
+    head.style.cssText=`display:grid;grid-template-columns:1.8fr .9fr .9fr .9fr .6fr .6fr .6fr .8fr;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
+    head.innerHTML=`${sh('name','Company')}${sh('market_cap','Market Cap')}${sh('revenue','Revenue')}${sh('earnings','Net Profit')}${sh('pe','P/E')}${sh('forward_pe','Fwd P/E')}${sh('dividend_yield','Div %')}${sh('country','Origin')}`;
+
+    if(alphaState==='loading'||alphaState==='idle'){
+      rows+=`<div style="padding:40px 16px;text-align:center;color:#555;font-size:12px;font-family:'JetBrains Mono',monospace">Loading market data\u2026</div>`;
+    }else if(alphaState==='error'||!ALPHA?.companies?.length){
+      rows+=`<div style="padding:40px 16px;text-align:center">
+        <div style="font-size:32px;margin-bottom:12px">\u{1F4C9}</div>
+        <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Market data unavailable</div>
+        <div style="color:#555;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
+          alpha.json is missing or failed to load.<br>
+          Run <span style="color:#888">python scripts/scrape.py</span> and commit the result.
+        </div>
+      </div>`;
+    }else{
+      const list_=[...ALPHA.companies].sort((a,b)=>{
+        let x=a[alphaSort.col],y=b[alphaSort.col];
+        if(typeof x==='string'||typeof y==='string')return String(x||'').localeCompare(String(y||''))*alphaSort.dir;
+        if(x==null)return 1;
+        if(y==null)return -1;
+        return (x-y)*alphaSort.dir;
+      });
+      const maxCap=Math.max(...ALPHA.companies.map(c=>c.market_cap||0));
+      const total=ALPHA.companies.reduce((t,c)=>t+(c.market_cap||0),0);
+      const when=ALPHA.updated?ageLbl(Date.now()-new Date(ALPHA.updated).getTime()):'unknown';
+
+      rows+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 8px 12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555">
+        <span>25 largest listed companies \u00b7 combined ${aCap(total)}</span>
+        <span>${ALPHA.seed?'<span style="color:#fbbf24">seed data</span> \u00b7 ':''}updated ${when}</span>
+      </div>`;
+
+      list_.forEach(c=>{
+        const initials=(c.ticker||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
+        const mark=c.logo
+          ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:3px;object-fit:contain;background:#111;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:#1a1a1a;color:#888;font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
+          : `<span style="display:grid;width:22px;height:22px;border-radius:3px;background:#1a1a1a;color:#888;font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`;
+        // Bar behind the market cap doubles the column as a chart of relative size.
+        const barW=maxCap?((c.market_cap||0)/maxCap*100).toFixed(1):0;
+        rows+=`<div class="trow" style="display:grid;grid-template-columns:1.8fr .9fr .9fr .9fr .6fr .6fr .6fr .8fr;gap:8px;align-items:center">
+          <div style="display:flex;align-items:center;gap:9px;min-width:0">
+            ${mark}
+            <div style="min-width:0"><span class="an">${esc(c.name)}</span><div class="as">${esc(c.ticker)}</div></div>
+          </div>
+          <span class="mv" style="position:relative">
+            <span style="position:absolute;right:0;top:-4px;bottom:-4px;width:${barW}%;background:#ffffff0d;border-right:2px solid #ffffff33"></span>
+            <span style="position:relative">${aDash(aCap(c.market_cap))}</span>
+          </span>
+          <span class="mv sm" style="color:#888">${aDash(aCap(c.revenue))}</span>
+          <span class="mv sm">${aDash(aCap(c.earnings))}</span>
+          <span class="mv sm">${aDash(aNum(c.pe))}</span>
+          <span class="mv sm">${aDash(aNum(c.forward_pe))}</span>
+          <span class="mv sm" style="color:#888">${aDash(aPct(c.dividend_yield))}</span>
+          <span class="as" style="white-space:nowrap">${esc(c.country)}</span>
+        </div>`;
+      });
+
+      rows+=`<div style="padding:14px 8px 4px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#444;line-height:1.7">
+        Rankings and fundamentals from companiesmarketcap.com \u00b7 forward P/E and dividend yield from Yahoo Finance.<br>
+        Logos belong to their owners and are shown for identification only. Figures are delayed \u2014 reference, not trading data.
+      </div>`;
+    }
   }
   list.innerHTML=rows||`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
 }
@@ -3188,7 +3291,7 @@ function delMF(id){
 }
 
 // ── TABS & ADD FORM ───────────────────────────────────────
-function sw(tab,btn){activeTab=tab;document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(addOpen){addOpen=false;document.getElementById('add-panel').classList.remove('open');}renderHoldings();}
+function sw(tab,btn){activeTab=tab;if(tab==='alpha')loadAlpha();document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(addOpen){addOpen=false;document.getElementById('add-panel').classList.remove('open');}renderHoldings();}
 
 // toggleAdd is auth-aware — prompts login if user is not signed in
 function toggleAdd(){
