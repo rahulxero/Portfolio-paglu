@@ -1,6 +1,5 @@
 // api/check-alerts.js — checks price alerts and sends notifications
-// Called by Vercel Cron (set in vercel.json) every 30 minutes
-// Also used by /api/user.js after each price refresh
+// Called by Vercel Cron (see the "crons" block in vercel.json)
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -33,8 +32,19 @@ async function sendEmail(to, subject, text) {
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // This endpoint sends emails and Telegram messages, so an open URL meant anyone
+  // could burn the Resend quota and spam alert recipients by hitting it in a loop.
+  // Vercel Cron sends Authorization: Bearer $CRON_SECRET automatically.
+  const CRON_SECRET = process.env.CRON_SECRET;
+  if (!CRON_SECRET) {
+    console.error('CRON_SECRET is not set — refusing to run alerts.');
+    return res.status(500).json({ error: 'Not configured' });
+  }
+  if (req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const sb = createClient(
     process.env.SUPABASE_URL,

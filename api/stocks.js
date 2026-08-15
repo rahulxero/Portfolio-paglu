@@ -1,32 +1,17 @@
 // api/stocks.js — Anthropic AI stock price proxy (CORS fix)
-// Key priority: ANTHROPIC_API_KEY env var → x-session-token signed admin token
-
-const crypto = require('crypto');
-
-function keyFromToken(token, secret) {
-  try {
-    const [b64, sig] = (token || '').split('.');
-    if (!b64 || !sig) return null;
-    const expected = crypto.createHmac('sha256', secret).update(b64).digest('hex');
-    if (sig !== expected) return null;
-    const payload = JSON.parse(Buffer.from(b64, 'base64url').toString());
-    return payload?.role === 'admin' ? (payload.anthropicKey || null) : null;
-  } catch { return null; }
-}
+// The key comes from the ANTHROPIC_API_KEY env var and nowhere else.
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-session-token');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const ANTHROPIC_KEY =
-    process.env.ANTHROPIC_API_KEY ||
-    (process.env.ADMIN_PASSWORD && keyFromToken(req.headers['x-session-token'], process.env.ADMIN_PASSWORD));
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
   if (!ANTHROPIC_KEY) return res.status(401).json({
-    error: 'Anthropic API key not configured. Visit /admin to set it up.'
+    error: 'Anthropic API key not configured. Set ANTHROPIC_API_KEY in the Vercel dashboard.'
   });
 
   const { indianSymbols = [], intlSymbols = [] } = req.body || {};

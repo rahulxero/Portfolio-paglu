@@ -2,23 +2,7 @@
 // Uses Supabase REST API directly (no SDK) to avoid Node.js 20 WebSocket issues
 // Auth: Firebase ID token
 
-const https = require('https');
-
-function decodeToken(authHeader) {
-  try {
-    const token = (authHeader || '').replace('Bearer ', '').trim();
-    if (!token) return null;
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    const p = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
-    if (p.exp && p.exp * 1000 < Date.now()) return null;
-    const uid = p.user_id || p.sub;
-    if (!uid) return null;
-    return { uid, email: p.email };
-  } catch(e) { return null; }
-}
+const { verifyIdToken } = require('./_auth');
 
 // Direct Supabase REST call — no SDK needed
 async function supaFetch(method, table, opts = {}) {
@@ -68,7 +52,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const user = decodeToken(req.headers.authorization);
+  const user = await verifyIdToken(req.headers.authorization);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   if (!process.env.SUPABASE_URL) {
