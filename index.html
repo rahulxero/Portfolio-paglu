@@ -210,6 +210,73 @@
     /* ══════════════════════════════════════════════════════
        LIGHT MODE
     ══════════════════════════════════════════════════════ */
+    /* ── tools menu ─────────────────────────────────────────── */
+    .hdr-menu-wrap{ position:relative; }
+    .hdr-menu{
+      position:absolute; top:calc(100% + 8px); right:0; z-index:200;
+      min-width:250px; padding:6px;
+      background:#0d0d0d; border:1px solid #262626; border-radius:12px;
+      box-shadow:0 14px 40px rgba(0,0,0,.55);
+      opacity:0; visibility:hidden; transform:translateY(-6px);
+      transition:opacity .16s ease, transform .16s ease, visibility .16s;
+    }
+    .hdr-menu.open{ opacity:1; visibility:visible; transform:translateY(0); }
+    .hdr-menu button{
+      display:grid; grid-template-columns:26px 1fr; grid-template-rows:auto auto;
+      column-gap:10px; width:100%; padding:9px 10px; text-align:left;
+      background:transparent; border:0; border-radius:8px; cursor:pointer;
+      font-family:'Syne',sans-serif; transition:background .12s;
+    }
+    .hdr-menu button:hover, .hdr-menu button:focus-visible{ background:#1a1a1a; outline:none; }
+    .hm-i{ grid-row:1/3; align-self:center; font-size:16px; text-align:center; opacity:.85; }
+    .hm-t{ font-size:13px; font-weight:600; color:#eee; line-height:1.3; }
+    .hm-d{ font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#666; line-height:1.4; }
+    body.light-mode .hdr-menu{ background:#fff; border-color:#e2e2e2; box-shadow:0 14px 40px rgba(0,0,0,.12); }
+    body.light-mode .hdr-menu button:hover, body.light-mode .hdr-menu button:focus-visible{ background:#f4f5f7; }
+    body.light-mode .hm-t{ color:#111; }
+    body.light-mode .hm-d{ color:#8a9099; }
+
+    /* ── refresh ────────────────────────────────────────────────
+       Compact, and the one green thing in the bar so the eye lands on it. */
+    .ref-btn{
+      display:inline-flex; align-items:center; gap:7px;
+      height:38px; padding:0 15px 0 13px; margin-left:2px;
+      background:linear-gradient(180deg,#00c853,#00a344);
+      color:#04140a; border:0; border-radius:19px; cursor:pointer;
+      font-family:'Syne',sans-serif; font-size:12.5px; font-weight:700; letter-spacing:.02em;
+      box-shadow:0 1px 0 rgba(255,255,255,.22) inset, 0 3px 12px rgba(0,200,83,.28);
+      transition:transform .14s ease, box-shadow .18s ease, filter .18s ease;
+    }
+    .ref-btn:hover{ filter:brightness(1.07); box-shadow:0 1px 0 rgba(255,255,255,.28) inset, 0 5px 20px rgba(0,200,83,.45); transform:translateY(-1px); }
+    .ref-btn:active{ transform:translateY(0) scale(.98); }
+    .ref-btn:focus-visible{ outline:2px solid #00e676; outline-offset:2px; }
+    .ref-btn:disabled{ cursor:default; filter:saturate(.55) brightness(.9); transform:none; box-shadow:none; }
+    .ref-ico{ font-size:15px; line-height:1; display:inline-block; transition:transform .45s cubic-bezier(.4,0,.2,1); }
+    .ref-btn:hover .ref-ico{ transform:rotate(180deg); }
+    .ref-btn.spinning .ref-ico{ animation:refspin .9s linear infinite; transition:none; }
+    @keyframes refspin{ to{ transform:rotate(360deg); } }
+    @media (prefers-reduced-motion:reduce){
+      .ref-ico,.ref-btn,.hdr-menu{ transition:none; }
+      .ref-btn.spinning .ref-ico{ animation-duration:2s; }
+    }
+    @media (max-width:760px){
+      .ref-txt{ display:none; }
+      .ref-btn{ padding:0; width:38px; justify-content:center; }
+      .hdr-menu{ min-width:210px; }
+    }
+
+    /* Semantic greys. The generated markup uses these instead of hard-coded
+       hex values, so a single override flips every label, caption and rule. */
+    :root{
+      --t-soft:#888; --t-mid:#666; --t-dim:#555; --t-dim2:#444; --t-low:#333;
+      --surf-2:#1a1a1a; --rule-2:#2a2a2a;
+      --chart-grid:#111; --chart-axis:#222; --chart-tick:#555; --chart-seg:#000;
+    }
+    body.light-mode{
+      --t-soft:#5f656d; --t-mid:#767c85; --t-dim:#868c95; --t-dim2:#9aa0a8; --t-low:#b4b9c0;
+      --surf-2:#eef0f3; --rule-2:#e2e2e2;
+      --chart-grid:#eceef1; --chart-axis:#d8dbe0; --chart-tick:#8a9099; --chart-seg:#fff;
+    }
     body.light-mode {
       --black: #ffffff; --white: #111111; --dim: #333333;
       --mid: #666666; --ghost: #999999;
@@ -854,12 +921,24 @@
       <option value="AUD">A$ AUD</option>
     </select>
     <button class="hdr-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark"><span class="hdr-btn-icon">☀</span><span class="hdr-btn-label">THEME</span></button>
-    <button class="hdr-btn" onclick="toggleHeatmap()" title="Heatmap"><span class="hdr-btn-icon">▦</span><span class="hdr-btn-label">MAP</span></button>
-    <button class="hdr-btn" onclick="toggleRebal()" title="Rebalance"><span class="hdr-btn-icon">⚖</span><span class="hdr-btn-label">REBAL</span></button>
-    <button class="hdr-btn" onclick="openShareCard()" title="Share"><span class="hdr-btn-icon">↗</span><span class="hdr-btn-label">SHARE</span></button>
-    <button class="hdr-btn" id="history-btn" style="min-width:64px" onclick="openHistory()" title="Portfolio History" style="display:none"><span class="hdr-btn-icon">📈</span><span class="hdr-btn-label">HISTORY</span></button>
     <button class="hdr-btn" onclick="openAlpha()" title="The 25 largest listed companies"><span class="hdr-btn-icon">◈</span><span class="hdr-btn-label">ALPHA</span></button>
-    <button class="hdr-btn hdr-btn-wide" id="ref-btn" onclick="refreshAll()">⟳ REFRESH</button>
+
+    <!-- Tools menu: the four occasional actions live here rather than in the bar. -->
+    <div class="hdr-menu-wrap">
+      <button class="hdr-btn" id="tools-btn" onclick="toggleTools(event)" title="Tools" aria-haspopup="true" aria-expanded="false">
+        <span class="hdr-btn-icon">☰</span><span class="hdr-btn-label">TOOLS</span>
+      </button>
+      <div class="hdr-menu" id="tools-menu" role="menu">
+        <button role="menuitem" onclick="toolsPick(toggleHeatmap)"><span class="hm-i">▦</span><span class="hm-t">Heatmap</span><span class="hm-d">Gains and losses at a glance</span></button>
+        <button role="menuitem" onclick="toolsPick(toggleRebal)"><span class="hm-i">⚖</span><span class="hm-t">Rebalance</span><span class="hm-d">What to buy and sell</span></button>
+        <button role="menuitem" id="history-btn" onclick="toolsPick(openHistory)"><span class="hm-i">📈</span><span class="hm-t">History</span><span class="hm-d">Net worth over time</span></button>
+        <button role="menuitem" onclick="toolsPick(openShareCard)"><span class="hm-i">↗</span><span class="hm-t">Share</span><span class="hm-d">Make a public link or card</span></button>
+      </div>
+    </div>
+
+    <button class="ref-btn" id="ref-btn" onclick="refreshAll()" title="Refresh prices">
+      <span class="ref-ico">⟳</span><span class="ref-txt">Refresh</span>
+    </button>
     <button class="hdr-btn hdr-btn-sq" onclick="openSettings()" title="Settings">⚙</button>
   </div>
 </header>
@@ -885,7 +964,7 @@
         Sign In
       </button>
       <button id="tab-signup"
-        style="flex:1;padding:8px;background:transparent;color:#555;border:none;border-left:1px solid #222;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">
+        style="flex:1;padding:8px;background:transparent;color:var(--t-dim);border:none;border-left:1px solid #222;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">
         Create Account
       </button>
     </div>
@@ -901,14 +980,14 @@
              onkeydown="if(event.key==='Enter')document.getElementById('li-pass').focus()">
     </div>
     <div class="login-field">
-      <label>Password <span style="color:#555;text-transform:none;letter-spacing:0;font-size:10px">(min 8 characters)</span></label>
+      <label>Password <span style="color:var(--t-dim);text-transform:none;letter-spacing:0;font-size:10px">(min 8 characters)</span></label>
       <input type="password" id="li-pass" placeholder="••••••••">
     </div>
     <div class="login-err" id="li-err"></div>
     <button class="btn btn-p" style="width:100%;margin-top:4px" id="li-btn">Sign In →</button>
     <div id="li-forgot" style="text-align:center;margin-top:12px;">
       <a href="#" id="li-forgot-link"
-         style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#888;text-decoration:none;">
+         style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t-soft);text-decoration:none;">
         Forgot password?
       </a>
     </div>
@@ -974,7 +1053,7 @@
     <div class="hero-eyebrow">Total Portfolio Value</div>
     <div style="display:flex;align-items:center;gap:12px">
       <div class="hero-val" id="tot-val">—</div>
-      <button id="privacy-btn" onclick="togglePrivacy()" title="Hide all amounts" style="background:transparent;border:1px solid #2a2a2a;border-radius:8px;padding:6px 10px;font-size:16px;line-height:1;cursor:pointer;color:#888;transition:all .15s" onmouseover="this.style.borderColor='#444';this.style.background='#111'" onmouseout="this.style.borderColor='#2a2a2a';this.style.background='transparent'">👁</button>
+      <button id="privacy-btn" onclick="togglePrivacy()" title="Hide all amounts" style="background:transparent;border:1px solid var(--rule-2);border-radius:8px;padding:6px 10px;font-size:16px;line-height:1;cursor:pointer;color:var(--t-soft);transition:all .15s" onmouseover="this.style.borderColor='#444';this.style.background='#111'" onmouseout="this.style.borderColor='#2a2a2a';this.style.background='transparent'">👁</button>
     </div>
     <div class="hero-chg" id="tot-chg"><span class="muted">—</span></div>
   </div>
@@ -1005,7 +1084,7 @@
       <div class="cc-hdr">
         <span class="cc-title">Performance</span>
         <div style="display:flex;gap:6px;align-items:center">
-          <select id="bench-select" onchange="buildPerf()" style="background:#000;border:1px solid #222;color:#555;font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 6px;cursor:pointer">
+          <select id="bench-select" onchange="buildPerf()" style="background:#000;border:1px solid #222;color:var(--t-dim);font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 6px;cursor:pointer">
             <option value="">No benchmark</option>
             <option value="nifty">vs Nifty 50</option>
             <option value="sp500">vs S&P 500</option>
@@ -1019,8 +1098,8 @@
         </div>
       </div>
       <div class="perf-meta">
-        <span>Return <span id="tf-r" class="mv" style="color:#666">—</span></span>
-        <span>Change <span id="tf-p" class="mv" style="color:#666">—</span></span>
+        <span>Return <span id="tf-r" class="mv" style="color:var(--t-mid)">—</span></span>
+        <span>Change <span id="tf-p" class="mv" style="color:var(--t-mid)">—</span></span>
       </div>
       <div style="position:relative;height:228px;">
         <canvas id="perfC" role="img" aria-label="Portfolio performance chart">Performance chart</canvas>
@@ -1077,7 +1156,7 @@
     <div class="mc-header">
       <div>
         <p class="mc-title">Account</p>
-        <p class="mc-sub" id="smo-email" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#666"></p>
+        <p class="mc-sub" id="smo-email" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t-mid)"></p>
       </div>
       <button class="btn btn-icon" onclick="closeSettings()">✕</button>
     </div>
@@ -1099,7 +1178,7 @@
           <label>New Password</label>
           <input type="password" id="new-pass" placeholder="Min 8 characters" style="background:#111;border:1px solid #333;padding:10px 12px;color:#fff;width:100%;font-family:'JetBrains Mono',monospace;font-size:13px;">
         </div>
-        <div id="pass-msg" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#888;margin-bottom:10px;min-height:14px"></div>
+        <div id="pass-msg" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t-soft);margin-bottom:10px;min-height:14px"></div>
         <button class="btn btn-p" style="width:100%" onclick="doChangePassword()">Update Password →</button>
       </div>
       <button class="btn" style="width:100%;justify-content:flex-start;gap:10px;padding:12px 16px;" onclick="doForgotFromSettings()">
@@ -1108,7 +1187,7 @@
     </div>
 
     <p class="sect-title">Data Sources</p>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#666;">
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t-mid);">
       <div style="display:flex;justify-content:space-between"><span>Crypto prices</span><span style="color:#00e676">CoinGecko</span></div>
       <div style="display:flex;justify-content:space-between"><span>EVM wallets</span><span style="color:#00e676">Zerion</span></div>
       <div style="display:flex;justify-content:space-between"><span>BTC balance</span><span style="color:#00e676">Blockstream</span></div>
@@ -1133,7 +1212,7 @@
       <button class="btn btn-icon" onclick="closeShare()">✕</button>
     </div>
     <div id="share-content">
-      <div style="font-size:13px;color:#888;padding:20px 0;text-align:center"><span class="spin"></span> Loading…</div>
+      <div style="font-size:13px;color:var(--t-soft);padding:20px 0;text-align:center"><span class="spin"></span> Loading…</div>
     </div>
   </div>
 </div>
@@ -1146,7 +1225,7 @@
       <button class="btn btn-icon" onclick="closeAlerts()">✕</button>
     </div>
     <div id="alerts-content">
-      <div style="font-size:13px;color:#888;padding:20px 0;text-align:center"><span class="spin"></span> Loading…</div>
+      <div style="font-size:13px;color:var(--t-soft);padding:20px 0;text-align:center"><span class="spin"></span> Loading…</div>
     </div>
   </div>
 </div>
@@ -1165,7 +1244,7 @@
       <button class="tf" onclick="loadHistory(365,this)">1Y</button>
     </div>
     <div style="position:relative;height:260px;"><canvas id="historyC"></canvas></div>
-    <div id="history-stats" style="display:flex;gap:24px;margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#666;"></div>
+    <div id="history-stats" style="display:flex;gap:24px;margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t-mid);"></div>
   </div>
 </div>
 
@@ -1777,7 +1856,7 @@ async function refreshAll(){
   if(loading) return;
   loading=true;
   const btn=document.getElementById('ref-btn');
-  btn.disabled=true; btn.textContent='⟳ Fetching…';
+  btn.disabled=true; btn.classList.add('spinning'); setRefreshLabel(btn,'Fetching');
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
@@ -1835,7 +1914,7 @@ async function refreshAll(){
 
   save(); savePriceCache(); hideCacheBar(); updateSummary(); buildPie(); buildPerf(); renderHoldings();
   const t=document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
-  loading=false; btn.disabled=false; btn.textContent='⟳ Refresh';
+  loading=false; btn.disabled=false; btn.classList.remove('spinning'); setRefreshLabel(btn,'Refresh');
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   if(errs.length) setStatus('warn',`Partial · ${ts} · ${errs[0]}${errs.length>1?` +${errs.length-1} more`:''}`);
   else{ const cfg=CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR; const rate=liveRates[cfg.gecko]||cfg.perUSD; setStatus('ok',`Live · Updated at ${ts} · 1 USD = ${cfg.sym}${rate.toLocaleString('en-US',{maximumFractionDigits:2})}`); }
@@ -1916,7 +1995,7 @@ function aCap(n){
 }
 const aNum=n=>n==null?null:n.toFixed(1);
 const aPct=n=>n==null?null:n.toFixed(2)+'%';
-const aDash=v=>v==null?'<span style="color:#333">—</span>':v;
+const aDash=v=>v==null?'<span style="color:var(--t-low)">—</span>':v;
 
 const ALPHA_GRID='grid-template-columns:1.7fr .85fr .85fr .85fr .55fr .6fr .55fr .8fr';
 
@@ -1925,21 +2004,21 @@ function renderAlpha(){
   if(!head||!body)return;
 
   const sh=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${alphaSort.col===col?'#fff':'#444'}" onclick="sortAlpha('${col}')">${lbl}${alphaSort.col===col?(alphaSort.dir===-1?' \u2193':' \u2191'):''}</span>`;
-  head.style.cssText=`display:grid;${ALPHA_GRID};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;min-width:760px`;
+  head.style.cssText=`display:grid;${ALPHA_GRID};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);min-width:760px`;
   head.innerHTML=`${sh('name','Company')}${sh('market_cap','Market Cap')}${sh('revenue','Revenue')}${sh('earnings','Net Profit')}${sh('pe','P/E')}${sh('forward_pe','Fwd P/E')}${sh('dividend_yield','Div %')}${sh('country','Origin')}`;
 
   const sub=document.getElementById('alpha-sub');
   let rows='';
 
   if(alphaState==='loading'||alphaState==='idle'){
-    rows=`<div style="padding:40px 16px;text-align:center;color:#555;font-size:12px;font-family:'JetBrains Mono',monospace">Loading market data\u2026</div>`;
+    rows=`<div style="padding:40px 16px;text-align:center;color:var(--t-dim);font-size:12px;font-family:'JetBrains Mono',monospace">Loading market data\u2026</div>`;
   }else if(alphaState==='error'||!ALPHA?.companies?.length){
     rows=`<div style="padding:40px 16px;text-align:center">
       <div style="font-size:32px;margin-bottom:12px">\u{1F4C9}</div>
       <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Market data unavailable</div>
-      <div style="color:#555;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
+      <div style="color:var(--t-dim);font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
         alpha.json is missing or failed to load.<br>
-        Run <span style="color:#888">python scripts/scrape.py</span> and commit the result.
+        Run <span style="color:var(--t-soft)">python scripts/scrape.py</span> and commit the result.
       </div>
     </div>`;
   }else{
@@ -1957,9 +2036,9 @@ function renderAlpha(){
 
     list_.forEach(c=>{
       const initials=(c.ticker||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
-      const fb=`<span style="display:grid;width:22px;height:22px;border-radius:3px;background:#1a1a1a;color:#888;font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`;
+      const fb=`<span style="display:grid;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`;
       const mark=c.logo
-        ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:3px;object-fit:contain;background:#111;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:#1a1a1a;color:#888;font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
+        ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:3px;object-fit:contain;background:#111;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
         : fb;
       // Bar behind the market cap turns the column into a chart of relative size.
       const barW=maxCap?((c.market_cap||0)/maxCap*100).toFixed(1):0;
@@ -1972,16 +2051,16 @@ function renderAlpha(){
           <span style="position:absolute;right:0;top:-4px;bottom:-4px;width:${barW}%;background:#ffffff0d;border-right:2px solid #ffffff33"></span>
           <span style="position:relative">${aDash(aCap(c.market_cap))}</span>
         </span>
-        <span class="mv sm" style="color:#888">${aDash(aCap(c.revenue))}</span>
+        <span class="mv sm" style="color:var(--t-soft)">${aDash(aCap(c.revenue))}</span>
         <span class="mv sm">${aDash(aCap(c.earnings))}</span>
         <span class="mv sm">${aDash(aNum(c.pe))}</span>
         <span class="mv sm">${aDash(aNum(c.forward_pe))}</span>
-        <span class="mv sm" style="color:#888">${aDash(aPct(c.dividend_yield))}</span>
+        <span class="mv sm" style="color:var(--t-soft)">${aDash(aPct(c.dividend_yield))}</span>
         <span class="as" style="white-space:nowrap">${esc(c.country)}</span>
       </div>`;
     });
 
-    rows+=`<div style="padding:14px 8px 4px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#444;line-height:1.7">
+    rows+=`<div style="padding:14px 8px 4px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim2);line-height:1.7">
       Rankings and fundamentals from companiesmarketcap.com \u00b7 forward P/E and dividend yield from Yahoo Finance.<br>
       Logos belong to their owners and are shown for identification only. Figures are delayed \u2014 reference, not trading data.
     </div>`;
@@ -2113,7 +2192,7 @@ function renderInsights(w24){
     if(up)sub+=`<span class="pos">▲ ${esc(up.name)}</span> ${fI(Math.abs(up.impactUSD))}`;
     if(up&&dn)sub+='  ·  ';
     if(dn)sub+=`<span class="neg">▼ ${esc(dn.name)}</span> ${fI(Math.abs(dn.impactUSD))}`;
-    cards.push(`<div class="insight-card"><div class="insight-lbl">Today</div><div class="insight-main ${w24>=0?'pos':'neg'}">${w24>=0?'+':''}${fI(Math.abs(dayUSD))} <span style="color:#555;font-size:11px">(${w24>=0?'+':''}${w24.toFixed(2)}%)</span></div>${sub?`<div class="insight-sub">${sub}</div>`:''}</div>`);
+    cards.push(`<div class="insight-card"><div class="insight-lbl">Today</div><div class="insight-main ${w24>=0?'pos':'neg'}">${w24>=0?'+':''}${fI(Math.abs(dayUSD))} <span style="color:var(--t-dim);font-size:11px">(${w24>=0?'+':''}${w24.toFixed(2)}%)</span></div>${sub?`<div class="insight-sub">${sub}</div>`:''}</div>`);
   }
   if(ins.topAsset){
     const flag=ins.topAsset.pct>=25;
@@ -2200,7 +2279,7 @@ function buildPie(){
   if(!ctx) return;
 
   if(!v.tot){
-    if(leg) leg.innerHTML='<span style="color:#444;font-size:11px;font-family:\'JetBrains Mono\',monospace">Add holdings to see allocation</span>';
+    if(leg) leg.innerHTML='<span style="color:var(--t-dim2);font-size:11px;font-family:\'JetBrains Mono\',monospace">Add holdings to see allocation</span>';
     return;
   }
 
@@ -2225,7 +2304,7 @@ function buildPie(){
       datasets:[{
         data:slices.map(s=>parseFloat(s.val.toFixed(4))),
         backgroundColor:slices.map(s=>s.color),
-        borderColor:'#000',
+        borderColor:chartTheme().seg,
         borderWidth:(ctx)=>{
           const val=ctx.raw||0, pct=v.tot?val/v.tot*100:0;
           // Thin border for big slices (visual separation), none for slivers (so color isn't swallowed)
@@ -2255,7 +2334,7 @@ function buildPie(){
         legend:{display:false},
         tooltip:{
           backgroundColor:'#111',
-          borderColor:'#333',
+          borderColor:chartTheme().tipBd,
           borderWidth:1,
           titleColor:'#fff',
           bodyColor:'#999',
@@ -2337,10 +2416,10 @@ async function buildPerf(){
 
   document.getElementById('tf-r').innerHTML = hasRealData
     ? `<span class="${pc(ret)}">${ret>=0?'+':''}${fI(Math.abs(ret))}</span>`
-    : `<span style="color:#444">— No history yet</span>`;
+    : `<span style="color:var(--t-dim2)">— No history yet</span>`;
   document.getElementById('tf-p').innerHTML = hasRealData
     ? `<span class="${pc(retPct)}">${retPct>=0?'+':''}${retPct.toFixed(2)}%</span>`
-    : `<span style="color:#444">Refresh daily to build history</span>`;
+    : `<span style="color:var(--t-dim2)">Refresh daily to build history</span>`;
 
   // Build benchmark line (normalized to same start)
   const benchPct = (BENCH[benchType]||BENCH.nifty)[curTF]||0.05;
@@ -2350,7 +2429,7 @@ async function buildPerf(){
   const datasets = [{
     label:'Portfolio',
     data: portfolioVals,
-    borderColor:'#ffffff',
+    borderColor:chartTheme().seg,
     backgroundColor:'rgba(255,255,255,.04)',
     fill:true, tension:.4, pointRadius:0, pointHoverRadius:5,
     pointHoverBackgroundColor:'#fff', borderWidth:1.5
@@ -2377,7 +2456,7 @@ async function buildPerf(){
       plugins:{
         legend:{ display:showBench, labels:{color:'#666',font:{size:10,family:"'JetBrains Mono'"}, boxWidth:20} },
         tooltip:{
-          backgroundColor:'#111',borderColor:'#333',borderWidth:1,
+          backgroundColor:chartTheme().tipBg,borderColor:chartTheme().tipBd,borderWidth:1,titleColor:chartTheme().tipFg,bodyColor:chartTheme().tipFg,
           titleColor:'#666',bodyColor:'#fff',
           callbacks:{
             label:c=>`${c.dataset.label}: ${fI(c.raw)}`,
@@ -2394,8 +2473,8 @@ async function buildPerf(){
         }
       },
       scales:{
-        x:{ticks:{maxTicksLimit:6,font:{size:10,family:"'JetBrains Mono'"},color:'#444'},grid:{color:'#111'},border:{color:'#222'}},
-        y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:'#444',callback:v=>fI(v)},grid:{color:'#111'},border:{color:'#222'}}
+        x:{ticks:{maxTicksLimit:6,font:{size:10,family:"'JetBrains Mono'"},color:chartTheme().tick},grid:{color:chartTheme().grid},border:{color:chartTheme().axis}},
+        y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:chartTheme().tick,callback:v=>fI(v)},grid:{color:chartTheme().grid},border:{color:chartTheme().axis}}
       }
     }
   });
@@ -2435,7 +2514,7 @@ function xirrCell(pct){
   if(pct==null)return`<span class="muted sm" title="Needs cost basis + 30 days">—</span>`;
   const cls=pct>=0?'pos':'neg';
   const d=pct>999?'>999':pct<-99?'<-99':(pct>=0?'+':'')+pct.toFixed(1);
-  return`<span class="${cls}" title="Annualized return since added to tracker">${d}%<span style="color:#555;font-size:9px"> p.a.</span></span>`;
+  return`<span class="${cls}" title="Annualized return since added to tracker">${d}%<span style="color:var(--t-dim);font-size:9px"> p.a.</span></span>`;
 }
 
 function renderHoldings(){
@@ -2445,7 +2524,7 @@ function renderHoldings(){
 
   if(activeTab==='crypto'){
     const curSym = (CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
-    head.style.cssText=`display:grid;${COLS_TOK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;${COLS_TOK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);`;
     head.innerHTML=`<span></span><span>Token</span><span>Balance</span><span>Price (${curSym})</span><span>Value (${curSym})</span><span>24h</span>`;
 
     D.wallets.forEach(w=>{
@@ -2464,8 +2543,8 @@ function renderHoldings(){
       rows+=`<div class="w-grp">
         <span class="badge">EVM</span>
         <span>${addr}</span>
-        <span style="color:#888">${esc(w.label)}</span>
-        ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
+        <span style="color:var(--t-soft)">${esc(w.label)}</span>
+        ${w.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:var(--t-dim)"> scanning…</span>`:''}
         ${w._refreshErr?`<span style="color:#ff8800;font-size:10px;margin-left:4px">⚠ ${w._refreshErr}</span>`:''}
         <span class="w-total">${tot>0?fI(tot):(w.fetching?'':'—')}</span>
         <button class="btn btn-ghost" onclick="refreshWallet(${w.id})" style="margin-left:8px">↻</button>
@@ -2473,15 +2552,15 @@ function renderHoldings(){
       </div>`;
 
       if(w.fetching){
-        rows+=`<div class="trow" style="color:#555;font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Scanning EVM chains + Hyperliquid…</div>`;
+        rows+=`<div class="trow" style="color:var(--t-dim);font-size:11px;font-family:'JetBrains Mono',monospace;padding:16px 8px"><span class="spin-sm"></span> Scanning EVM chains + Hyperliquid…</div>`;
       }else if(!w.positions.length){
-        rows+=`<div class="trow" style="color:#888;font-size:12px;font-family:'JetBrains Mono',monospace;padding:14px 8px;display:flex;align-items:center;gap:12px">${
+        rows+=`<div class="trow" style="color:var(--t-soft);font-size:12px;font-family:'JetBrains Mono',monospace;padding:14px 8px;display:flex;align-items:center;gap:12px">${
           w._zerionError
             ? (w._zerionError.includes('not configured')
                 ? `⚠ Zerion API key not set. Visit <a href="/admin" target="_blank" style="color:#fff">/admin</a> to add your free key.`
                 : `⚠ ${w._zerionError}`)
             : 'No token positions found'
-        } <button class="btn btn-ghost" onclick="refreshWallet(${w.id})" style="font-size:10px;padding:2px 8px;color:#555;margin-left:4px">↺ Retry</button></div>`;
+        } <button class="btn btn-ghost" onclick="refreshWallet(${w.id})" style="font-size:10px;padding:2px 8px;color:var(--t-dim);margin-left:4px">↺ Retry</button></div>`;
       }else{
         visiblePositions.forEach(p=>{
           const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-IN',{maximumFractionDigits:6});
@@ -2516,7 +2595,7 @@ function renderHoldings(){
         });
         if(hideSmall && w.positions.length > visiblePositions.length){
           const hidden = w.positions.length - visiblePositions.length;
-          rows+=`<div class="trow" style="color:#555;font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px 8px">${hidden} position${hidden>1?'s':''} under $1 hidden</div>`;
+          rows+=`<div class="trow" style="color:var(--t-dim);font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px 8px">${hidden} position${hidden>1?'s':''} under $1 hidden</div>`;
         }
       }
     });
@@ -2543,15 +2622,15 @@ function renderHoldings(){
 
     // ── Manual crypto entries (CEX / cold storage) ─────────
     if((D.manualCrypto||[]).length){
-      rows+=`<div style="font-size:9px;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;text-transform:uppercase;padding:12px 8px 6px;border-top:1px solid #111;margin-top:4px">Manual Entries</div>`;
+      rows+=`<div style="font-size:9px;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;text-transform:uppercase;padding:12px 8px 6px;border-top:1px solid #111;margin-top:4px">Manual Entries</div>`;
       D.manualCrypto.forEach(a=>{
         const valUSD = (a.priceUSD||0)*a.qty;
         if(hideSmall && valUSD<1) return;
         const plUSD = a.invested>0 ? valUSD - a.invested : null;
         const plPct = a.invested>0 ? (plUSD/a.invested*100) : null;
         const plHtml = plUSD!=null
-          ? `<span class="${pc(plUSD)}">${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span></span>`
-          : `<span style="color:#555">—</span>`;
+          ? `<span class="${pc(plUSD)}">${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:var(--t-dim);font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span></span>`
+          : `<span style="color:var(--t-dim)">—</span>`;
         rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;">
           <div>
             <span class="an">${a.sym}</span>
@@ -2570,7 +2649,7 @@ function renderHoldings(){
       });
     }
 
-    if(!rows) rows=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
+    if(!rows) rows=`<div style="padding:40px 16px;color:var(--t-mid);font-size:13px;font-family:'JetBrains Mono',monospace;">No wallets added yet. Click + Add to connect a crypto wallet.</div>`;
 
   // Render SOL / XRP / ADA / TRX wallets
   const COIN_CHAIN={sol:'solana',trx:'tron',hl:'hyperliquid',xmr:'monero'};
@@ -2587,8 +2666,8 @@ function renderHoldings(){
       if(hideSmall && totUSD<1 && !a.fetching) return;
       rows+=`<div class="w-grp">
         <span class="badge">${badgeLabel}</span><span>${addr}</span>
-        <span style="color:#888">${esc(a.label||'')}</span>
-        ${a.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:#555"> scanning…</span>`:''}
+        <span style="color:var(--t-soft)">${esc(a.label||'')}</span>
+        ${a.fetching?`<span class="spin-sm" style="margin-left:4px"></span><span style="margin-left:6px;color:var(--t-dim)"> scanning…</span>`:''}
         <span class="w-total">${totUSD>0?fI(totUSD):'—'}</span>
         <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
         <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px">✕</button>
@@ -2597,7 +2676,7 @@ function renderHoldings(){
       const showPos = visPos.length ? visPos : (a.positions.length ? a.positions.slice(0,1) : []);
       showPos.forEach(p=>{
         const balFmt=p.balance<0.0001?p.balance.toExponential(2):p.balance.toLocaleString('en-US',{maximumFractionDigits:6});
-        const srcLabel = p.source==='hypercore-perp'?' <span style="font-size:9px;color:#555">(perp)</span>':p.source==='hyperevm-native'?' <span style="font-size:9px;color:#555">(EVM)</span>':'';
+        const srcLabel = p.source==='hypercore-perp'?' <span style="font-size:9px;color:var(--t-dim)">(perp)</span>':p.source==='hyperevm-native'?' <span style="font-size:9px;color:var(--t-dim)">(EVM)</span>':'';
         rows+=`<div class="trow" style="display:grid;${COLS_TOK};gap:8px;align-items:center;">
           <div class="tok-logo">${p.logo?`<img src="${p.logo}" onerror="this.style.display='none'">`:`${(p.symbol||'??').slice(0,2)}`}</div>
           <div><span class="an">${esc(p.symbol||'???')}</span>${chainPill(chainLabel)}${srcLabel}<div class="as">${esc(p.name||'Token')}</div></div>
@@ -2609,16 +2688,16 @@ function renderHoldings(){
       });
       if(hideSmall && a.positions.length>visPos.length){
         const h=a.positions.length-visPos.length;
-        rows+=`<div class="trow" style="color:#555;font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px">${h} token${h>1?'s':''} under $1 hidden</div>`;
+        rows+=`<div class="trow" style="color:var(--t-dim);font-size:10px;font-family:'JetBrains Mono',monospace;padding:8px">${h} token${h>1?'s':''} under $1 hidden</div>`;
       }
     } else {
       // TRX, XMR and other single-balance wallets
       const valUSD=a.priceUSD&&a.balance!=null?a.balance*a.priceUSD:null;
       if(hideSmall && valUSD!=null && valUSD<1) return;
-      const xmrNote = a.type==='xmr' ? `<span style="font-size:9px;color:#555;margin-left:6px">manual balance</span>` : '';
+      const xmrNote = a.type==='xmr' ? `<span style="font-size:9px;color:var(--t-dim);margin-left:6px">manual balance</span>` : '';
       rows+=`<div class="w-grp">
         <span class="badge">${sym}</span><span>${addr}</span>
-        <span style="color:#888">${esc(a.label||'')}</span>
+        <span style="color:var(--t-soft)">${esc(a.label||'')}</span>
         <span class="w-total">${valUSD?fI(valUSD):'—'}</span>
         <button class="btn btn-ghost" onclick="refreshOther(${a.id})" style="margin-left:8px">↻</button>
         <button class="btn btn-ghost" onclick="delOther(${a.id})" style="color:#ff4444;border-color:#2a0000;margin-left:2px">✕</button>
@@ -2638,10 +2717,10 @@ function renderHoldings(){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0; // 0=₹, 1=%, 2=XIRR(todo)
     const plLabel=['P&L ('+curSym+')','P&L (%)','XIRR'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);`;
     const srtI=window._stockSort||{col:null,dir:1};
     const shI=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtI.col===col&&srtI.tab==='indian'?'#fff':'#444'}" onclick="toggleStockSort('${col}','indian')">${lbl}${srtI.col===col&&srtI.tab==='indian'?(srtI.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle P&L view">${plLabel} ↻</span><span></span>`;
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shI('invested','Invested')}${shI('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:var(--t-soft);border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%2;renderHoldings()" title="Click to cycle P&L view">${plLabel} ↻</span><span></span>`;
     // Apply sort
     let indArr=[...D.indian];
     const ss=window._stockSort;
@@ -2658,8 +2737,8 @@ function renderHoldings(){
       const valUSD = valINR != null ? valINR / (liveRates.inr || USD_INR) : null;
       const investedINR = a.avgCost > 0 ? a.avgCost * a.qty : null;
       const investedDisp = investedINR
-        ? `<span style="color:#888">${inrToDisp(investedINR)}</span>`
-        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'indian')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
+        ? `<span style="color:var(--t-soft)">${inrToDisp(investedINR)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'indian')" title="Click to set invested amount" style="color:var(--t-low);border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasAvgCost = a.avgCost > 0;
       const plINR = (hasAvgCost && valINR != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct  = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
@@ -2672,19 +2751,19 @@ function renderHoldings(){
       } else if(plMode===2){
         plHtml = xirrCell(holdingXirr(investedINR, valINR, a.id));
       } else {
-        const plDisp = plINR!=null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
+        const plDisp = plINR!=null ? `${plINR>=0?'+':''}${inrToDisp(Math.abs(plINR))} <span style="color:var(--t-dim);font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .6fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:var(--t-soft)">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plINR!=null&&plSane?pc(plINR):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'indian')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIndian(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='intl'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['P&L ('+curSym+')','P&L (%)','XIRR'][plMode]||'P&L';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);`;
     const srtX=window._stockSort||{col:null,dir:1};
     const shX=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtX.col===col&&srtX.tab==='intl'?'#fff':'#444'}" onclick="toggleStockSort('${col}','intl')">${lbl}${srtX.col===col&&srtX.tab==='intl'?(srtX.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
+    head.innerHTML=`<span>Stock</span><span>Exch</span><span>Qty</span>${shX('invested','Invested')}${shX('value','Cur. Value')}<span>24h</span><span style="cursor:pointer;color:var(--t-soft);border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
     let intlArr=[...D.intl];
     const ssx=window._stockSort;
     if(ssx&&ssx.col&&ssx.tab==='intl'){
@@ -2699,8 +2778,8 @@ function renderHoldings(){
       const valUSD = a.price && a.qty ? a.qty * a.price : null;
       const investedUSD = a.avgCost > 0 ? a.avgCost * a.qty : null;
       const investedDisp = investedUSD
-        ? `<span style="color:#888">${fI(investedUSD)}</span>`
-        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'intl')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
+        ? `<span style="color:var(--t-soft)">${fI(investedUSD)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'intl')" title="Click to set invested amount" style="color:var(--t-low);border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasAvgCost = a.avgCost > 0;
       const plUSD = (hasAvgCost && valUSD != null) ? a.qty * (a.price - a.avgCost) : null;
       const plPct = (hasAvgCost && a.price) ? ((a.price - a.avgCost) / a.avgCost * 100) : null;
@@ -2713,19 +2792,19 @@ function renderHoldings(){
       } else if(plMode===2){
         plHtml = xirrCell(holdingXirr(investedUSD, valUSD, a.id));
       } else {
-        const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
+        const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:var(--t-dim);font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .5fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${a.symbol}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${a._err}</span>`:a.name}</div></div><span class="badge" style="font-size:9px">${a.exchange}</span><span class="mv">${a.qty}</span><span class="mv" style="color:var(--t-soft)">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null&&plSane?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'intl')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delIntl(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
   }else if(activeTab==='mf'){
     const curSym=(CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR).sym;
     const plMode=window._plMode||0;
     const plLabel=['Gain/Loss ('+curSym+')','Gain/Loss (%)','XIRR'][plMode]||'Gain/Loss';
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);`;
     const srtMF=window._stockSort||{col:null,dir:1};
     const shMF=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${srtMF.col===col&&srtMF.tab==='mf'?'#fff':'#444'}" onclick="toggleStockSort('${col}','mf')">${lbl}${srtMF.col===col&&srtMF.tab==='mf'?(srtMF.dir===-1?' ↓':' ↑'):''}</span>`;
-    head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:#888;border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
+    head.innerHTML=`<span>Fund</span><span>Units</span><span>NAV (₹)</span>${shMF('invested','Invested')}${shMF('value','Cur. Value')}<span>1d</span><span style="cursor:pointer;color:var(--t-soft);border-bottom:1px dashed #333" onclick="window._plMode=((window._plMode||0)+1)%3;renderHoldings()" title="₹ → % → XIRR">${plLabel} ↻</span><span></span>`;
     let mfArr=[...D.mf];
     const ssMF=window._stockSort;
     if(ssMF&&ssMF.col&&ssMF.tab==='mf'){
@@ -2741,8 +2820,8 @@ function renderHoldings(){
       const investedINR = a.navBought > 0 ? a.navBought * a.units : null;
       const investedUSD = investedINR ? investedINR / (liveRates.inr||USD_INR) : null;
       const investedDisp = investedUSD
-        ? `<span style="color:#888">${fI(investedUSD)}</span>`
-        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'mf')" title="Click to set invested amount" style="color:#333;border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
+        ? `<span style="color:var(--t-soft)">${fI(investedUSD)}</span>`
+        : `<span class="inline-cost-input" onclick="inlineSetCost(event,${a.id},'mf')" title="Click to set invested amount" style="color:var(--t-low);border-bottom:1px dashed #333;cursor:pointer;font-size:11px">+ add cost</span>`;
       const hasNavBought = a.navBought > 0;
       const plINR = (hasNavBought && a.nav) ? a.units * (a.nav - a.navBought) : null;
       const plUSD = plINR != null ? plINR / (liveRates.inr || USD_INR) : null;
@@ -2754,15 +2833,15 @@ function renderHoldings(){
         const invUSD=a.navBought>0?a.navBought*a.units/(liveRates.inr||USD_INR):null;
         plHtml = xirrCell(holdingXirr(invUSD, valUSD, a.id));
       } else {
-        const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:#555;font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
+        const plDisp = plUSD!=null ? `${plUSD>=0?'+':''}${fI(Math.abs(plUSD))} <span style="color:var(--t-dim);font-size:10px">(${plPct>=0?'+':''}${plPct.toFixed(1)}%)</span>` : null;
         plHtml = plDisp ?? lc();
       }
-      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${esc(a.name)}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${esc(a._err)}</span>`:`AMFI ${esc(a.code)}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:#888">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
+      rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .7fr .9fr .9fr .8fr 1fr auto;gap:8px;align-items:center;"><div><span class="an">${esc(a.name)}</span><div class="as">${a._err?`<span style="color:#ff8800;font-size:10px">⚠ ${esc(a._err)}</span>`:`AMFI ${esc(a.code)}`}</div></div><span class="mv">${a.units.toFixed(3)}</span><span class="mv">${a.nav?'₹'+a.nav.toFixed(2):lc()}</span><span class="mv" style="color:var(--t-soft)">${investedDisp}</span><span class="mv">${valUSD!=null?fI(valUSD):lc()}</span><span class="mv sm ${pc(a.ch24)}">${fP(a.ch24)}</span><span class="mv sm ${plUSD!=null?pc(plUSD):''}">${plHtml}</span><span style="display:flex;gap:4px"><button class="btn btn-ghost" onclick="editPosition(${a.id},'mf')" style="padding:2px 6px;font-size:11px" title="Edit">✎</button><button class="btn btn-ghost" onclick="delMF(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button></span></div>`;
     });
 
   }else if(activeTab==='banks'){
     const COLS_BNK='grid-template-columns:2fr 1fr 1fr 1fr 28px 28px';
-    head.style.cssText=`display:grid;${COLS_BNK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a;`;
+    head.style.cssText=`display:grid;${COLS_BNK};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);`;
     head.innerHTML='<span>Account</span><span>Type</span><span>Balance</span><span>Last Updated</span><span></span><span></span>';
 
     // Staleness nudge banner
@@ -2772,12 +2851,12 @@ function renderHoldings(){
       const count=staleAccounts.length+neverUpdated.length;
       rows+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 8px;background:#0d0800;border-bottom:1px solid #2a1a00;font-size:11px;font-family:'JetBrains Mono',monospace;">
         <span style="color:var(--amber)">⚠ ${count} account${count>1?'s':''} need${count===1?'s':''} balance update</span>
-        <span style="color:#555;font-size:10px">Click ✎ on each row to update</span>
+        <span style="color:var(--t-dim);font-size:10px">Click ✎ on each row to update</span>
       </div>`;
     }
 
     if(!D.banks.length){
-      rows+=`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No accounts added yet. Click + Add to add a bank account, FD, or PPF.</div>`;
+      rows+=`<div style="padding:40px 16px;color:var(--t-mid);font-size:13px;font-family:'JetBrains Mono',monospace;">No accounts added yet. Click + Add to add a bank account, FD, or PPF.</div>`;
     }else{
       D.banks.forEach(a=>{
         const age=a.updatedAt?Date.now()-a.updatedAt:null;
@@ -2787,7 +2866,7 @@ function renderHoldings(){
           <div><span class="an">${esc(a.name)}</span><div class="as">${esc(a.bank||'')}</div></div>
           <span class="badge" style="font-size:9px">${bankTypeLabel(a.type)}</span>
           <span class="mv">${a.balance!=null?fI(a.balance/(liveRates.inr||USD_INR)):lc()}</span>
-          <span class="mv" style="font-size:10px;${isStale?'color:var(--amber)':'color:#555'}">${ageStr}</span>
+          <span class="mv" style="font-size:10px;${isStale?'color:var(--amber)':'color:var(--t-dim)'}">${ageStr}</span>
           <button class="btn btn-ghost" onclick="editBank(${a.id})" style="padding:2px 6px;font-size:11px" title="Update balance">✎</button>
           <button class="btn btn-ghost" onclick="delBank(${a.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px" title="Remove">✕</button>
         </div>`;
@@ -2795,13 +2874,13 @@ function renderHoldings(){
     }
   }else if(activeTab==='bonds'){
     const BOND_TYPES = { govt:'Govt Bond', corporate:'Corp Bond', fd:'Fixed Deposit', ppf:'PPF', sgb:'Sovereign Gold Bond', nsc:'NSC', epf:'EPF', nps:'NPS', other:'Other' };
-    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2)`;
     head.innerHTML=`<span>Bond / Instrument</span><span>Type</span><span>Invested</span><span>Cur. Value</span><span>Rate</span><span>Maturity</span><span></span>`;
     if(!D.bonds?.length){
       rows+=`<div style="padding:40px 16px;text-align:center">
         <div style="font-size:32px;margin-bottom:12px">🏦</div>
         <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Track your bonds & fixed income</div>
-        <div style="color:#555;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
+        <div style="color:var(--t-dim);font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
           PPF · Fixed Deposits · Govt Bonds · Corporate Bonds<br>
           Sovereign Gold Bonds · NSC · EPF · NPS
         </div>
@@ -2828,10 +2907,10 @@ function renderHoldings(){
         rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr .8fr 1fr auto;gap:8px;align-items:center">
           <div><span class="an">${esc(b.name)}</span><div class="as">${subLine}</div></div>
           <span class="badge" style="font-size:9px;color:#fcd34d;border-color:#4a3a00;background:#1a1000">${BOND_TYPES[b.type]||b.type}</span>
-          <span class="mv" style="color:#888">${fI(investedUSD)}</span>
+          <span class="mv" style="color:var(--t-soft)">${fI(investedUSD)}</span>
           <span class="mv">${fI(valueUSD)}</span>
-          <span class="mv" style="${isNPS?'color:#555':'color:#4ade80'}">${rate}</span>
-          <span class="mv" style="font-size:10px;color:#555">${maturity}</span>
+          <span class="mv" style="${isNPS?'color:var(--t-dim)':'color:#4ade80'}">${rate}</span>
+          <span class="mv" style="font-size:10px;color:var(--t-dim)">${maturity}</span>
           <span style="display:flex;gap:4px">
             <button class="btn btn-ghost" onclick="editBond(${b.id})" style="padding:2px 6px;font-size:11px">✎</button>
             <button class="btn btn-ghost" onclick="delBond(${b.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
@@ -2840,13 +2919,13 @@ function renderHoldings(){
       });
     }
   }else if(activeTab==='ulip'){
-    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-family:'JetBrains Mono',monospace;border-bottom:1px solid #1a1a1a`;
+    head.style.cssText=`display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2)`;
     head.innerHTML=`<span>Plan</span><span>Premium Paid</span><span>Cur. Value</span><span>P&L</span><span>Last Updated</span><span></span>`;
     if(!D.ulip?.length){
       rows+=`<div style="padding:40px 16px;text-align:center">
         <div style="font-size:32px;margin-bottom:12px">🛡️</div>
         <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Track your ULIP plans</div>
-        <div style="color:#555;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
+        <div style="color:var(--t-dim);font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
           Unit Linked Insurance Plans aren't on mfapi.in (insurer-declared NAV)<br>
           Enter fund value manually from your policy statement
         </div>
@@ -2874,10 +2953,10 @@ function renderHoldings(){
         const ageStr = age==null ? 'never updated' : ageLbl(age);
         rows+=`<div class="trow" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center">
           <div><span class="an">${esc(u.name)}</span><div class="as">${sub}</div></div>
-          <span class="mv" style="color:#888">${fI(investedUSD)}</span>
+          <span class="mv" style="color:var(--t-soft)">${fI(investedUSD)}</span>
           <span class="mv">${fI(valueUSD)}</span>
-          <span class="mv sm ${pc(pnlUSD)}">${pnlUSD>=0?'+':''}${fI(Math.abs(pnlUSD))} <span style="color:#555;font-size:10px">(${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%)</span></span>
-          <span class="mv" style="font-size:10px;${isStale?'color:#fbbf24':'color:#555'}" title="${isStale?'ULIP value may be out of date — update from your policy statement':'Recently updated'}">${isStale?'⚠ ':''}${ageStr}</span>
+          <span class="mv sm ${pc(pnlUSD)}">${pnlUSD>=0?'+':''}${fI(Math.abs(pnlUSD))} <span style="color:var(--t-dim);font-size:10px">(${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}%)</span></span>
+          <span class="mv" style="font-size:10px;${isStale?'color:#fbbf24':'color:var(--t-dim)'}" title="${isStale?'ULIP value may be out of date — update from your policy statement':'Recently updated'}">${isStale?'⚠ ':''}${ageStr}</span>
           <span style="display:flex;gap:4px">
             <button class="btn btn-ghost" onclick="editUlip(${u.id})" style="padding:2px 6px;font-size:11px" title="Update value">✎</button>
             <button class="btn btn-ghost" onclick="delUlip(${u.id})" style="color:#ff4444;border-color:#2a0000;padding:2px 6px;font-size:11px">✕</button>
@@ -2886,7 +2965,7 @@ function renderHoldings(){
       });
     }
   }
-  list.innerHTML=rows||`<div style="padding:40px 16px;color:#666;font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
+  list.innerHTML=rows||`<div style="padding:40px 16px;color:var(--t-mid);font-size:13px;font-family:'JetBrains Mono',monospace;">No holdings in this category yet. Click + Add to get started.</div>`;
 }
 
 // ── NPS form helpers ───────────────────────────────────────
@@ -2950,17 +3029,17 @@ function editBond(id){
   const inner=document.createElement('div');
   inner.style.cssText='background:#0a0a0a;border:1px solid #222;padding:28px;width:480px;max-width:95vw;border-radius:8px';
   inner.innerHTML=[
-    `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit Bond</div>`,
+    `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--t-dim);margin-bottom:4px;text-transform:uppercase">Edit Bond</div>`,
     `<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:20px">${b.name}</div>`,
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Amount Invested (₹)</div><input type="number" id="eb-invested" value="${b.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Current Value (₹)</div><input type="number" id="eb-value" value="${b.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Interest Rate (% p.a.)</div><input type="number" id="eb-rate" value="${b.rate||''}" step="0.01" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Maturity Date</div><input type="date" id="eb-maturity" value="${b.maturity||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Amount Invested (₹)</div><input type="number" id="eb-invested" value="${b.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Current Value (₹)</div><input type="number" id="eb-value" value="${b.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Interest Rate (% p.a.)</div><input type="number" id="eb-rate" value="${b.rate||''}" step="0.01" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Maturity Date</div><input type="date" id="eb-maturity" value="${b.maturity||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     `</div>`,
     `<div style="display:flex;gap:8px;margin-top:4px">`,
     `<button id="eb-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;border-radius:6px">Save</button>`,
-    `<button id="eb-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
+    `<button id="eb-cancel" style="padding:11px 20px;background:transparent;color:var(--t-dim);border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
     `</div>`
   ].join('');
   modal.appendChild(inner);
@@ -3013,24 +3092,24 @@ function editUlip(id){
     ? `<div style="grid-column:span 2;background:#0a1a0a;border:1px solid #1a3a1a;border-radius:6px;padding:12px;margin-bottom:4px">
          <div style="font-size:10px;color:#4ade80;text-transform:uppercase;margin-bottom:8px">📈 Update NAV only — value recalculates</div>
          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-           <div><div style="font-size:10px;color:#555;margin-bottom:6px">Units Held</div><input type="number" id="eu-units" value="${u.units}" step="any" oninput="euNavCalc()" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>
+           <div><div style="font-size:10px;color:var(--t-dim);margin-bottom:6px">Units Held</div><input type="number" id="eu-units" value="${u.units}" step="any" oninput="euNavCalc()" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>
            <div><div style="font-size:10px;color:#4ade80;margin-bottom:6px">Current NAV (₹)</div><input type="number" id="eu-nav" value="${u.nav||''}" step="any" oninput="euNavCalc()" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #2a4a2a;color:#fff;font-family:monospace;box-sizing:border-box"></div>
          </div>
          <div id="eu-navcalc" style="font-size:11px;font-family:monospace;color:#4ade80;margin-top:8px"></div>
        </div>`
-    : `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Current Fund Value (₹)</div><input type="number" id="eu-value" value="${u.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`;
+    : `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Current Fund Value (₹)</div><input type="number" id="eu-value" value="${u.value||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`;
   inner.innerHTML=[
-    `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit ULIP</div>`,
+    `<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--t-dim);margin-bottom:4px;text-transform:uppercase">Edit ULIP</div>`,
     `<div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:20px">${esc(u.name)}</div>`,
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
     valueField,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Premium Paid (₹)</div><input type="number" id="eu-invested" value="${u.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Policy Term</div><input type="text" id="eu-term" value="${esc(u.term||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Insurer</div><input type="text" id="eu-insurer" value="${esc(u.insurer||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Premium Paid (₹)</div><input type="number" id="eu-invested" value="${u.invested||''}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Policy Term</div><input type="text" id="eu-term" value="${esc(u.term||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Insurer</div><input type="text" id="eu-insurer" value="${esc(u.insurer||'')}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     `</div>`,
     `<div style="display:flex;gap:8px;margin-top:4px">`,
     `<button id="eu-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;border-radius:6px">Save</button>`,
-    `<button id="eu-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
+    `<button id="eu-cancel" style="padding:11px 20px;background:transparent;color:var(--t-dim);border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
     `</div>`
   ].join('');
   modal.appendChild(inner);
@@ -3117,7 +3196,7 @@ function editBank(id){
   const row=document.getElementById('bank-row-'+id); if(!row) return;
   row.innerHTML=`
     <div style="display:grid;grid-template-columns:2fr 1fr 28px;gap:8px;align-items:center;padding:8px;">
-      <div style="font-size:12px;font-weight:600">${esc(a.name)} <span style="font-size:10px;color:#555;font-weight:400">${bankTypeLabel(a.type)}</span></div>
+      <div style="font-size:12px;font-weight:600">${esc(a.name)} <span style="font-size:10px;color:var(--t-dim);font-weight:400">${bankTypeLabel(a.type)}</span></div>
       <input type="number" id="edit-bal-${id}" value="${a.balance||''}" placeholder="Current balance (₹)" style="font-size:12px;padding:6px 10px;background:#000;border:1px solid #fff;color:#fff;font-family:'JetBrains Mono',monospace;width:100%" step="1" onkeydown="if(event.key==='Enter')saveBank(${id})">
       <div style="display:flex;gap:4px">
         <button class="btn btn-ghost" onclick="saveBank(${id})" style="padding:3px 8px;font-size:10px;color:#00e676;border-color:#1a3a2a">✓</button>
@@ -3225,19 +3304,19 @@ function editPosition(id, type){
   const inner = document.createElement('div');
   inner.style.cssText = 'background:#0a0a0a;border:1px solid #222;padding:28px;width:460px;max-width:95vw';
   inner.innerHTML = [
-    '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#555;margin-bottom:4px;text-transform:uppercase">Edit Position</div>',
+    '<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--t-dim);margin-bottom:4px;text-transform:uppercase">Edit Position</div>',
     `<div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:20px">${sym}</div>`,
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">',
-      `<div><div style="font-size:10px;letter-spacing:.06em;color:#555;font-weight:700;text-transform:uppercase;margin-bottom:6px">${qtyLabel}</div>`,
+      `<div><div style="font-size:10px;letter-spacing:.06em;color:var(--t-dim);font-weight:700;text-transform:uppercase;margin-bottom:6px">${qtyLabel}</div>`,
       `<input type="number" id="ep-qty" value="${curQty}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-      `<div><div style="font-size:10px;letter-spacing:.06em;color:#555;font-weight:700;text-transform:uppercase;margin-bottom:6px">Total Invested (${cur})</div>`,
+      `<div><div style="font-size:10px;letter-spacing:.06em;color:var(--t-dim);font-weight:700;text-transform:uppercase;margin-bottom:6px">Total Invested (${cur})</div>`,
       `<input type="number" id="ep-invested" value="${curInvested}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     '</div>',
-    '<div style="font-size:11px;color:#555;margin-bottom:8px">Add shares: increase qty + add to total invested. Reduce: decrease qty + reduce total.</div>',
+    '<div style="font-size:11px;color:var(--t-dim);margin-bottom:8px">Add shares: increase qty + add to total invested. Reduce: decrease qty + reduce total.</div>',
     '<div id="ep-preview" style="font-size:11px;color:#00e676;margin-bottom:16px;min-height:16px"></div>',
     '<div style="display:flex;gap:8px">',
       `<button id="ep-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer;text-transform:uppercase">Save Changes</button>`,
-      '<button id="ep-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;text-transform:uppercase">Cancel</button>',
+      '<button id="ep-cancel" style="padding:11px 20px;background:transparent;color:var(--t-dim);border:1px solid #222;font-size:11px;cursor:pointer;text-transform:uppercase">Cancel</button>',
     '</div>'
   ].join('');
 
@@ -3347,7 +3426,7 @@ function renderAddForm(){
         ⬡ Add Wallet
       </button>
       <button id="mode-manual" onclick="setCryptoAddMode('manual')"
-        style="padding:9px 20px;font-size:11px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:#555">
+        style="padding:9px 20px;font-size:11px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:var(--t-dim)">
         ✎ Manual Entry
       </button>
     </div>
@@ -3364,7 +3443,7 @@ function renderAddForm(){
             <option value="trx">TRON (TRX)</option>
             <option value="xmr">Monero (XMR)</option>
           </select>
-          <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:#555;overflow:hidden;white-space:nowrap;width:200px">
+          <div id="chain-info" style="margin-top:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim);overflow:hidden;white-space:nowrap;width:200px">
             <span id="chain-marquee" style="display:inline-block;animation:marquee 18s linear infinite">
               Ethereum &nbsp;·&nbsp; Arbitrum &nbsp;·&nbsp; Base &nbsp;·&nbsp; BNB Chain &nbsp;·&nbsp; Polygon &nbsp;·&nbsp; Optimism &nbsp;·&nbsp; Avalanche &nbsp;·&nbsp; Fantom &nbsp;·&nbsp; zkSync &nbsp;·&nbsp; Linea &nbsp;·&nbsp; Hyperliquid &nbsp;·&nbsp; Polymarket &nbsp;·&nbsp; Blast &nbsp;·&nbsp; Scroll &nbsp;&nbsp;&nbsp;&nbsp;
             </span>
@@ -3379,7 +3458,7 @@ function renderAddForm(){
     </div>
 
     <div id="crypto-manual-form" style="display:none">
-      <p class="add-panel-title" style="margin-top:0">Manual Crypto Entry <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· for CEX, cold storage, or any token</span></p>
+      <p class="add-panel-title" style="margin-top:0">Manual Crypto Entry <span style="font-weight:400;color:var(--t-dim);font-size:11px;text-transform:none;letter-spacing:0">· for CEX, cold storage, or any token</span></p>
       <div class="fg fg4" style="margin-bottom:12px">
         <div>
           <label>Token Symbol</label>
@@ -3397,7 +3476,7 @@ function renderAddForm(){
           </datalist>
         </div>
         <div><label>Quantity</label><input type="number" id="f-mcqty" placeholder="0" step="any" oninput="calcManualCryptoVal()"></div>
-        <div><label>Total Invested ($) <span style="color:#555;font-size:9px">optional</span></label><input type="number" id="f-mcinvested" placeholder="e.g. 5000" step="any"></div>
+        <div><label>Total Invested ($) <span style="color:var(--t-dim);font-size:9px">optional</span></label><input type="number" id="f-mcinvested" placeholder="e.g. 5000" step="any"></div>
       </div>
       <div id="mc-preview" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#00e676;margin-bottom:12px;min-height:16px"></div>
       <div id="fetch-st-mc" class="fetch-st" style="margin-bottom:8px"></div>
@@ -3446,7 +3525,7 @@ function renderAddForm(){
     };
     const m = MKT[activeCurrency] || MKT.INR;
     const exchOptions = m.exchanges.map(e=>`<option>${e}</option>`).join('');
-    h=`<p class="add-panel-title">Add ${m.title} <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· ${m.note}</span></p>
+    h=`<p class="add-panel-title">Add ${m.title} <span style="font-weight:400;color:var(--t-dim);font-size:11px;text-transform:none;letter-spacing:0">· ${m.note}</span></p>
     <div class="fg fg4">
       <div><label>${m.label}</label>
         <div class="ac-wrap">
@@ -3456,14 +3535,14 @@ function renderAddForm(){
       </div>
       <div><label>Exchange</label><select id="f-ex">${exchOptions}</select></div>
       <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="any" oninput="calcAvgCost('indian')"></div>
-      <div><label>Total Invested (${cur}) <span style="color:#555;font-size:9px;font-weight:400">total amount paid</span></label><input type="number" id="f-invested" placeholder="e.g. 48000" step="any" oninput="calcAvgCost('indian')"></div>
+      <div><label>Total Invested (${cur}) <span style="color:var(--t-dim);font-size:9px;font-weight:400">total amount paid</span></label><input type="number" id="f-invested" placeholder="e.g. 48000" step="any" oninput="calcAvgCost('indian')"></div>
     </div>
-    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;margin-bottom:12px" id="avg-cost-display"></div>
-    <div class="info-box" style="font-size:11px;color:#888;margin-bottom:12px;">Examples: ${m.hint}</div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-mid);margin-bottom:12px" id="avg-cost-display"></div>
+    <div class="info-box" style="font-size:11px;color:var(--t-soft);margin-bottom:12px;">Examples: ${m.hint}</div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddStock()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
     setTimeout(()=>setupAutocomplete('f-sym','ac-indian','indian'),50);
   }else if(activeTab==='intl'){
-    h=`<p class="add-panel-title">Add Global Stock / ETF <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· USD via yfinance</span></p>
+    h=`<p class="add-panel-title">Add Global Stock / ETF <span style="font-weight:400;color:var(--t-dim);font-size:11px;text-transform:none;letter-spacing:0">· USD via yfinance</span></p>
     <div class="fg fg4">
       <div><label>Ticker</label>
         <div class="ac-wrap">
@@ -3479,14 +3558,14 @@ function renderAddForm(){
         </select>
       </div>
       <div><label>Quantity</label><input type="number" id="f-qty" placeholder="0" step="any" oninput="calcAvgCost('intl')"></div>
-      <div><label>Total Invested ($) <span style="color:#555;font-size:9px;font-weight:400">total paid</span></label><input type="number" id="f-invested" placeholder="e.g. 1500" step="any" oninput="calcAvgCost('intl')"></div>
+      <div><label>Total Invested ($) <span style="color:var(--t-dim);font-size:9px;font-weight:400">total paid</span></label><input type="number" id="f-invested" placeholder="e.g. 1500" step="any" oninput="calcAvgCost('intl')"></div>
     </div>
-    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#666;margin-bottom:8px" id="avg-cost-display"></div>
-    <div class="info-box" style="font-size:11px;color:#888;margin-bottom:12px">
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-mid);margin-bottom:8px" id="avg-cost-display"></div>
+    <div class="info-box" style="font-size:11px;color:var(--t-soft);margin-bottom:12px">
       <strong style="color:#aaa">World Indices/ETFs:</strong>
-      <span style="color:#555"> SPY (S&P500) · QQQ (NASDAQ) · VTI (Total US) · IWDA (World) · EWA (Australia) · EWS (Singapore) · EWU (UK) · EWJ (Japan) · EEM (Emerging)</span><br>
+      <span style="color:var(--t-dim)"> SPY (S&P500) · QQQ (NASDAQ) · VTI (Total US) · IWDA (World) · EWA (Australia) · EWS (Singapore) · EWU (UK) · EWJ (Japan) · EEM (Emerging)</span><br>
       <strong style="color:#aaa">Stocks:</strong>
-      <span style="color:#555"> AAPL · MSFT · GOOGL · NVDA · TSLA · META · AMZN · BRK-B · TSM · ASML</span>
+      <span style="color:var(--t-dim)"> AAPL · MSFT · GOOGL · NVDA · TSLA · META · AMZN · BRK-B · TSM · ASML</span>
     </div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddIntl()">Add Stock</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
     setTimeout(()=>setupAutocomplete('f-sym','ac-intl','intl'),50);
@@ -3511,14 +3590,14 @@ function renderAddForm(){
         <button class="btn" onclick="toggleAdd()">Cancel</button>
       </div>`;
     } else {
-      h=`<p class="add-panel-title">Add Mutual Fund <span style="font-weight:400;color:#555;font-size:11px;text-transform:none;letter-spacing:0">· NAV from MFApi.in</span></p>
+      h=`<p class="add-panel-title">Add Mutual Fund <span style="font-weight:400;color:var(--t-dim);font-size:11px;text-transform:none;letter-spacing:0">· NAV from MFApi.in</span></p>
     <div style="margin-bottom:16px">
       <div class="ac-wrap">
         <input type="text" id="f-fn" placeholder="Search mutual fund…" autocomplete="off"
           style="width:100%;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
         <div class="ac-drop" id="ac-mf"></div>
       </div>
-      <div style="font-size:10px;color:#444;font-family:'JetBrains Mono',monospace;margin-top:6px">
+      <div style="font-size:10px;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;margin-top:6px">
         💡 Direct Growth plans shown first — best for long-term investing
       </div>
       <div id="mf-selected" style="display:none;margin-top:8px;padding:10px 14px;background:#0a0a0a;border:1px solid #1a3a1a">
@@ -3529,17 +3608,17 @@ function renderAddForm(){
     <input type="hidden" id="f-code">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">
       <div>
-        <label style="font-size:10px;letter-spacing:.06em;color:#555;font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Units Held</label>
+        <label style="font-size:10px;letter-spacing:.06em;color:var(--t-dim);font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Units Held</label>
         <input type="number" id="f-units" placeholder="e.g. 584.481" step="any" oninput="calcMFAvg()"
           style="width:100%;margin-top:6px;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:10px;letter-spacing:.06em;color:#555;font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Total Invested (₹)</label>
+        <label style="font-size:10px;letter-spacing:.06em;color:var(--t-dim);font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase">Total Invested (₹)</label>
         <input type="number" id="f-pnav" placeholder="e.g. 50000" step="any" oninput="calcMFAvg()"
           style="width:100%;margin-top:6px;font-size:14px;padding:12px 14px;background:#0a0a0a;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;box-sizing:border-box">
       </div>
     </div>
-    <div id="mf-avg-display" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;margin-bottom:12px;min-height:16px"></div>
+    <div id="mf-avg-display" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t-dim);margin-bottom:12px;min-height:16px"></div>
     <div id="fetch-st" class="fetch-st" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddMF()">Add Fund</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
       setTimeout(()=>setupMFAutocomplete(),50);
@@ -3563,7 +3642,7 @@ function renderAddForm(){
       </div>
       <div><label>Current Balance (₹)</label><input type="number" id="f-bbal" placeholder="0" step="1" min="0"></div>
     </div>
-    <div class="info-box" style="font-size:11px;color:#555;margin-bottom:12px;">
+    <div class="info-box" style="font-size:11px;color:var(--t-dim);margin-bottom:12px;">
       Balance is entered manually. A <span style="color:var(--amber)">⚠ nudge</span> appears after 7 days reminding you to update it. Click ✎ on any row to update the balance at any time.
     </div>
     <div style="display:flex;gap:8px;"><button class="btn btn-p" onclick="doAddBank()">Add Account</button><button class="btn" onclick="toggleAdd()">Cancel</button></div>`;
@@ -3613,7 +3692,7 @@ function renderAddForm(){
           </select>
         </div>
       </div>
-      <div style="font-size:10px;color:#555;margin-bottom:8px;font-family:'JetBrains Mono',monospace">FUND ALLOCATION (E + C + G should total 100)</div>
+      <div style="font-size:10px;color:var(--t-dim);margin-bottom:8px;font-family:'JetBrains Mono',monospace">FUND ALLOCATION (E + C + G should total 100)</div>
       <div class="fg fg3" style="margin-bottom:8px">
         <div>
           <label style="display:flex;align-items:center;gap:6px">
@@ -3637,7 +3716,7 @@ function renderAddForm(){
           <input type="number" id="f-npsg" placeholder="e.g. 10" min="0" max="100" step="1" oninput="npsAllocCheck()">
         </div>
       </div>
-      <div id="nps-alloc-status" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555;margin-bottom:4px"></div>
+      <div id="nps-alloc-status" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t-dim);margin-bottom:4px"></div>
       <div style="margin-top:8px">
         <label>PRAN Number (optional)</label>
         <input type="text" id="f-npspran" placeholder="e.g. 110012345678" maxlength="12" style="font-family:'JetBrains Mono',monospace">
@@ -3673,7 +3752,7 @@ function renderAddForm(){
     </div>
     <div id="ulip-calc-hint" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#4ade80;margin-bottom:8px;min-height:14px"></div>
     <div class="fg fg3" style="margin-bottom:12px">
-      <div><label>Current Fund Value (₹) <span style="color:#555;font-size:9px">— auto if units × NAV given</span></label><input type="number" id="f-ulipvalue" placeholder="e.g. 112000" step="1" min="0"></div>
+      <div><label>Current Fund Value (₹) <span style="color:var(--t-dim);font-size:9px">— auto if units × NAV given</span></label><input type="number" id="f-ulipvalue" placeholder="e.g. 112000" step="1" min="0"></div>
       <div style="grid-column:span 2"><label>Notes (optional)</label><input type="text" id="f-ulipnotes" placeholder="e.g. Discovery Fund, equity mandate"></div>
     </div>
     <div class="info-box info-ok" style="font-size:11px;margin-bottom:12px">✓ Enter <b>Units + NAV</b> and the value is calculated for you — then each month you only update the NAV from your policy portal. Or leave them blank and enter the fund value directly. ULIP NAVs aren't on any public feed, so this stays manual.</div>
@@ -3721,7 +3800,7 @@ async function doAddWallet(){
   }
 
   const btn=document.getElementById('add-btn');
-  btn.disabled=true; btn.textContent='⟳ Fetching…';
+  btn.disabled=true; btn.classList.add('spinning'); setRefreshLabel(btn,'Fetching');
 
   const COIN_LABELS={sol:'Solana',trx:'TRON',hl:'Hyperliquid',xmr:'Monero'};
   const COIN_FETCH={sol:fetchSOL, trx:fetchTRX, hl:fetchHL, xmr:fetchXMR};
@@ -3972,11 +4051,11 @@ function switchAuthTab(mode){
   authMode = mode;
   const isSignup = mode === 'signup';
   document.getElementById('tab-signin').style.cssText = isSignup
-    ? 'flex:1;padding:8px;background:transparent;color:#555;border:none;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;'
+    ? 'flex:1;padding:8px;background:transparent;color:var(--t-dim);border:none;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;'
     : 'flex:1;padding:8px;background:#fff;color:#000;border:none;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;';
   document.getElementById('tab-signup').style.cssText = isSignup
     ? 'flex:1;padding:8px;background:#fff;color:#000;border:none;border-left:1px solid #222;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;'
-    : 'flex:1;padding:8px;background:transparent;color:#555;border:none;border-left:1px solid #222;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;';
+    : 'flex:1;padding:8px;background:transparent;color:var(--t-dim);border:none;border-left:1px solid #222;font-family:\'Syne\',sans-serif;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;';
   document.getElementById('li-name-field').style.display = isSignup ? 'block' : 'none';
   document.getElementById('li-btn').textContent = isSignup ? 'Create Account →' : 'Sign In →';
   document.getElementById('li-forgot').style.display = isSignup ? 'none' : 'block';
@@ -4193,7 +4272,7 @@ async function loadHistory(days, btn) {
   document.querySelectorAll('#history-mo .tf').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
   if (!_fbAuth || !supaToken) {
-    document.getElementById('history-stats').innerHTML = '<span style="color:#555">Sign in with Supabase to see history</span>';
+    document.getElementById('history-stats').innerHTML = '<span style="color:var(--t-dim)">Sign in with Supabase to see history</span>';
     return;
   }
   try {
@@ -4202,7 +4281,7 @@ async function loadHistory(days, btn) {
     });
     const { snapshots } = await r.json();
     if (!snapshots?.length) {
-      document.getElementById('history-stats').innerHTML = '<span style="color:#555">No history yet — data builds up daily</span>';
+      document.getElementById('history-stats').innerHTML = '<span style="color:var(--t-dim)">No history yet — data builds up daily</span>';
       return;
     }
     const labels = snapshots.map(s=>s.snapped_at.slice(5)); // MM-DD
@@ -4222,12 +4301,12 @@ async function loadHistory(days, btn) {
       }]},
       options: { responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{display:false}, tooltip:{
-          backgroundColor:'#111',borderColor:'#333',borderWidth:1,
+          backgroundColor:chartTheme().tipBg,borderColor:chartTheme().tipBd,borderWidth:1,titleColor:chartTheme().tipFg,bodyColor:chartTheme().tipFg,
           callbacks:{label:c=>fI(parseFloat(c.raw))}
         }},
         scales:{
-          x:{ticks:{maxTicksLimit:8,font:{size:10,family:"'JetBrains Mono'"},color:'#555'},grid:{color:'#111'},border:{color:'#222'}},
-          y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:'#555',callback:v=>fI(v)},grid:{color:'#111'},border:{color:'#222'}}
+          x:{ticks:{maxTicksLimit:8,font:{size:10,family:"'JetBrains Mono'"},color:chartTheme().tick},grid:{color:chartTheme().grid},border:{color:chartTheme().axis}},
+          y:{ticks:{maxTicksLimit:5,font:{size:10,family:"'JetBrains Mono'"},color:chartTheme().tick,callback:v=>fI(v)},grid:{color:chartTheme().grid},border:{color:chartTheme().axis}}
         }
       }
     });
@@ -4246,7 +4325,7 @@ function openHistory(){ document.getElementById('history-mo').classList.add('ope
 async function openShare(){
   document.getElementById('share-mo').classList.add('open');
   const el = document.getElementById('share-content');
-  if (!_fbAuth || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in to use share links.</p>'; return; }
+  if (!_fbAuth || !supaToken) { el.innerHTML='<p style="color:var(--t-dim);font-size:13px">Sign in to use share links.</p>'; return; }
   el.innerHTML = '<div style="text-align:center;padding:16px"><span class="spin"></span></div>';
   try {
     const r = await fetch('/api/user?action=share_get', { headers:{Authorization:`Bearer ${supaToken}`} });
@@ -4254,24 +4333,24 @@ async function openShare(){
     if (link) {
       const url = `${location.origin}/p/${link.slug}`;
       el.innerHTML = `
-        <p style="font-size:12px;color:#888;margin-bottom:16px">Your portfolio is publicly shared at:</p>
+        <p style="font-size:12px;color:var(--t-soft);margin-bottom:16px">Your portfolio is publicly shared at:</p>
         <div style="background:#111;border:1px solid #333;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#fff;word-break:break-all;margin-bottom:12px">${url}</div>
         <div style="display:flex;gap:8px;margin-bottom:16px">
           <button class="btn btn-p" style="flex:1" onclick="navigator.clipboard.writeText('${url}').then(()=>this.textContent='Copied!')">Copy Link</button>
           <button class="btn" onclick="deleteShare()">Delete Link</button>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;font-family:'JetBrains Mono',monospace;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t-mid);font-family:'JetBrains Mono',monospace;cursor:pointer">
           <input type="checkbox" ${link.show_values?'checked':''} id="share-vals" style="accent-color:#fff">
           Show portfolio values (uncheck to hide exact amounts)
         </label>`;
     } else {
       el.innerHTML = `
-        <p style="font-size:13px;color:#888;margin-bottom:16px">Share your portfolio with a custom link.</p>
+        <p style="font-size:13px;color:var(--t-soft);margin-bottom:16px">Share your portfolio with a custom link.</p>
         <div class="fg" style="grid-template-columns:1fr;margin-bottom:12px">
           <div><label>Custom slug (yoursite.com/p/<strong>your-slug</strong>)</label>
           <input type="text" id="share-slug" placeholder="e.g. rohit-portfolio" style="text-transform:lowercase"></div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;font-family:'JetBrains Mono',monospace;cursor:pointer;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t-mid);font-family:'JetBrains Mono',monospace;cursor:pointer;margin-bottom:16px">
           <input type="checkbox" id="share-vals" checked style="accent-color:#fff">
           Show portfolio values publicly
         </label>
@@ -4301,28 +4380,28 @@ async function deleteShare(){
 async function openAlerts(){
   document.getElementById('alerts-mo').classList.add('open');
   const el = document.getElementById('alerts-content');
-  if (!_fbAuth || !supaToken) { el.innerHTML='<p style="color:#555;font-size:13px">Sign in to set alerts.</p>'; return; }
+  if (!_fbAuth || !supaToken) { el.innerHTML='<p style="color:var(--t-dim);font-size:13px">Sign in to set alerts.</p>'; return; }
   el.innerHTML = '<div style="text-align:center;padding:16px"><span class="spin"></span></div>';
   try {
     const r = await fetch('/api/user?action=alerts',{headers:{Authorization:`Bearer ${supaToken}`}});
     const {alerts=[]} = await r.json();
     const alertRows = alerts.map(a=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #1a1a1a;margin-bottom:6px;background:#080808;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid var(--rule-2);margin-bottom:6px;background:#080808;">
         <div>
           <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#fff">${a.asset} ${a.type==='price_below'?'↓':'↑'} $${Number(a.threshold).toLocaleString()}</span>
-          <span style="font-size:10px;color:#555;margin-left:8px">${a.channel}</span>
+          <span style="font-size:10px;color:var(--t-dim);margin-left:8px">${a.channel}</span>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:${a.active?'#00e676':'#555'}">${a.active?'ON':'OFF'}</span>
           <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px" onclick="toggleAlert('${a.id}',${!a.active})">${a.active?'Pause':'Resume'}</button>
           <button class="btn btn-ghost" style="padding:2px 8px;font-size:10px;color:#ff4444;border-color:#2a0000" onclick="deleteAlert('${a.id}')">✕</button>
         </div>
-      </div>`).join('') || '<p style="color:#555;font-size:12px;font-family:\'JetBrains Mono\',monospace;margin-bottom:16px">No alerts yet.</p>';
+      </div>`).join('') || '<p style="color:var(--t-dim);font-size:12px;font-family:\'JetBrains Mono\',monospace;margin-bottom:16px">No alerts yet.</p>';
 
     el.innerHTML = `
       ${alertRows}
       <div class="divider"></div>
-      <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;color:#888">New Alert</p>
+      <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;color:var(--t-soft)">New Alert</p>
       <div class="fg fg4" style="margin-bottom:12px">
         <div><label>Asset</label><input type="text" id="al-asset" placeholder="BTC" style="text-transform:uppercase"></div>
         <div><label>Type</label><select id="al-type"><option value="price_below">Price Below ↓</option><option value="price_above">Price Above ↑</option></select></div>
@@ -4330,8 +4409,8 @@ async function openAlerts(){
         <div><label>Notify via</label><select id="al-channel"><option value="email">Email</option><option value="telegram">Telegram</option></select></div>
       </div>
       <div id="al-tg" style="display:none;margin-bottom:12px">
-        <label style="font-size:9px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:#555;display:block;margin-bottom:6px">
-          Telegram Chat ID <span style="text-transform:none;color:#444">— get it from @userinfobot</span>
+        <label style="font-size:9px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim);display:block;margin-bottom:6px">
+          Telegram Chat ID <span style="text-transform:none;color:var(--t-dim2)">— get it from @userinfobot</span>
         </label>
         <input type="text" id="al-tg-id" placeholder="123456789">
       </div>
@@ -4654,7 +4733,7 @@ function setupMFAutocomplete() {
         if (!r.ok) return;
         const all = await r.json();
         if (!all.length) {
-          drop.innerHTML='<div style="padding:14px;color:#555;font-size:12px;font-family:\'JetBrains Mono\',monospace">No funds found</div>';
+          drop.innerHTML='<div style="padding:14px;color:var(--t-dim);font-size:12px;font-family:\'JetBrains Mono\',monospace">No funds found</div>';
           drop.style.display='block'; return;
         }
 
@@ -4921,7 +5000,7 @@ function toggleRebal(){
 
 function buildRebal(){
   const v = vals();
-  if(!v.tot){ document.getElementById('rebal-body').innerHTML='<p style="color:#555;font-size:12px;padding:0 8px">Add holdings to use the rebalancer.</p>'; return; }
+  if(!v.tot){ document.getElementById('rebal-body').innerHTML='<p style="color:var(--t-dim);font-size:12px;padding:0 8px">Add holdings to use the rebalancer.</p>'; return; }
 
   const cats = [
     { key:'c', label:'Crypto', color:'#ffffff', cur: (v.c+v.s)/v.tot*100 },
@@ -4934,8 +5013,8 @@ function buildRebal(){
   const el = document.getElementById('rebal-body');
   el.innerHTML = `
     <div style="padding:0 8px">
-      <p style="font-size:11px;color:#555;font-family:'JetBrains Mono',monospace;margin-bottom:16px">Set your target allocation. We'll tell you exactly what to buy/sell.</p>
-      <div style="display:grid;grid-template-columns:1fr 120px 120px 150px;gap:8px;font-size:10px;letter-spacing:.08em;color:#444;font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:8px">
+      <p style="font-size:11px;color:var(--t-dim);font-family:'JetBrains Mono',monospace;margin-bottom:16px">Set your target allocation. We'll tell you exactly what to buy/sell.</p>
+      <div style="display:grid;grid-template-columns:1fr 120px 120px 150px;gap:8px;font-size:10px;letter-spacing:.08em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:8px">
         <span>Asset Class</span><span>Current</span><span>Target %</span><span>Action</span>
       </div>
       ${cats.map(c=>`
@@ -4943,14 +5022,14 @@ function buildRebal(){
           <span style="display:flex;align-items:center;gap:8px;font-size:12px;color:#ccc">
             <span style="width:8px;height:8px;background:${c.color};border-radius:2px;display:inline-block"></span>${c.label}
           </span>
-          <span style="font-size:12px;color:#888;font-family:'JetBrains Mono',monospace">${c.cur.toFixed(1)}%</span>
+          <span style="font-size:12px;color:var(--t-soft);font-family:'JetBrains Mono',monospace">${c.cur.toFixed(1)}%</span>
           <input type="number" id="rb-${c.key}" value="${Math.round(c.cur)}" min="0" max="100" step="1" oninput="calcRebal()"
             style="padding:6px 8px;background:#111;border:1px solid #333;color:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;width:80px">
-          <span id="rba-${c.key}" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555">—</span>
+          <span id="rba-${c.key}" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t-dim)">—</span>
         </div>`).join('')}
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:center">
-        <span id="rb-total" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#555">Total: 0%</span>
-        <span style="font-size:10px;color:#444;font-family:'JetBrains Mono',monospace">Total portfolio: ${fI(v.tot)}</span>
+        <span id="rb-total" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t-dim)">Total: 0%</span>
+        <span style="font-size:10px;color:var(--t-dim2);font-family:'JetBrains Mono',monospace">Total portfolio: ${fI(v.tot)}</span>
       </div>
     </div>`;
   calcRebal();
@@ -5013,7 +5092,7 @@ function buildHeatmap(){
   D.intl.forEach(a=>{ if(a.price&&a.qty) all.push({name:a.symbol,value:a.qty*a.price,ch24:a.ch24||0,chain:'nasdaq'}); });
   D.mf.forEach(a=>{ if(a.nav&&a.units) all.push({name:a.name.split(' ')[0],value:a.units*a.nav/(liveRates.inr||USD_INR),ch24:a.ch24||0,chain:'mf'}); });
 
-  if(!all.length){ el.innerHTML='<p style="color:#555;font-size:12px;padding:8px">Add holdings to see the heatmap.</p>'; return; }
+  if(!all.length){ el.innerHTML='<p style="color:var(--t-dim);font-size:12px;padding:8px">Add holdings to see the heatmap.</p>'; return; }
 
   const sorted = all.sort((a,b)=>b.value-a.value).slice(0,40);
   const maxVal = sorted[0].value;
@@ -5030,7 +5109,7 @@ function buildHeatmap(){
       return `<div style="width:${sz}px;height:${sz*0.75}px;background:${bg};border:1px solid ${ch>=0?'#1a3a1a':'#3a1a1a'};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:default;transition:transform .15s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
         <div style="font-size:${sz>80?12:10}px;font-weight:700;color:#fff;font-family:'JetBrains Mono',monospace">${esc(p.name.slice(0,6))}</div>
         <div style="font-size:${sz>80?11:9}px;color:${textColor};font-family:'JetBrains Mono',monospace">${ch>=0?'+':''}${ch.toFixed(2)}%</div>
-        ${sz>90?`<div style="font-size:9px;color:#555;font-family:'JetBrains Mono',monospace">${fI(p.value)}</div>`:''}
+        ${sz>90?`<div style="font-size:9px;color:var(--t-dim);font-family:'JetBrains Mono',monospace">${fI(p.value)}</div>`:''}
       </div>`;
     }).join('') + `</div>`;
 }
@@ -5063,12 +5142,12 @@ function openShareCard(){
   card.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
       <div>
-        <div style="font-size:9px;letter-spacing:.15em;color:#555;text-transform:uppercase;margin-bottom:4px">Portfolio Value</div>
+        <div style="font-size:9px;letter-spacing:.15em;color:var(--t-dim);text-transform:uppercase;margin-bottom:4px">Portfolio Value</div>
         <div style="font-size:32px;font-weight:700;color:#fff;font-family:'Syne',sans-serif">${tot}</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:9px;color:#555;letter-spacing:.08em">${now}</div>
-        <div style="font-size:11px;color:#333;margin-top:4px">portfoliopaglu.vercel.app</div>
+        <div style="font-size:9px;color:var(--t-dim);letter-spacing:.08em">${now}</div>
+        <div style="font-size:11px;color:var(--t-low);margin-top:4px">portfoliopaglu.vercel.app</div>
       </div>
     </div>
     <div style="display:flex;gap:0;height:6px;border-radius:3px;overflow:hidden;margin-bottom:16px">
@@ -5077,20 +5156,20 @@ function openShareCard(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
       ${cats.map(c=>`<div style="display:flex;align-items:center;gap:8px">
         <span style="width:6px;height:6px;background:${c.color};border-radius:1px;display:inline-block;flex-shrink:0"></span>
-        <span style="font-size:10px;color:#888">${c.label}</span>
+        <span style="font-size:10px;color:var(--t-soft)">${c.label}</span>
         <span style="font-size:10px;color:#fff;margin-left:auto">${(c.val/v.tot*100).toFixed(1)}%</span>
       </div>`).join('')}
     </div>
     <div style="border-top:1px solid #1a1a1a;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:9px;color:#333;letter-spacing:.1em">BUILT WITH PORTFOLIOPAGLU</div>
-      <div style="font-size:9px;color:#333">🔒 SELF-HOSTED</div>
+      <div style="font-size:9px;color:var(--t-low);letter-spacing:.1em">BUILT WITH PORTFOLIOPAGLU</div>
+      <div style="font-size:9px;color:var(--t-low)">🔒 SELF-HOSTED</div>
     </div>`;
 
   const btns = document.createElement('div');
   btns.style.cssText='display:flex;gap:8px';
   btns.innerHTML=`
     <button onclick="downloadCard()" style="padding:10px 20px;background:#fff;color:#000;border:none;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.06em">↓ DOWNLOAD</button>
-    <button onclick="document.getElementById('share-card-modal').remove()" style="padding:10px 20px;background:transparent;color:#555;border:1px solid #333;font-family:'Syne',sans-serif;font-size:11px;cursor:pointer">CLOSE</button>`;
+    <button onclick="document.getElementById('share-card-modal').remove()" style="padding:10px 20px;background:transparent;color:var(--t-dim);border:1px solid #333;font-family:'Syne',sans-serif;font-size:11px;cursor:pointer">CLOSE</button>`;
 
   modal.appendChild(card);
   modal.appendChild(btns);
@@ -5115,17 +5194,72 @@ async function downloadCard(){
 // ══════════════════════════════════════════════════════════
 //  DARK / LIGHT MODE
 // ══════════════════════════════════════════════════════════
+function setRefreshLabel(btn,text){
+  if(!btn)return;
+  const t=btn.querySelector('.ref-txt');
+  if(t)t.textContent=text; else btn.textContent=text;
+}
+
+// ── tools menu ──────────────────────────────────────────
+function toggleTools(e){
+  if(e)e.stopPropagation();
+  const m=document.getElementById('tools-menu'), b=document.getElementById('tools-btn');
+  const open=m.classList.toggle('open');
+  b.setAttribute('aria-expanded',open?'true':'false');
+}
+function closeTools(){
+  const m=document.getElementById('tools-menu'), b=document.getElementById('tools-btn');
+  if(m)m.classList.remove('open');
+  if(b)b.setAttribute('aria-expanded','false');
+}
+function toolsPick(fn){ closeTools(); try{ fn(); }catch(e){ console.error(e); } }
+document.addEventListener('click',e=>{ if(!e.target.closest('.hdr-menu-wrap'))closeTools(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeTools(); });
+
+function chartVar(name,fallback){
+  const v=getComputedStyle(document.body).getPropertyValue(name).trim();
+  return v||fallback;
+}
+function chartTheme(){
+  return {
+    grid: chartVar('--chart-grid','#111'),
+    axis: chartVar('--chart-axis','#222'),
+    tick: chartVar('--chart-tick','#555'),
+    seg:  chartVar('--chart-seg','#000'),
+    tipBg:document.body.classList.contains('light-mode')?'#fff':'#111',
+    tipBd:document.body.classList.contains('light-mode')?'#e2e2e2':'#333',
+    tipFg:document.body.classList.contains('light-mode')?'#111':'#fff',
+  };
+}
+
 function toggleTheme(){
   const isLight = document.body.classList.toggle('light-mode');
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  document.getElementById('theme-btn').textContent = isLight ? '🌙' : '☀';
+  paintThemeBtn(isLight);
+  // Chart.js bakes colours in at construction, so the charts have to be rebuilt.
+  redrawCharts();
+}
+
+function paintThemeBtn(isLight){
+  const btn=document.getElementById('theme-btn');
+  if(!btn)return;
+  const ic=btn.querySelector('.hdr-btn-icon'), lb=btn.querySelector('.hdr-btn-label');
+  if(ic)ic.textContent = isLight ? '\u263D' : '\u2600';
+  if(lb)lb.textContent = isLight ? 'LIGHT' : 'DARK';
+  btn.title = isLight ? 'Switch to dark' : 'Switch to light';
+}
+
+function redrawCharts(){
+  try{ if(typeof buildPie==='function') buildPie(); }catch(e){}
+  try{ if(typeof buildPerf==='function') buildPerf(); }catch(e){}
+  try{ if(typeof renderHoldings==='function') renderHoldings(); }catch(e){}
+  try{ if(typeof renderAlpha==='function' && alphaState==='done') renderAlpha(); }catch(e){}
 }
 // Restore theme on load
 (function initTheme(){
-  if(localStorage.getItem('theme')==='light'){
-    document.body.classList.add('light-mode');
-    setTimeout(()=>{ const btn=document.getElementById('theme-btn'); if(btn) btn.textContent='🌙'; },100);
-  }
+  const isLight = localStorage.getItem('theme')==='light';
+  if(isLight) document.body.classList.add('light-mode');
+  setTimeout(()=>paintThemeBtn(isLight),100);
 })();
 
 // ── MANUAL CRYPTO ENTRY ──────────────────────────────────
@@ -5138,12 +5272,12 @@ function setCryptoAddMode(mode){
   if(mode==='wallet'){
     wallet.style.display='block'; manual.style.display='none';
     btnW.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:#fff;color:#000';
-    btnM.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:#555';
+    btnM.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:var(--t-dim)';
     updateChainInfo();
   } else {
     wallet.style.display='none'; manual.style.display='block';
     btnM.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:#fff;color:#000';
-    btnW.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:#555';
+    btnW.style.cssText='padding:9px 20px;font-size:11px;font-family:\'Syne\',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:none;cursor:pointer;background:transparent;color:var(--t-dim)';
   }
 }
 
@@ -5165,7 +5299,7 @@ async function searchManualCrypto(q){
         ${c.thumb?`<img src="${c.thumb}" style="width:20px;height:20px;border-radius:50%">`:'<div style="width:20px;height:20px;background:#222;border-radius:50%"></div>'}
         <div>
           <div style="font-size:12px;color:#fff;font-family:\'JetBrains Mono\',monospace">${c.symbol.toUpperCase()}</div>
-          <div style="font-size:10px;color:#555">${c.name} · Rank #${c.market_cap_rank||'?'}</div>
+          <div style="font-size:10px;color:var(--t-dim)">${c.name} · Rank #${c.market_cap_rank||'?'}</div>
         </div>
       </div>`
     ).join('');
@@ -5237,19 +5371,19 @@ function editManualCrypto(id){
   const inner=document.createElement('div');
   inner.style.cssText='background:#0a0a0a;border:1px solid #222;padding:28px;width:460px;max-width:95vw;border-radius:8px';
   inner.innerHTML=[
-    `<div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Edit Manual Entry</div>`,
-    `<div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:20px">${a.sym} <span style="font-size:12px;color:#555;font-weight:400">${a.network}</span></div>`,
+    `<div style="font-size:11px;color:var(--t-dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Edit Manual Entry</div>`,
+    `<div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:20px">${a.sym} <span style="font-size:12px;color:var(--t-dim);font-weight:400">${a.network}</span></div>`,
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Quantity</div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Quantity</div>`,
     `<input type="number" id="emc-qty" value="${a.qty}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Total Invested ($)</div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Total Invested ($)</div>`,
     `<input type="number" id="emc-inv" value="${a.invested||''}" step="any" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
-    `<div><div style="font-size:10px;color:#555;text-transform:uppercase;margin-bottom:6px">Network / Source</div>`,
+    `<div><div style="font-size:10px;color:var(--t-dim);text-transform:uppercase;margin-bottom:6px">Network / Source</div>`,
     `<input type="text" id="emc-net" value="${a.network}" style="width:100%;font-size:14px;padding:10px 12px;background:#111;border:1px solid #333;color:#fff;font-family:monospace;box-sizing:border-box"></div>`,
     `</div>`,
     `<div style="display:flex;gap:8px">`,
     `<button id="emc-save" style="flex:1;padding:11px;background:#fff;color:#000;border:none;font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase;border-radius:6px">Save</button>`,
-    `<button id="emc-cancel" style="padding:11px 20px;background:transparent;color:#555;border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
+    `<button id="emc-cancel" style="padding:11px 20px;background:transparent;color:var(--t-dim);border:1px solid #222;font-size:11px;cursor:pointer;border-radius:6px">Cancel</button>`,
     `</div>`,
   ].join('');
   modal.appendChild(inner); document.body.appendChild(modal);
