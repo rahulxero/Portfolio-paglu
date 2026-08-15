@@ -247,35 +247,12 @@ async function login() {
 }
 
 // ── save keys ─────────────────────────────────────────────
+// Keys are set in Vercel → Settings → Environment Variables, not here. Sending them
+// through the browser meant they came back embedded in the session token, where
+// anyone with that token could read them. This page now only reports their status.
 async function saveKeys() {
-  const zerVal = document.getElementById('zer').value.trim();
-  const antVal = document.getElementById('ant').value.trim();
-  const btn = document.getElementById('save-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>Saving…';
-  clearMsg('save-msg');
-  try {
-    const r = await fetch('/api/admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save', token, zerionKey: zerVal, anthropicKey: antVal }),
-    });
-    const d = await r.json();
-    if (!r.ok || !d.ok) {
-      showMsg('save-msg', 'err', d.error || 'Save failed.');
-      btn.disabled = false; btn.textContent = 'Save Keys →';
-      return;
-    }
-    token = d.token;
-    localStorage.setItem(TK, token);
-    document.getElementById('zer').value = '';
-    document.getElementById('ant').value = '';
-    setKeyStatus(d.zerionKeySet, d.anthropicKeySet);
-    showMsg('save-msg', 'ok', '✓ Keys saved and activated. Your friends\' sessions will now use these keys via the proxy.');
-  } catch (e) {
-    showMsg('save-msg', 'err', 'Error: ' + e.message);
-  }
-  btn.disabled = false; btn.textContent = 'Save Keys →';
+  showMsg('save-msg', 'err',
+    'Keys are set in Vercel → Settings → Environment Variables (ZERION_API_KEY, ANTHROPIC_API_KEY), then redeploy. They are never sent to the browser.');
 }
 
 // ── logout ────────────────────────────────────────────────
@@ -294,12 +271,11 @@ async function init() {
     const r = await fetch('/api/admin?action=check&token=' + encodeURIComponent(token));
     const d = await r.json();
     if (!d.ok) { localStorage.removeItem(TK); token = ''; return; }
-    // Session valid — decode payload to get key status (no need to re-login)
-    const [b64] = token.split('.');
-    const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
+    // Key status comes from the server now. The token carries no secrets, so
+    // there is nothing to decode here.
     showAdmin({
-      zerionKeySet:    !!payload.zerionKey,
-      anthropicKeySet: !!payload.anthropicKey,
+      zerionKeySet:    d.zerionKeySet,
+      anthropicKeySet: d.anthropicKeySet,
       note: 'Session restored.',
     });
   } catch { /* silently show login */ }
