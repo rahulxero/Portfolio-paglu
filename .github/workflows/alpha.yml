@@ -1,0 +1,46 @@
+# Refreshes the Alpha table's data and commits it.
+#
+# Runs on GitHub's servers, so nothing needs to be running on your machine.
+# The scraper hits companiesmarketcap for the rankings and Yahoo Finance for
+# forward P/E, dividends, FCF and the rest, then writes alpha.json and logos/.
+
+name: Refresh Alpha data
+
+on:
+  schedule:
+    - cron: '30 1 * * *'      # 07:00 IST daily
+  workflow_dispatch:           # and a Run workflow button in the Actions tab
+
+permissions:
+  contents: write              # needed to push the refreshed data back
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 yfinance
+
+      - name: Run scraper
+        run: python scripts/scrape.py
+
+      - name: Commit if the data changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add alpha.json logos
+          # Market caps move daily, so an empty diff means the scrape failed
+          # quietly. Better to leave the old data than commit nothing and
+          # assume it worked.
+          if git diff --staged --quiet; then
+            echo "No change — scraper likely returned nothing. Not committing."
+            exit 1
+          fi
+          git commit -m "alpha: refresh $(date -u +%Y-%m-%d)"
+          git push
