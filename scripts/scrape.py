@@ -187,6 +187,17 @@ def enrich_from_yahoo(companies):
         if c.get("pe") is None:
             c["pe"] = info.get("trailingPE")
 
+        c["sector"] = info.get("sector")
+        c["ev_ebitda"] = info.get("enterpriseToEbitda")
+        c["ps"] = info.get("priceToSalesTrailing12Months")
+        c["roe"] = round(info["returnOnEquity"] * 100, 1) if info.get("returnOnEquity") else None
+
+        # FCF yield: free cash flow over market cap. Harder to massage than earnings,
+        # and it's the inverse of what you pay — above ~5% is genuinely cheap.
+        fcf = info.get("freeCashflow")
+        mc = c.get("market_cap") or info.get("marketCap")
+        c["fcf_yield"] = round(fcf / mc * 100, 2) if fcf and mc and mc > 0 else None
+
         # dividendYield has changed units between yfinance releases, so derive it
         # from the rate and price when both are present and only fall back otherwise.
         rate = info.get("dividendRate")
@@ -238,6 +249,12 @@ def main():
             "pe": round(mc / e, 2) if mc and e and e > 0 else None,
             "forward_pe": None,
             "dividend_yield": None,
+            "sector": None,
+            "fcf_yield": None,
+            "ev_ebitda": None,
+            "ps": None,
+            "roe": None,
+            "net_margin": None,
             "logo": None,
             "logo_url": r["logo_url"],
         })
@@ -253,6 +270,9 @@ def main():
     for c in companies:
         if c["pe"] is None and c["market_cap"] and c["earnings"] and c["earnings"] > 0:
             c["pe"] = round(c["market_cap"] / c["earnings"], 2)
+        # Net margin needs no extra source — it's profit over revenue.
+        if c.get("revenue") and c.get("earnings") is not None and c["revenue"] > 0:
+            c["net_margin"] = round(c["earnings"] / c["revenue"] * 100, 1)
 
     companies.sort(key=lambda c: c["market_cap"] or 0, reverse=True)
 
