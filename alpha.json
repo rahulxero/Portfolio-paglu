@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-15T13:10:46+00:00",
+  "updated": "2026-08-16T02:44:18+00:00",
   "companies": [
     {
       "rank": 1,
@@ -86,7 +86,7 @@
       "earnings": 117990000000.0,
       "revenue": 742770000000.0,
       "pe": 24.01,
-      "forward_pe": 25.270699,
+      "forward_pe": 25.246893,
       "dividend_yield": null,
       "sector": "Consumer Cyclical",
       "fcf_yield": 0.11,
@@ -143,12 +143,12 @@
       "earnings": -8888999936,
       "revenue": 23043999744,
       "pe": null,
-      "forward_pe": 75.55887,
+      "forward_pe": 69.30693,
       "dividend_yield": null,
       "sector": "Industrials",
       "fcf_yield": null,
       "ev_ebitda": 615.669,
-      "ps": 80.03759,
+      "ps": 80.08372,
       "roe": null,
       "net_margin": -38.6,
       "logo": "logos/SPCX.png"
@@ -243,7 +243,7 @@
       "sector": "Technology",
       "fcf_yield": 0.7,
       "ev_ebitda": 15.798,
-      "ps": 12.156171,
+      "ps": null,
       "roe": 66.6,
       "net_margin": 65.7,
       "logo": "logos/MU.png"
@@ -281,7 +281,7 @@
       "sector": "Healthcare",
       "fcf_yield": 1.05,
       "ev_ebitda": 26.324,
-      "ps": 13.204428,
+      "ps": 13.210121,
       "roe": 102.3,
       "net_margin": 39.1,
       "logo": "logos/LLY.png"
@@ -314,7 +314,7 @@
       "earnings": 33479999999.999996,
       "revenue": 725300000000.0,
       "pe": 27.4,
-      "forward_pe": 35.131187,
+      "forward_pe": 35.1314,
       "dividend_yield": 0.86,
       "sector": "Consumer Defensive",
       "fcf_yield": 0.75,
