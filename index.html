@@ -165,12 +165,30 @@
     .insight-flag{color:#ff9800;}
     .insight-bar{height:5px;border-radius:3px;background:#1a1a1a;margin-top:8px;overflow:hidden;display:flex;}
     .insight-bar>span{height:100%;display:block;}
-    body.light-mode .insight-card{background:#fff;border:1px solid #e2e2e2;box-shadow:0 1px 4px rgba(0,0,0,.04);}
-    body.light-mode .insight-main{color:#111;}
     .ticker-bar { border-radius: 0; } /* full-width bars stay square */
     .hdr { border-radius: 0; }
 
     /* ── HEADER BUTTONS — equal size ─────────────────────── */
+    .hdr-menu-wrap { position: relative; display: inline-block; }
+    .hdr-menu {
+      position: absolute; top: calc(100% + 8px); right: 0;
+      min-width: 200px; background: #0d0d0d; border: 1px solid #2a2a2a;
+      border-radius: 10px; padding: 8px; z-index: 200;
+      display: none; flex-direction: column; gap: 2px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.6);
+    }
+    .hdr-menu.open { display: flex; }
+    .hdr-menu-sec { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: #555; padding: 4px 8px 2px; font-family: 'JetBrains Mono', monospace; }
+    .hdr-menu-select { width: 100%; background: #000; border: 1px solid #333; color: #ccc; font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 8px; border-radius: 6px; cursor: pointer; }
+    .hdr-menu-sep { height: 1px; background: #1c1c1c; margin: 6px 4px; }
+    .hdr-menu-item {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      background: transparent; border: none; color: #ddd;
+      font-size: 13px; padding: 9px 8px; border-radius: 6px;
+      cursor: pointer; text-align: left; transition: background .12s;
+    }
+    .hdr-menu-item:hover { background: #1a1a1a; color: #fff; }
+    .hdr-menu-ic { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
     .hdr-btn {
       display: inline-flex;
       flex-direction: column;
@@ -210,63 +228,11 @@
     /* ══════════════════════════════════════════════════════
        LIGHT MODE
     ══════════════════════════════════════════════════════ */
-    body.light-mode {
       --black: #ffffff; --white: #111111; --dim: #333333;
       --mid: #666666; --ghost: #999999;
       --border-rule: 1px solid #e2e2e2; --border-thin: 1px solid #ebebeb;
       background: #f7f8fa; color: #111;
     }
-    body.light-mode .hdr { background:#fff; border-bottom:1px solid #e2e2e2; box-shadow:0 1px 8px rgba(0,0,0,.06); }
-    body.light-mode .ticker-bar { background:#fff; border-bottom:1px solid #e2e2e2; color:#333; }
-    body.light-mode .hc, body.light-mode .cc { background:#fff; border:1px solid #e2e2e2; box-shadow:0 1px 4px rgba(0,0,0,.04); }
-    body.light-mode .sum-card { background:#fff; border:1px solid #e2e2e2; box-shadow:0 1px 4px rgba(0,0,0,.04); }
-    body.light-mode .hero { border-bottom-color:#e2e2e2; }
-    body.light-mode .hero-val { color:#111; }
-    body.light-mode .hero-eyebrow { color:#999; }
-    body.light-mode .hero-eyebrow::before { background:#ddd; }
-    body.light-mode .card-label { color:#888; }
-    body.light-mode .card-val { color:#111; font-weight:600; }
-    body.light-mode .card-chg.muted { color:#bbb; }
-    body.light-mode .trow { border-bottom:1px solid #f0f0f0; }
-    body.light-mode .trow:hover { background:#f9fafb; }
-    body.light-mode .an { color:#111; font-weight:600; }
-    body.light-mode .as { color:#888; }
-    body.light-mode .mv { color:#333; }
-    body.light-mode .muted { color:#bbb; }
-    body.light-mode .badge { background:#f0f0f5; color:#444; border-color:#ddd; }
-    body.light-mode .cp { background:#f5f5f5; }
-    body.light-mode .tok-logo { background:#f0f0f5; color:#555; }
-    body.light-mode .w-grp { background:#f7f8fa; border-bottom:1px solid #e8e8e8; }
-    body.light-mode .w-total { color:#111; font-weight:600; }
-    body.light-mode .btn { border-color:#ddd; color:#333; background:#fff; }
-    body.light-mode .btn:hover { background:#f0f0f5; border-color:#bbb; }
-    body.light-mode .btn-p { background:#111; color:#fff; border-color:#111; }
-    body.light-mode .btn-p:hover { background:#333; border-color:#333; }
-    body.light-mode .hdr-btn { border-color:#e2e2e2; color:#444; background:#fff; }
-    body.light-mode .hdr-btn:hover { background:#f0f0f5; color:#111; border-color:#bbb; }
-    body.light-mode .hdr-btn-label { color:#999; }
-    body.light-mode .hdr-btn-wide { color:#333; border-color:#ddd; }
-    body.light-mode .user-pill { border-color:#e2e2e2 !important; background:#fff; }
-    body.light-mode #currency-sel { background:#fff; border-color:#e2e2e2; color:#333; }
-    body.light-mode select, body.light-mode input, body.light-mode textarea { background:#fff; border-color:#ddd; color:#111; }
-    body.light-mode .tab { color:#666; border-color:#e2e2e2; background:#fff; }
-    body.light-mode .tab:hover { background:#f5f5f5; color:#111; }
-    body.light-mode .tab.on { background:#111; color:#fff; border-color:#111; }
-    body.light-mode .cc-title { color:#111; font-weight:700; }
-    body.light-mode .info-box { background:#f0f8ff; border-color:#c8dff0; color:#336; }
-    body.light-mode .info-box.info-ok { background:#f0fff4; border-color:#b0d8b8; color:#1a5c2a; }
-    body.light-mode .add-panel { background:#fff; border-color:#e2e2e2; }
-    body.light-mode .add-panel-title { color:#111; }
-    body.light-mode label { color:#666; }
-    body.light-mode .ac-drop { background:#fff; border-color:#e2e2e2; box-shadow:0 4px 16px rgba(0,0,0,.1); }
-    body.light-mode .ac-item:hover { background:#f5f5f5; }
-    body.light-mode .login-mo { background:rgba(247,248,250,.97); }
-    body.light-mode .login-card { background:#fff; border-color:#e2e2e2; box-shadow:0 4px 24px rgba(0,0,0,.08); }
-    body.light-mode .login-card h2 { color:#111; }
-    body.light-mode .login-card input { background:#f7f8fa; border-color:#ddd; color:#111; }
-    body.light-mode .logo-text { color:#111; }
-    body.light-mode .notice { background:#fff; border-color:#e2e2e2; }
-    body.light-mode .cache-bar { background:#fff8e1; border-color:#ffe082; color:#666; }
 
     /* ══════════════════════════════════════════════════════
        MOBILE RESPONSIVE
@@ -311,14 +277,11 @@
     /* Mobile bottom nav */
     @media (max-width: 768px) {
       .mobile-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--black); border-top:var(--border-thin); z-index:200; padding:6px 0 env(safe-area-inset-bottom,6px); }
-      body.light-mode .mobile-nav { background:#fff; border-top-color:#e2e2e2; }
     }
     @media (min-width: 769px) { .mobile-nav { display:none; } }
     .mobile-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px; background:none; border:none; cursor:pointer; color:#555; font-family:var(--mono); font-size:8px; text-transform:uppercase; letter-spacing:.06em; }
     .mobile-nav-btn.on { color:#00e676; }
     .mobile-nav-btn span:first-child { font-size:18px; line-height:1; }
-    body.light-mode .mobile-nav-btn { color:#aaa; }
-    body.light-mode .mobile-nav-btn.on { color:#059669; }
 
     /* ── AUTH SPLASH ─────────────────────────────────────── */
     #auth-splash {
@@ -660,7 +623,6 @@
       transform: scale(1.35);
       filter: drop-shadow(0 0 5px currentColor) brightness(1.15);
     }
-    body.light-mode .pie-leg-row:hover { background: rgba(0,0,0,.05); }
 
     /* ── LOAD ANIMATION ──────────────────────────────────── */
     @keyframes fadeUp {
@@ -842,22 +804,28 @@
       <div class="avatar" id="user-avatar">?</div>
       <span id="user-name">Guest</span>
     </div>
-    <select id="currency-sel" onchange="setCurrency(this.value)" style="background:#000;border:1px solid #333;color:#999;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 8px;cursor:pointer;letter-spacing:.04em;">
-      <option value="INR">₹ INR</option>
-      <option value="USD">$ USD</option>
-      <option value="EUR">€ EUR</option>
-      <option value="GBP">£ GBP</option>
-      <option value="JPY">¥ JPY</option>
-      <option value="CNY">¥ CNY</option>
-      <option value="SGD">S$ SGD</option>
-      <option value="AED">د AED</option>
-      <option value="AUD">A$ AUD</option>
-    </select>
-    <button class="hdr-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark"><span class="hdr-btn-icon">☀</span><span class="hdr-btn-label">THEME</span></button>
-    <button class="hdr-btn" onclick="toggleHeatmap()" title="Heatmap"><span class="hdr-btn-icon">▦</span><span class="hdr-btn-label">MAP</span></button>
-    <button class="hdr-btn" onclick="toggleRebal()" title="Rebalance"><span class="hdr-btn-icon">⚖</span><span class="hdr-btn-label">REBAL</span></button>
-    <button class="hdr-btn" onclick="openShareCard()" title="Share"><span class="hdr-btn-icon">↗</span><span class="hdr-btn-label">SHARE</span></button>
-    <button class="hdr-btn" id="history-btn" style="min-width:64px" onclick="openHistory()" title="Portfolio History" style="display:none"><span class="hdr-btn-icon">📈</span><span class="hdr-btn-label">HISTORY</span></button>
+    <div class="hdr-menu-wrap">
+      <button class="hdr-btn hdr-btn-sq" id="hdr-menu-btn" onclick="toggleHdrMenu(event)" title="Menu" aria-label="Menu" aria-expanded="false">☰</button>
+      <div class="hdr-menu" id="hdr-menu">
+        <div class="hdr-menu-sec">Currency</div>
+        <select id="currency-sel" onchange="setCurrency(this.value)" class="hdr-menu-select">
+          <option value="INR">₹ INR</option>
+          <option value="USD">$ USD</option>
+          <option value="EUR">€ EUR</option>
+          <option value="GBP">£ GBP</option>
+          <option value="JPY">¥ JPY</option>
+          <option value="CNY">¥ CNY</option>
+          <option value="SGD">S$ SGD</option>
+          <option value="AED">د AED</option>
+          <option value="AUD">A$ AUD</option>
+        </select>
+        <div class="hdr-menu-sep"></div>
+        <button class="hdr-menu-item" onclick="toggleHeatmap();closeHdrMenu()"><span class="hdr-menu-ic">▦</span> Heatmap</button>
+        <button class="hdr-menu-item" onclick="toggleRebal();closeHdrMenu()"><span class="hdr-menu-ic">⚖</span> Rebalance</button>
+        <button class="hdr-menu-item" onclick="openShareCard();closeHdrMenu()"><span class="hdr-menu-ic">↗</span> Share</button>
+        <button class="hdr-menu-item" id="history-menu-item" onclick="openHistory();closeHdrMenu()" style="display:none"><span class="hdr-menu-ic">📈</span> History</button>
+      </div>
+    </div>
     <button class="hdr-btn hdr-btn-wide" id="ref-btn" onclick="refreshAll()">⟳ REFRESH</button>
     <button class="hdr-btn hdr-btn-sq" onclick="openSettings()" title="Settings">⚙</button>
   </div>
@@ -3981,11 +3949,11 @@ function updateUserUI() {
     document.getElementById('user-avatar').textContent = (currentUser.name||'?').charAt(0).toUpperCase();
     document.getElementById('user-name').textContent = currentUser.name;
     // Show history button only
-    const hBtn = document.getElementById('history-btn');
-    if(hBtn) hBtn.style.display = 'inline-flex';
+    const hBtn = document.getElementById('history-menu-item');
+    if(hBtn) hBtn.style.display = 'flex';
   } else {
     pill.style.display = 'none';
-    const hBtn = document.getElementById('history-btn');
+    const hBtn = document.getElementById('history-menu-item');
     if(hBtn) hBtn.style.display = 'none';
   }
 }
@@ -5044,18 +5012,26 @@ async function downloadCard(){
 // ══════════════════════════════════════════════════════════
 //  DARK / LIGHT MODE
 // ══════════════════════════════════════════════════════════
-function toggleTheme(){
-  const isLight = document.body.classList.toggle('light-mode');
-  localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  document.getElementById('theme-btn').textContent = isLight ? '🌙' : '☀';
+function toggleHdrMenu(e){
+  if(e) e.stopPropagation();
+  const m = document.getElementById('hdr-menu');
+  const btn = document.getElementById('hdr-menu-btn');
+  const open = m.classList.toggle('open');
+  if(btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
-// Restore theme on load
-(function initTheme(){
-  if(localStorage.getItem('theme')==='light'){
-    document.body.classList.add('light-mode');
-    setTimeout(()=>{ const btn=document.getElementById('theme-btn'); if(btn) btn.textContent='🌙'; },100);
-  }
-})();
+function closeHdrMenu(){
+  const m = document.getElementById('hdr-menu');
+  if(m) m.classList.remove('open');
+  const btn = document.getElementById('hdr-menu-btn');
+  if(btn) btn.setAttribute('aria-expanded','false');
+}
+// Close the menu on any outside click or Escape
+document.addEventListener('click', (e)=>{
+  const wrap = document.querySelector('.hdr-menu-wrap');
+  if(wrap && !wrap.contains(e.target)) closeHdrMenu();
+});
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeHdrMenu(); });
+
 
 // ── MANUAL CRYPTO ENTRY ──────────────────────────────────
 function setCryptoAddMode(mode){
