@@ -1639,8 +1639,25 @@ async function fetchWalletPositions(wallet){
     }catch(e){ console.warn('Polymarket fetch failed:', e.message); }
   }
 
-  // Merge all positions
-  wallet.positions = [...evmPositions, ...hlPositions, ...polyPositions];
+  // Merge all positions, then dedup: Zerion already indexes HyperEVM, so a HyperEVM token
+  // can come back from BOTH Zerion and the /api/hyperliquid call. Collapse those.
+  const merged = [...evmPositions, ...hlPositions, ...polyPositions];
+  const seen = new Map();
+  const deduped = [];
+  for(const p of merged){
+    if(p.source==='polymarket'){ deduped.push(p); continue; } // never dedup prediction markets
+    // Identity = symbol + chain + rounded balance. Same token, same chain, same amount = dupe.
+    const key = `${(p.symbol||'').toUpperCase()}|${(p.chain||'').toLowerCase()}|${Number(p.balance||0).toFixed(6)}`;
+    if(!seen.has(key)){
+      seen.set(key, deduped.length);
+      deduped.push(p);
+    } else {
+      // Keep whichever copy has a real USD value (the priced one wins)
+      const idx = seen.get(key);
+      if((p.valueUSD||0) > (deduped[idx].valueUSD||0)) deduped[idx] = p;
+    }
+  }
+  wallet.positions = deduped;
   wallet.totalUSD = wallet.positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
   wallet.fetching = false;
 }
