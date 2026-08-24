@@ -169,8 +169,23 @@
     .hdr { border-radius: 0; }
 
     /* ── HEADER BUTTONS — equal size ─────────────────────── */
-    .hdr-menu-wrap { position: relative; display: inline-block; }
-    .hdr-menu {
+    .hdr-refresh {
+      display: inline-flex; align-items: center; gap: 7px;
+      height: 52px; padding: 0 20px; flex-shrink: 0;
+      background: linear-gradient(135deg, #00e676 0%, #00b85c 100%);
+      color: #04140b; font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+      border: none; border-radius: 10px; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,230,118,.28);
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    }
+    .hdr-refresh:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(0,230,118,.42); filter: brightness(1.06); }
+    .hdr-refresh:active { transform: translateY(0); box-shadow: 0 3px 10px rgba(0,230,118,.3); }
+    .hdr-refresh:disabled { opacity: .55; cursor: default; box-shadow: none; transform: none; filter: grayscale(.3); }
+    .hdr-refresh-ic { font-size: 16px; line-height: 1; display: inline-block; }
+    .hdr-refresh.spinning .hdr-refresh-ic { animation: hdrSpin .8s linear infinite; }
+    @keyframes hdrSpin { to { transform: rotate(360deg); } }
+    .hdr-menu-wrap { position: relative; display: inline-block; }    .hdr-menu {
       position: absolute; top: calc(100% + 8px); right: 0;
       min-width: 200px; background: #0d0d0d; border: 1px solid #2a2a2a;
       border-radius: 10px; padding: 8px; z-index: 200;
@@ -178,9 +193,6 @@
       box-shadow: 0 12px 32px rgba(0,0,0,.6);
     }
     .hdr-menu.open { display: flex; }
-    .hdr-menu-sec { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: #555; padding: 4px 8px 2px; font-family: 'JetBrains Mono', monospace; }
-    .hdr-menu-select { width: 100%; background: #000; border: 1px solid #333; color: #ccc; font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 8px; border-radius: 6px; cursor: pointer; }
-    .hdr-menu-sep { height: 1px; background: #1c1c1c; margin: 6px 4px; }
     .hdr-menu-item {
       display: flex; align-items: center; gap: 10px; width: 100%;
       background: transparent; border: none; color: #ddd;
@@ -804,29 +816,27 @@
       <div class="avatar" id="user-avatar">?</div>
       <span id="user-name">Guest</span>
     </div>
+    <select id="currency-sel" onchange="setCurrency(this.value)" title="Display currency">
+      <option value="INR">₹ INR</option>
+      <option value="USD">$ USD</option>
+      <option value="EUR">€ EUR</option>
+      <option value="GBP">£ GBP</option>
+      <option value="JPY">¥ JPY</option>
+      <option value="CNY">¥ CNY</option>
+      <option value="SGD">S$ SGD</option>
+      <option value="AED">د AED</option>
+      <option value="AUD">A$ AUD</option>
+    </select>
     <div class="hdr-menu-wrap">
       <button class="hdr-btn hdr-btn-sq" id="hdr-menu-btn" onclick="toggleHdrMenu(event)" title="Menu" aria-label="Menu" aria-expanded="false">☰</button>
       <div class="hdr-menu" id="hdr-menu">
-        <div class="hdr-menu-sec">Currency</div>
-        <select id="currency-sel" onchange="setCurrency(this.value)" class="hdr-menu-select">
-          <option value="INR">₹ INR</option>
-          <option value="USD">$ USD</option>
-          <option value="EUR">€ EUR</option>
-          <option value="GBP">£ GBP</option>
-          <option value="JPY">¥ JPY</option>
-          <option value="CNY">¥ CNY</option>
-          <option value="SGD">S$ SGD</option>
-          <option value="AED">د AED</option>
-          <option value="AUD">A$ AUD</option>
-        </select>
-        <div class="hdr-menu-sep"></div>
         <button class="hdr-menu-item" onclick="toggleHeatmap();closeHdrMenu()"><span class="hdr-menu-ic">▦</span> Heatmap</button>
         <button class="hdr-menu-item" onclick="toggleRebal();closeHdrMenu()"><span class="hdr-menu-ic">⚖</span> Rebalance</button>
         <button class="hdr-menu-item" onclick="openShareCard();closeHdrMenu()"><span class="hdr-menu-ic">↗</span> Share</button>
         <button class="hdr-menu-item" id="history-menu-item" onclick="openHistory();closeHdrMenu()" style="display:none"><span class="hdr-menu-ic">📈</span> History</button>
       </div>
     </div>
-    <button class="hdr-btn hdr-btn-wide" id="ref-btn" onclick="refreshAll()">⟳ REFRESH</button>
+    <button class="hdr-refresh" id="ref-btn" onclick="refreshAll()"><span class="hdr-refresh-ic">⟳</span> <span class="hdr-refresh-lbl">REFRESH</span></button>
     <button class="hdr-btn hdr-btn-sq" onclick="openSettings()" title="Settings">⚙</button>
   </div>
 </header>
@@ -1747,7 +1757,8 @@ async function refreshAll(){
   if(loading) return;
   loading=true;
   const btn=document.getElementById('ref-btn');
-  btn.disabled=true; btn.textContent='⟳ Fetching…';
+  btn.disabled=true; btn.classList.add('spinning');
+  const refLbl=btn.querySelector('.hdr-refresh-lbl'); if(refLbl) refLbl.textContent='FETCHING…';
   const errs=[];
 
   setStatus('loading','Fetching wallet positions…');
@@ -1805,7 +1816,8 @@ async function refreshAll(){
 
   save(); savePriceCache(); hideCacheBar(); updateSummary(); buildPie(); buildPerf(); renderHoldings();
   const t=document.getElementById('src-tag'); t.textContent='live'; t.classList.add('live');
-  loading=false; btn.disabled=false; btn.textContent='⟳ Refresh';
+  loading=false; btn.disabled=false; btn.classList.remove('spinning');
+  { const l=btn.querySelector('.hdr-refresh-lbl'); if(l) l.textContent='REFRESH'; }
   const ts=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   if(errs.length) setStatus('warn',`Partial · ${ts} · ${errs[0]}${errs.length>1?` +${errs.length-1} more`:''}`);
   else{ const cfg=CURRENCY_CONFIG[activeCurrency]||CURRENCY_CONFIG.INR; const rate=liveRates[cfg.gecko]||cfg.perUSD; setStatus('ok',`Live · Updated at ${ts} · 1 USD = ${cfg.sym}${rate.toLocaleString('en-US',{maximumFractionDigits:2})}`); }
