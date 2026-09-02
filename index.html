@@ -2072,7 +2072,7 @@ function buildPie(){
   if(!slices.length) return;
 
   if(leg) leg.innerHTML=slices.map((s,idx)=>{
-    const isCrypto = s.label==='Crypto' || s.label==='Stablecoins';
+    const isCrypto = s.label==='Crypto';
     return `
     <span class="pie-leg-row${isCrypto?' pie-leg-clickable':''}" data-idx="${idx}" ${isCrypto?'onclick="openCryptoBreakdown()"':''} onmouseenter="pieLegHover(${idx})" onmouseleave="pieLegHover(-1)" style="display:flex;align-items:center;justify-content:space-between;${isCrypto?'cursor:pointer;':''}">
       <span style="display:flex;align-items:center;gap:8px;">
@@ -4923,7 +4923,25 @@ function collectCryptoPositions(){
   });
   (D.manualCrypto||[]).forEach(a=>add(a.sym, (a.priceUSD||0)*a.qty, a.network, a.ch24, a.qty));
   D.btc.forEach(a=>{ if(a.priceUSD&&a.balance) add('BTC', a.balance*a.priceUSD, 'bitcoin', a.ch24, a.balance); });
-  return out;
+
+  // Consolidate same-symbol tokens across chains into one slice (e.g. USDC on 4 chains → one "USDC").
+  // Keeps value summed; drops the per-chain tag since it now spans chains.
+  const bySym = new Map();
+  const consolidated = [];
+  for(const p of out){
+    const sym = (p.name||'').toUpperCase();
+    if(bySym.has(sym)){
+      const e = bySym.get(sym);
+      e.value += p.value;
+      e._chains += 1;
+      e.chain = `${e._chains} chains`;
+    } else {
+      const e = {name:p.name, value:p.value, chain:p.chain, ch24:p.ch24, _chains:1};
+      bySym.set(sym, e);
+      consolidated.push(e);
+    }
+  }
+  return consolidated;
 }
 
 function toggleHeatmap(){ openCryptoBreakdown(); } // legacy menu entry now opens the breakdown
@@ -4947,9 +4965,9 @@ function openCryptoBreakdown(){
         <button onclick="document.getElementById('crypto-pie-modal').remove()" style="background:transparent;border:1px solid #2a2a2a;border-radius:8px;color:#888;width:32px;height:32px;cursor:pointer;font-size:14px">✕</button>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;color:#888;font-family:'JetBrains Mono',monospace">
-          <input type="checkbox" id="crypto-hide-small" ${window._cryptoHideSmall?'checked':''} onchange="toggleCryptoHideSmall()" style="accent-color:#00e676;cursor:pointer">
-          Hide small balances (&lt;1% each)
+        <label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;line-height:1;color:#aaa;font-family:'JetBrains Mono',monospace;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="crypto-hide-small" ${window._cryptoHideSmall?'checked':''} onchange="toggleCryptoHideSmall()" style="accent-color:#00e676;cursor:pointer;width:14px;height:14px;margin:0">
+          Hide small balances (&lt;1%)
         </label>
       </div>
       <div style="position:relative;height:260px;margin-bottom:20px">
