@@ -1,5 +1,5 @@
 // api/hyperliquid.js — Hyperliquid wallet proxy
-// Fetches HyperCore spot balances + HyperEVM token balances
+// Fetches HyperCore spot + perp balances AND HyperEVM native + token balances
 // Hyperliquid API: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api
 
 module.exports = async function handler(req, res) {
@@ -16,77 +16,37 @@ module.exports = async function handler(req, res) {
   const headers = { 'Content-Type': 'application/json' };
   const positions = [];
 
-  try {
-    // ── 1. Fetch spot token metadata (name/symbol mapping) ────
-    let tokenMeta = {};
-    try {
-      const metaRes = await fetch(HL_API, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ type: 'spotMeta' }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (metaRes.ok) {
-        const meta = await metaRes.json();
-        // tokens array: [{name, szDecimals, weiDecimals, index, tokenId, ...}]
-        (meta.tokens || []).forEach(t => {
-          tokenMeta[t.index] = { symbol: t.name, decimals: t.weiDecimals || 8 };
-        });
-        // universe has {name, tokens:[idx1,idx2]} — first token is base
-        (meta.universe || []).forEach(u => {
-          const baseIdx = u.tokens?.[0];
-          if (baseIdx != null && tokenMeta[baseIdx]) {
-            tokenMeta[baseIdx].pairName = u.name;
-          }
-        });
-      }
-    } catch(e) { console.warn('spotMeta failed:', e.message); }
+  const post = (body, ms = 10000) =>
+    fetch(HL_API, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
 
-    // ── 2. Fetch HyperCore spot balances ─────────────────────
+  try {
+    // ── 1. HyperCore spot balances ────────────────────────────
     try {
-      const spotRes = await fetch(HL_API, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ type: 'spotClearinghouseState', user: address }),
-        signal: AbortSignal.timeout(10000),
-      });
+      const spotRes = await post({ type: 'spotClearinghouseState', user: address });
       if (spotRes.ok) {
         const spotData = await spotRes.json();
-        // balances: [{coin, hold, total, entryNtl}]
-        const balances = spotData.balances || [];
-
-        for (const b of balances) {
+        for (const b of (spotData.balances || [])) {
           const total = parseFloat(b.total || 0);
           if (total <= 0) continue;
-
           positions.push({
             id: `hl-spot-${b.coin}`,
             symbol: b.coin,
             name: b.coin === 'USDC' ? 'USD Coin' : b.coin,
             chain: 'hyperliquid',
             balance: total,
-            priceUSD: 0, // will be enriched via Jupiter/CoinGecko
-            valueUSD: 0,
-            ch24: null,
-            logo: '',
+            priceUSD: 0, valueUSD: 0, ch24: null, logo: '',
             source: 'hypercore-spot',
           });
         }
       }
-    } catch(e) { console.warn('spotClearinghouseState failed:', e.message); }
+    } catch (e) { console.warn('spotClearinghouseState failed:', e.message); }
 
-    // ── 3. Fetch perp account value (USDC in perp margin) ─────
+    // ── 2. Perp account value (USDC margin) ───────────────────
     try {
-      const perpRes = await fetch(HL_API, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ type: 'clearinghouseState', user: address }),
-        signal: AbortSignal.timeout(10000),
-      });
+      const perpRes = await post({ type: 'clearinghouseState', user: address });
       if (perpRes.ok) {
         const perpData = await perpRes.json();
-        const marginSummary = perpData.marginSummary || {};
-        const accountValue = parseFloat(marginSummary.accountValue || 0);
+        const accountValue = parseFloat(perpData.marginSummary?.accountValue || 0);
         if (accountValue > 0.01) {
           positions.push({
             id: 'hl-perp-margin',
@@ -94,36 +54,27 @@ module.exports = async function handler(req, res) {
             name: 'Perp Margin (USDC)',
             chain: 'hyperliquid',
             balance: accountValue,
-            priceUSD: 1,
-            valueUSD: accountValue,
-            ch24: null,
-            logo: '',
+            priceUSD: 1, valueUSD: accountValue, ch24: null, logo: '',
             source: 'hypercore-perp',
           });
         }
       }
-    } catch(e) { console.warn('clearinghouseState failed:', e.message); }
+    } catch (e) { console.warn('clearinghouseState failed:', e.message); }
 
-    // ── 4. Fetch HyperEVM token balances ──────────────────────
-    // HyperEVM is EVM-compatible, RPC: https://rpc.hyperliquid.xyz/evm
-    try {
-      const HYPER_EVM_RPC = 'https://rpc.hyperliquid.xyz/evm';
-
-      // Get native HYPE balance on HyperEVM
-      const nativeRes = await fetch(HYPER_EVM_RPC, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 1,
-          method: 'eth_getBalance',
-          params: [address, 'latest'],
-        }),
+    // ── 3. HyperEVM native HYPE ───────────────────────────────
+    const HYPER_EVM_RPC = 'https://rpc.hyperliquid.xyz/evm';
+    const rpc = (method, params, id = 1) =>
+      fetch(HYPER_EVM_RPC, {
+        method: 'POST', headers,
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
         signal: AbortSignal.timeout(8000),
       });
+
+    try {
+      const nativeRes = await rpc('eth_getBalance', [address, 'latest']);
       if (nativeRes.ok) {
         const nativeData = await nativeRes.json();
-        const weiHex = nativeData.result || '0x0';
-        const hypeBalance = parseInt(weiHex, 16) / 1e18;
+        const hypeBalance = parseInt(nativeData.result || '0x0', 16) / 1e18;
         if (hypeBalance > 0.0001) {
           positions.push({
             id: 'hyperevm-hype',
@@ -131,84 +82,102 @@ module.exports = async function handler(req, res) {
             name: 'Hyperliquid (HyperEVM)',
             chain: 'hyperevm',
             balance: hypeBalance,
-            priceUSD: 0,
-            valueUSD: 0,
-            ch24: null,
-            logo: '',
+            priceUSD: 0, valueUSD: 0, ch24: null, logo: '',
             source: 'hyperevm-native',
           });
         }
       }
-    } catch(e) { console.warn('HyperEVM RPC failed:', e.message); }
+    } catch (e) { console.warn('HyperEVM native failed:', e.message); }
 
-    // ── 5. Get prices for all tokens ──────────────────────────
-    // Use CoinGecko for HYPE + common tokens
-    const priceMap = {};
-    const symbolsToPrice = [...new Set(positions.map(p => p.symbol))];
+    // ── 4. HyperEVM ERC-20 token balances ─────────────────────
+    // eth_getBalance ONLY returns native HYPE. ERC-20 tokens (USDC, USDT, etc.
+    // bridged to HyperEVM) must be read from each token contract via balanceOf.
+    // Hyperliquid's spotMeta exposes each token's EVM contract (evmContract.address).
+    try {
+      const metaRes = await post({ type: 'spotMeta' }, 8000);
+      if (metaRes.ok) {
+        const meta = await metaRes.json();
+        // tokens: [{ name, weiDecimals, evmContract:{address, evm_extra_wei_decimals}, ... }]
+        const evmTokens = (meta.tokens || []).filter(t => t.evmContract?.address);
 
-    // Map known symbols to CoinGecko IDs
+        // balanceOf(address) selector = 0x70a08231 + 32-byte padded address
+        const addrNoPrefix = address.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+        const callData = '0x70a08231' + addrNoPrefix;
+
+        // Query each token contract (cap at 40 to stay within function time budget)
+        const calls = evmTokens.slice(0, 40).map((t, i) =>
+          rpc('eth_call', [{ to: t.evmContract.address, data: callData }, 'latest'], i + 10)
+            .then(r => r.ok ? r.json() : null)
+            .then(j => ({ token: t, hex: j?.result }))
+            .catch(() => null)
+        );
+        const results = await Promise.all(calls);
+
+        for (const out of results) {
+          if (!out || !out.hex || out.hex === '0x') continue;
+          const raw = BigInt(out.hex);
+          if (raw === 0n) continue;
+          const t = out.token;
+          // On-chain decimals = weiDecimals + evm_extra_wei_decimals (per HL docs)
+          const decimals = (t.weiDecimals || 0) + (t.evmContract.evm_extra_wei_decimals || 0);
+          const bal = Number(raw) / Math.pow(10, decimals);
+          if (bal <= 0) continue;
+          positions.push({
+            id: `hyperevm-${t.name}`,
+            symbol: t.name,
+            name: `${t.name} (HyperEVM)`,
+            chain: 'hyperevm',
+            balance: bal,
+            priceUSD: 0, valueUSD: 0, ch24: null, logo: '',
+            source: 'hyperevm-token',
+          });
+        }
+      }
+    } catch (e) { console.warn('HyperEVM tokens failed:', e.message); }
+
+    // ── 5. Price everything (CoinGecko for what we can map) ────
     const COINGECKO_IDS = {
-      'HYPE': 'hyperliquid',
-      'BTC': 'bitcoin',
-      'ETH': 'ethereum',
-      'USDC': 'usd-coin',
-      'USDT': 'tether',
-      'SOL': 'solana',
-      'ARB': 'arbitrum',
-      'OP': 'optimism',
-      'AVAX': 'avalanche-2',
-      'LINK': 'chainlink',
-      'UNI': 'uniswap',
-      'AAVE': 'aave',
-      'PURR': 'purr-hyperliquid',
+      HYPE: 'hyperliquid', BTC: 'bitcoin', ETH: 'ethereum', WETH: 'weth',
+      USDC: 'usd-coin', USDT: 'tether', USDE: 'ethena-usde', SOL: 'solana',
+      ARB: 'arbitrum', OP: 'optimism', AVAX: 'avalanche-2', LINK: 'chainlink',
+      UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-hyperliquid', WBTC: 'wrapped-bitcoin',
     };
-
-    const coinIds = symbolsToPrice
-      .map(s => COINGECKO_IDS[s])
-      .filter(Boolean)
-      .join(',');
-
-    if (coinIds) {
+    const priceMap = {};
+    const wantIds = [...new Set(positions.map(p => COINGECKO_IDS[p.symbol]).filter(Boolean))].join(',');
+    if (wantIds) {
       try {
         const cgRes = await fetch(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd&include_24hr_change=true`,
+          `https://api.coingecko.com/api/v3/simple/price?ids=${wantIds}&vs_currencies=usd&include_24hr_change=true`,
           { signal: AbortSignal.timeout(8000) }
         );
         if (cgRes.ok) {
-          const cgData = await cgRes.json();
-          // Reverse map: coingecko id → price
+          const cg = await cgRes.json();
           Object.entries(COINGECKO_IDS).forEach(([sym, id]) => {
-            if (cgData[id]) {
-              priceMap[sym] = {
-                price: cgData[id].usd || 0,
-                ch24: cgData[id].usd_24h_change || null,
-              };
-            }
+            if (cg[id]) priceMap[sym] = { price: cg[id].usd || 0, ch24: cg[id].usd_24h_change ?? null };
           });
         }
-      } catch(e) { console.warn('CoinGecko price fetch failed:', e.message); }
+      } catch (e) { console.warn('CoinGecko failed:', e.message); }
     }
+    // Stables are $1 regardless of feed
+    priceMap.USDC = { price: 1, ch24: 0 };
+    priceMap.USDT = { price: 1, ch24: 0 };
+    priceMap.USDE = priceMap.USDE || { price: 1, ch24: 0 };
 
-    // USDC is always $1
-    priceMap['USDC'] = { price: 1, ch24: 0 };
-    priceMap['USDT'] = { price: 1, ch24: 0 };
-
-    // Apply prices to positions
     positions.forEach(p => {
-      const priceInfo = priceMap[p.symbol];
-      if (priceInfo) {
-        p.priceUSD = priceInfo.price;
-        p.valueUSD = p.balance * priceInfo.price;
-        p.ch24 = priceInfo.ch24;
+      const info = priceMap[p.symbol];
+      if (info) {
+        p.priceUSD = info.price;
+        p.valueUSD = p.balance * info.price;
+        p.ch24 = info.ch24;
       }
+      // Unpriced tokens keep priceUSD:0 / valueUSD:0 but are STILL returned,
+      // so the frontend can show the balance even without a USD price.
     });
 
-    // Sort by value descending
     positions.sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0));
-
     return res.status(200).json({ positions });
 
-  } catch(err) {
+  } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 };
