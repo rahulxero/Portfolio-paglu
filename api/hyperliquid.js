@@ -140,7 +140,7 @@ module.exports = async function handler(req, res) {
       HYPE: 'hyperliquid', BTC: 'bitcoin', ETH: 'ethereum', WETH: 'weth',
       USDC: 'usd-coin', USDT: 'tether', USDE: 'ethena-usde', SOL: 'solana',
       ARB: 'arbitrum', OP: 'optimism', AVAX: 'avalanche-2', LINK: 'chainlink',
-      UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-hyperliquid', WBTC: 'wrapped-bitcoin',
+      UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-2', WBTC: 'wrapped-bitcoin',
     };
     const priceMap = {};
     const wantIds = [...new Set(positions.map(p => COINGECKO_IDS[p.symbol]).filter(Boolean))].join(',');
