@@ -4925,18 +4925,27 @@ function collectCryptoPositions(){
   D.btc.forEach(a=>{ if(a.priceUSD&&a.balance) add('BTC', a.balance*a.priceUSD, 'bitcoin', a.ch24, a.balance); });
 
   // Consolidate same-symbol tokens across chains into one slice (e.g. USDC on 4 chains → one "USDC").
-  // Keeps value summed; drops the per-chain tag since it now spans chains.
+  // Normalize common stablecoin variants so bridged/native forms merge (USDT0, USD₮, USDC.e, etc.)
+  const normSym = raw => {
+    let s = (raw||'').toUpperCase().replace(/[₮]/g,'T').replace(/\.(E|B|POS|ARB|OP)$/,'').trim();
+    if(/^USDT\d*$/.test(s)) return 'USDT';       // USDT, USDT0, USDT1
+    if(/^USDC\d*$/.test(s)) return 'USDC';       // USDC, USDC0
+    if(s==='USDBC'||s==='USDC.E') return 'USDC';
+    if(s==='USDTE') return 'USDT';
+    return s;
+  };
   const bySym = new Map();
   const consolidated = [];
   for(const p of out){
-    const sym = (p.name||'').toUpperCase();
+    const sym = normSym(p.name);
     if(bySym.has(sym)){
       const e = bySym.get(sym);
       e.value += p.value;
       e._chains += 1;
       e.chain = `${e._chains} chains`;
     } else {
-      const e = {name:p.name, value:p.value, chain:p.chain, ch24:p.ch24, _chains:1};
+      // Use the normalized symbol as the display name so USDT0 shows as USDT
+      const e = {name:sym, value:p.value, chain:p.chain, ch24:p.ch24, _chains:1};
       bySym.set(sym, e);
       consolidated.push(e);
     }
@@ -4949,6 +4958,12 @@ function toggleHeatmap(){ openCryptoBreakdown(); } // legacy menu entry now open
 function toggleCryptoHideSmall(){
   window._cryptoHideSmall = !window._cryptoHideSmall;
   localStorage.setItem('cryptoHideSmall', window._cryptoHideSmall?'1':'0');
+  const box = document.getElementById('crypto-hide-box');
+  if(box){
+    box.textContent = window._cryptoHideSmall ? '✓' : '';
+    box.style.background = window._cryptoHideSmall ? '#00e676' : 'transparent';
+    box.style.borderColor = window._cryptoHideSmall ? '#00e676' : '#444';
+  }
   renderCryptoBreakdown();
 }
 
@@ -4965,8 +4980,8 @@ function openCryptoBreakdown(){
         <button onclick="document.getElementById('crypto-pie-modal').remove()" style="background:transparent;border:1px solid #2a2a2a;border-radius:8px;color:#888;width:32px;height:32px;cursor:pointer;font-size:14px">✕</button>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-        <label style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;line-height:1;color:#aaa;font-family:'JetBrains Mono',monospace;text-transform:none;letter-spacing:0">
-          <input type="checkbox" id="crypto-hide-small" ${window._cryptoHideSmall?'checked':''} onchange="toggleCryptoHideSmall()" style="accent-color:#00e676;cursor:pointer;width:14px;height:14px;margin:0">
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;line-height:1;color:#bbb;font-family:'JetBrains Mono',monospace;text-transform:none;letter-spacing:0" onclick="toggleCryptoHideSmall()">
+          <span id="crypto-hide-box" style="width:18px;height:18px;border:1.5px solid ${window._cryptoHideSmall?'#00e676':'#444'};border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:${window._cryptoHideSmall?'#00e676':'transparent'};color:#04140b;font-size:12px;font-weight:800;flex-shrink:0;transition:all .12s">${window._cryptoHideSmall?'✓':''}</span>
           Hide small balances (&lt;1%)
         </label>
       </div>
@@ -5023,14 +5038,14 @@ function renderCryptoBreakdown(){
   });
 
   legEl.innerHTML = items.map((p,i)=>`
-    <span class="pie-leg-row" onmouseenter="cryptoLegHover(${i})" onmouseleave="cryptoLegHover(-1)" style="display:flex;align-items:center;justify-content:space-between">
-      <span style="display:flex;align-items:center;gap:8px">
-        <span class="pie-leg-dot" style="width:8px;height:8px;background:${colors[i]};color:${colors[i]};border-radius:2px;display:inline-block"></span>
-        <span style="color:#aaa;font-size:11px">${esc(p.name)}${p.chain?` <span style="color:#555;font-size:9px">${esc(p.chain)}</span>`:''}</span>
+    <span class="pie-leg-row" onmouseenter="cryptoLegHover(${i})" onmouseleave="cryptoLegHover(-1)" style="display:flex;align-items:center;justify-content:space-between;padding:7px 8px">
+      <span style="display:flex;align-items:center;gap:10px">
+        <span class="pie-leg-dot" style="width:10px;height:10px;background:${colors[i]};color:${colors[i]};border-radius:3px;display:inline-block"></span>
+        <span style="color:#ddd;font-size:14px;font-weight:500">${esc(p.name)}${p.chain?` <span style="color:#666;font-size:11px">${esc(p.chain)}</span>`:''}</span>
       </span>
-      <span style="display:flex;gap:10px;align-items:center">
-        ${p.ch24!=null&&!p._isOthers?`<span style="font-size:10px;color:${p.ch24>=0?'#00e676':'#ff6b6b'}">${p.ch24>=0?'+':''}${p.ch24.toFixed(1)}%</span>`:''}
-        <span style="color:#fff;font-size:11px;font-weight:500;min-width:44px;text-align:right">${(p.value/total*100).toFixed(1)}%</span>
+      <span style="display:flex;gap:14px;align-items:center">
+        ${p.ch24!=null&&!p._isOthers?`<span style="font-size:12px;color:${p.ch24>=0?'#00e676':'#ff6b6b'}">${p.ch24>=0?'+':''}${p.ch24.toFixed(1)}%</span>`:''}
+        <span style="color:#fff;font-size:14px;font-weight:600;min-width:52px;text-align:right">${(p.value/total*100).toFixed(1)}%</span>
       </span>
     </span>`).join('');
 }
