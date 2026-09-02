@@ -4960,11 +4960,16 @@ function collectCryptoPositions(){
     if(bySym.has(sym)){
       const e = bySym.get(sym);
       e.value += p.value;
-      e._chains += 1;
-      e.chain = `${e._chains} chains`;
+      const ck = (p.chain||'').toLowerCase();
+      if(!e._chainSet.has(ck)) e._chainSet.add(ck);
+      // hyperliquid + hyperevm are same ecosystem → collapse to one label
+      const hasHL = [...e._chainSet].some(c=>c.includes('hyperliquid')||c.includes('hyperevm'));
+      const others = [...e._chainSet].filter(c=>!c.includes('hyperliquid')&&!c.includes('hyperevm'));
+      const parts = [...(hasHL?['hyperliquid']:[]), ...others];
+      e.chain = parts.length > 1 ? `${parts.length} chains` : (parts[0] || e.chain);
     } else {
       // Use the normalized symbol as the display name so USDT0 shows as USDT
-      const e = {name:sym, value:p.value, chain:p.chain, ch24:p.ch24, _chains:1};
+      const e = {name:sym, value:p.value, chain:p.chain, ch24:p.ch24, _chains:1, _chainSet:new Set([(p.chain||'').toLowerCase()])};
       bySym.set(sym, e);
       consolidated.push(e);
     }
@@ -5001,7 +5006,7 @@ function openCryptoBreakdown(){
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
         <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;line-height:1;color:#bbb;font-family:'JetBrains Mono',monospace;text-transform:none;letter-spacing:0" onclick="toggleCryptoHideSmall()">
           <span id="crypto-hide-box" style="width:18px;height:18px;border:1.5px solid ${window._cryptoHideSmall?'#00e676':'#444'};border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:${window._cryptoHideSmall?'#00e676':'transparent'};color:#04140b;font-size:12px;font-weight:800;flex-shrink:0;transition:all .12s">${window._cryptoHideSmall?'✓':''}</span>
-          Hide small balances (&lt;$50)
+          Hide small balances
         </label>
       </div>
       <div style="position:relative;height:260px;margin-bottom:20px">
