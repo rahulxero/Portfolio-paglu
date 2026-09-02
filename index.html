@@ -170,19 +170,36 @@
 
     /* ── HEADER BUTTONS — equal size ─────────────────────── */
     .hdr-refresh {
-      display: inline-flex; align-items: center; gap: 7px;
-      height: 52px; padding: 0 20px; flex-shrink: 0;
-      background: linear-gradient(135deg, #00e676 0%, #00b85c 100%);
-      color: #04140b; font-family: 'Syne', sans-serif; font-weight: 700;
-      font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
-      border: none; border-radius: 10px; cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0,230,118,.28);
-      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 52px; padding: 0 22px; flex-shrink: 0;
+      background: #0f1a13;
+      color: #4ade80; font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+      border: 1px solid #1d3a28; border-radius: 12px; cursor: pointer;
+      position: relative; overflow: hidden;
+      transition: all .18s ease;
     }
-    .hdr-refresh:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(0,230,118,.42); filter: brightness(1.06); }
-    .hdr-refresh:active { transform: translateY(0); box-shadow: 0 3px 10px rgba(0,230,118,.3); }
-    .hdr-refresh:disabled { opacity: .55; cursor: default; box-shadow: none; transform: none; filter: grayscale(.3); }
-    .hdr-refresh-ic { font-size: 16px; line-height: 1; display: inline-block; }
+    .hdr-refresh::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(0,230,118,.14), rgba(0,230,118,0));
+      opacity: 0; transition: opacity .18s ease;
+    }
+    .hdr-refresh:hover {
+      border-color: #2fae6b; color: #6ee79b;
+      box-shadow: 0 4px 20px rgba(0,230,118,.18);
+      transform: translateY(-1px);
+    }
+    .hdr-refresh:hover::before { opacity: 1; }
+    .hdr-refresh:active { transform: translateY(0); }
+    .hdr-refresh:disabled { cursor: default; }
+    .hdr-refresh-ic { font-size: 15px; line-height: 1; display: inline-block; position: relative; z-index: 1; }
+    .hdr-refresh-lbl { position: relative; z-index: 1; }
+    /* Fetching state: filled green, icon spins */
+    .hdr-refresh.spinning {
+      background: linear-gradient(135deg, #00e676, #00b85c);
+      color: #04140b; border-color: transparent;
+      box-shadow: 0 4px 18px rgba(0,230,118,.35);
+    }
     .hdr-refresh.spinning .hdr-refresh-ic { animation: hdrSpin .8s linear infinite; }
     @keyframes hdrSpin { to { transform: rotate(360deg); } }
     .hdr-menu-wrap { position: relative; display: inline-block; }    .hdr-menu {
@@ -4902,9 +4919,11 @@ window._cryptoHideSmall = localStorage.getItem('cryptoHideSmall')==='1';
 function collectCryptoPositions(){
   const seen = new Map();
   const out = [];
-  const add = (sym, valUSD, chain, ch24, balance)=>{
+  // walletId scopes the dedup: two different wallets holding the same token+amount are
+  // BOTH kept (real separate holdings); only a Zerion/HL duplicate *within one wallet* collapses.
+  const add = (sym, valUSD, chain, ch24, balance, walletId)=>{
     if(!(valUSD>0)) return;
-    const key = `${(sym||'').toUpperCase()}|${(chain||'').toLowerCase()}|${Number(balance||0).toFixed(6)}`;
+    const key = `${walletId||'?'}|${(sym||'').toUpperCase()}|${(chain||'').toLowerCase()}|${Number(balance||0).toFixed(6)}`;
     if(seen.has(key)){
       const i = seen.get(key);
       if(valUSD > out[i].value){ out[i] = {name:sym, value:valUSD, chain, ch24}; }
@@ -4915,14 +4934,14 @@ function collectCryptoPositions(){
   };
   D.wallets.forEach(w=>(w.positions||[]).forEach(p=>{
     if(p.source==='polymarket') return;
-    add(p.symbol, p.valueUSD||0, p.chain, p.ch24, p.balance);
+    add(p.symbol, p.valueUSD||0, p.chain, p.ch24, p.balance, w.id||w.address);
   }));
   D.others.forEach(a=>{
-    if(a.positions?.length) a.positions.forEach(p=>add(p.symbol, p.valueUSD||0, p.chain, p.ch24, p.balance));
-    else if(a.balance&&a.priceUSD) add((a.type||'').toUpperCase(), a.balance*a.priceUSD, a.type, a.ch24, a.balance);
+    if(a.positions?.length) a.positions.forEach(p=>add(p.symbol, p.valueUSD||0, p.chain, p.ch24, p.balance, a.id||a.address));
+    else if(a.balance&&a.priceUSD) add((a.type||'').toUpperCase(), a.balance*a.priceUSD, a.type, a.ch24, a.balance, a.id||a.address);
   });
-  (D.manualCrypto||[]).forEach(a=>add(a.sym, (a.priceUSD||0)*a.qty, a.network, a.ch24, a.qty));
-  D.btc.forEach(a=>{ if(a.priceUSD&&a.balance) add('BTC', a.balance*a.priceUSD, 'bitcoin', a.ch24, a.balance); });
+  (D.manualCrypto||[]).forEach(a=>add(a.sym, (a.priceUSD||0)*a.qty, a.network, a.ch24, a.qty, 'manual-'+(a.id||a.sym)));
+  D.btc.forEach(a=>{ if(a.priceUSD&&a.balance) add('BTC', a.balance*a.priceUSD, 'bitcoin', a.ch24, a.balance, a.id||a.address); });
 
   // Consolidate same-symbol tokens across chains into one slice (e.g. USDC on 4 chains → one "USDC").
   // Normalize common stablecoin variants so bridged/native forms merge (USDT0, USD₮, USDC.e, etc.)
