@@ -5001,7 +5001,7 @@ function openCryptoBreakdown(){
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
         <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;line-height:1;color:#bbb;font-family:'JetBrains Mono',monospace;text-transform:none;letter-spacing:0" onclick="toggleCryptoHideSmall()">
           <span id="crypto-hide-box" style="width:18px;height:18px;border:1.5px solid ${window._cryptoHideSmall?'#00e676':'#444'};border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:${window._cryptoHideSmall?'#00e676':'transparent'};color:#04140b;font-size:12px;font-weight:800;flex-shrink:0;transition:all .12s">${window._cryptoHideSmall?'✓':''}</span>
-          Hide small balances (&lt;1%)
+          Hide small balances (&lt;$50)
         </label>
       </div>
       <div style="position:relative;height:260px;margin-bottom:20px">
@@ -5030,7 +5030,7 @@ function renderCryptoBreakdown(){
   if(window._cryptoHideSmall){
     const kept = [];
     items.forEach(p=>{
-      if(p.value/total < 0.01){ hiddenCount++; hiddenVal += p.value; }
+      if(p.value < 50){ hiddenCount++; hiddenVal += p.value; }
       else kept.push(p);
     });
     items = kept;
