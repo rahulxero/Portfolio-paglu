@@ -1643,19 +1643,8 @@ async function fetchWalletPositions(wallet){
     }catch(e){ console.warn('Hyperliquid fetch failed:', e.message); }
   }
 
-  // ── Lighter perp DEX ─────────────────────────────────────
-  // Same EVM address can have a Lighter account — check automatically for all EVM wallets
+  // Lighter positions are fetched inside /api/hyperliquid (combined to save function slots)
   let lighterPositions = [];
-  if(wallet.includeHL){
-    try{
-      const r = await fetch('/api/lighter', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ address: wallet.address }),
-        signal: makeSig(12000),
-      });
-      if(r.ok){ const d=await r.json(); lighterPositions = d.positions||[]; }
-    }catch(e){ console.warn('Lighter fetch failed:', e.message); }
-  }
 
   // ── Polymarket positions ──────────────────────────────────
   let polyPositions = [];
