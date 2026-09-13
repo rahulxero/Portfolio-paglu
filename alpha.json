@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-12T06:19:09+00:00",
+  "updated": "2026-09-13T06:39:56+00:00",
   "companies": [
     {
       "rank": 1,
@@ -129,7 +129,7 @@
       "sector": "Industrials",
       "fcf_yield": null,
       "ev_ebitda": 665.785,
-      "ps": 86.49614,
+      "ps": 86.44632,
       "roe": null,
       "net_margin": -38.6,
       "logo": "logos/SPCX.png"
@@ -281,7 +281,7 @@
       "sector": "Healthcare",
       "fcf_yield": 1.11,
       "ev_ebitda": 24.947,
-      "ps": 12.488586,
+      "ps": 12.483205,
       "roe": 102.3,
       "net_margin": 39.1,
       "logo": "logos/LLY.png"
@@ -338,7 +338,7 @@
       "sector": "Consumer Defensive",
       "fcf_yield": 0.84,
       "ev_ebitda": 20.88,
-      "ps": 1.1588228,
+      "ps": 1.1552796,
       "roe": 22.3,
       "net_margin": 4.6,
       "logo": "logos/WMT.png"
@@ -351,7 +351,7 @@
       "market_cap": 842560000000.0,
       "earnings": 6469000192,
       "revenue": 41305001984,
-      "pe": 128.07196,
+      "pe": 131.66582,
       "forward_pe": 33.276188,
       "dividend_yield": null,
       "sector": "Technology",
@@ -409,7 +409,7 @@
       "earnings": 14520000000.0,
       "revenue": 35327500288,
       "pe": 44.92,
-      "forward_pe": 28.224884,
+      "forward_pe": 28.296152,
       "dividend_yield": 0.53,
       "sector": "Technology",
       "fcf_yield": 1.29,
