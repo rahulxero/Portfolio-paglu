@@ -158,6 +158,14 @@
     .charts-row, .edit-modal { border-radius: 8px; }
     .logo-mark { border-radius: 0 !important; overflow: visible !important; }
     .insights-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0 4px;}
+    .perp-oi-panel { display:none; margin-bottom:16px; }
+    .perp-oi-row { display:grid; grid-template-columns:28px 1.8fr 1fr 1fr; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid #0d0d0d; font-family:'JetBrains Mono',monospace; font-size:12px; }
+    .perp-oi-row:last-child { border-bottom:none; }
+    .perp-oi-row:hover { background:#060606; }
+    .perp-oi-rank { color:#555; font-size:10px; text-align:center; }
+    .perp-oi-name { color:#ddd; font-weight:600; }
+    .perp-oi-oi { color:#fff; text-align:right; font-weight:500; }
+    .perp-oi-chg { text-align:right; font-size:11px; }
     .insight-card{background:#0b0b0b;border:1px solid #1a1a1a;border-radius:10px;padding:13px 15px;font-family:'JetBrains Mono',monospace;}
     .insight-lbl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:7px;}
     .insight-main{font-size:14px;color:#eee;font-weight:600;line-height:1.35;}
@@ -846,6 +854,7 @@
       <button class="hdr-btn hdr-btn-sq" id="hdr-menu-btn" onclick="toggleHdrMenu(event)" title="Menu" aria-label="Menu" aria-expanded="false">☰</button>
       <div class="hdr-menu" id="hdr-menu">
         <button class="hdr-menu-item" onclick="openCryptoBreakdown();closeHdrMenu()"><span class="hdr-menu-ic">◑</span> Crypto Breakdown</button>
+        <button class="hdr-menu-item" onclick="openPerpOI();closeHdrMenu()"><span class="hdr-menu-ic">📊</span> Perp DEX OI</button>
         <button class="hdr-menu-item" onclick="toggleRebal();closeHdrMenu()"><span class="hdr-menu-ic">⚖</span> Rebalance</button>
         <button class="hdr-menu-item" onclick="openShareCard();closeHdrMenu()"><span class="hdr-menu-ic">↗</span> Share</button>
         <button class="hdr-menu-item" id="history-menu-item" onclick="openHistory();closeHdrMenu()" style="display:none"><span class="hdr-menu-ic">📈</span> History</button>
@@ -1021,7 +1030,29 @@
   </div>
 
   <!-- Rebalancing Calculator -->
-  <div class="hc" id="rebal-panel" style="display:none;margin-bottom:16px">
+  <div class="hc perp-oi-panel" id="perp-oi-panel">
+    <div class="cc-hdr" style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <span class="cc-title">Perp DEX Open Interest</span>
+        <span style="font-size:10px;color:#555;font-family:'JetBrains Mono',monospace;margin-left:8px">via DefiLlama · top 25</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="perp-oi-ts" style="font-size:10px;color:#555;font-family:'JetBrains Mono',monospace"></span>
+        <button class="btn btn-ghost" onclick="closePerpOI()" style="font-size:11px;padding:2px 8px">✕</button>
+      </div>
+    </div>
+    <div class="cc">
+      <div class="perp-oi-row" style="border-bottom:1px solid #1a1a1a;padding-bottom:6px;margin-bottom:2px">
+        <span class="perp-oi-rank">#</span>
+        <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;font-family:'JetBrains Mono',monospace">Protocol</span>
+        <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;font-family:'JetBrains Mono',monospace;text-align:right">Open Interest</span>
+        <span style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#555;font-family:'JetBrains Mono',monospace;text-align:right">7d Change</span>
+      </div>
+      <div id="perp-oi-body" style="min-height:60px">
+        <div style="padding:24px;text-align:center;color:#555;font-size:12px;font-family:'JetBrains Mono',monospace">Loading OI data…</div>
+      </div>
+    </div>
+  </div> style="display:none;margin-bottom:16px">
     <div class="cc-hdr"><span class="cc-title">Rebalancing Calculator</span><button class="btn btn-ghost" onclick="document.getElementById('rebal-panel').style.display='none'" style="font-size:11px">✕</button></div>
     <div id="rebal-body" style="padding:16px 0"></div>
   </div>
@@ -1612,6 +1643,20 @@ async function fetchWalletPositions(wallet){
     }catch(e){ console.warn('Hyperliquid fetch failed:', e.message); }
   }
 
+  // ── Lighter perp DEX ─────────────────────────────────────
+  // Same EVM address can have a Lighter account — check automatically for all EVM wallets
+  let lighterPositions = [];
+  if(wallet.includeHL){
+    try{
+      const r = await fetch('/api/lighter', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ address: wallet.address }),
+        signal: makeSig(12000),
+      });
+      if(r.ok){ const d=await r.json(); lighterPositions = d.positions||[]; }
+    }catch(e){ console.warn('Lighter fetch failed:', e.message); }
+  }
+
   // ── Polymarket positions ──────────────────────────────────
   let polyPositions = [];
   if(wallet.includeHL){ // includeHL wallets also check Polymarket (same EVM address)
@@ -1629,9 +1674,10 @@ async function fetchWalletPositions(wallet){
     }catch(e){ console.warn('Polymarket fetch failed:', e.message); }
   }
 
-  // Merge all positions, then dedup: Zerion already indexes HyperEVM, so a HyperEVM token
-  // can come back from BOTH Zerion and the /api/hyperliquid call. Collapse those.
-  const merged = [...evmPositions, ...hlPositions, ...polyPositions];
+  // Merge all positions — dedup by wallet+symbol+chain+balance to collapse Zerion/HL
+  // duplicates within the same wallet while keeping cross-wallet same-token holdings separate.
+  // Lighter positions use source:'lighter-*' so they never collide with Zerion/HL tags.
+  const merged = [...evmPositions, ...hlPositions, ...lighterPositions, ...polyPositions];
   const seen = new Map();
   const deduped = [];
   for(const p of merged){
@@ -5159,8 +5205,82 @@ async function downloadCard(){
 // ══════════════════════════════════════════════════════════
 //  DARK / LIGHT MODE
 // ══════════════════════════════════════════════════════════
-function toggleHdrMenu(e){
-  if(e) e.stopPropagation();
+// ══════════════════════════════════════════════════════════
+// PERP DEX OI PANEL — powered by DefiLlama
+// ══════════════════════════════════════════════════════════
+let _perpOICache = null, _perpOIFetching = false;
+
+function openPerpOI(){
+  const panel = document.getElementById('perp-oi-panel');
+  if(!panel) return;
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
+  if(!_perpOICache) fetchPerpOI();
+}
+
+function closePerpOI(){
+  const panel = document.getElementById('perp-oi-panel');
+  if(panel) panel.style.display = 'none';
+}
+
+async function fetchPerpOI(){
+  if(_perpOIFetching) return;
+  _perpOIFetching = true;
+  const body = document.getElementById('perp-oi-body');
+  const ts = document.getElementById('perp-oi-ts');
+  if(!body) return;
+
+  try {
+    // DefiLlama derivatives overview — returns all perp protocols with OI and daily/weekly volume
+    const r = await fetch(
+      'https://api.llama.fi/overview/derivatives?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true',
+      { signal: makeSig(12000) }
+    );
+    if(!r.ok) throw new Error('DefiLlama OI API returned '+r.status);
+    const d = await r.json();
+
+    // Sort by openInterest desc, take top 25, skip HL since user already tracks it
+    const protocols = (d.protocols || [])
+      .filter(p => p.openInterest > 0 && !(p.name||'').toLowerCase().includes('hyperliquid'))
+      .sort((a,b) => (b.openInterest||0) - (a.openInterest||0))
+      .slice(0, 25);
+
+    _perpOICache = protocols;
+
+    const fmtOI = v => {
+      if(!v) return '—';
+      if(v >= 1e9) return '$'+(v/1e9).toFixed(2)+'B';
+      if(v >= 1e6) return '$'+(v/1e6).toFixed(1)+'M';
+      return '$'+(v/1e3).toFixed(0)+'K';
+    };
+    const fmtChg = v => {
+      if(v==null) return '<span style="color:#555">—</span>';
+      const cls = v>=0 ? 'color:#00e676' : 'color:#ff6b6b';
+      return `<span style="${cls}">${v>=0?'+':''}${v.toFixed(1)}%</span>`;
+    };
+
+    body.innerHTML = protocols.map((p, i) => {
+      // weekly change: compare current OI vs 7d-ago OI from the chart data
+      const weekChg = p.change_7d != null ? p.change_7d : null;
+      return `<div class="perp-oi-row">
+        <span class="perp-oi-rank">${i+1}</span>
+        <span class="perp-oi-name">${esc(p.displayName||p.name||'')}</span>
+        <span class="perp-oi-oi">${fmtOI(p.openInterest)}</span>
+        <span class="perp-oi-chg">${fmtChg(weekChg)}</span>
+      </div>`;
+    }).join('');
+
+    if(ts) ts.textContent = 'updated '+new Date().toLocaleTimeString();
+
+  } catch(e) {
+    if(body) body.innerHTML = `<div style="padding:20px 12px;color:#555;font-size:12px;font-family:'JetBrains Mono',monospace">Failed to load OI data: ${esc(e.message)}</div>`;
+    console.warn('Perp OI fetch failed:', e.message);
+  } finally {
+    _perpOIFetching = false;
+  }
+}
+
+function toggleHdrMenu(e){  if(e) e.stopPropagation();
   const m = document.getElementById('hdr-menu');
   const btn = document.getElementById('hdr-menu-btn');
   const open = m.classList.toggle('open');
