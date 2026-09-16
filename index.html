@@ -210,6 +210,29 @@
 
     /* Filter checkbox. The native control renders as a pale blob on dark, so
        it's hidden and a styled box is drawn in its place. */
+    /* Alpha table numbers. The shared .mv.sm is 11px at #ccc, which is hard to
+       scan across a wide table — these are bumped up and brightened, with
+       tabular figures so digits line up column to column. */
+    .a-sort{
+      cursor: pointer; user-select: none;
+      display: inline-flex; align-items: center; gap: 3px;
+      color: #7a7a7a; transition: color .12s;
+      white-space: nowrap;
+    }
+    .a-sort:hover{ color: #ddd; }
+    .a-sort.on{ color: #fff; }
+    .a-sort-ar{ font-size: 9px; opacity: .35; transition: opacity .12s; }
+    .a-sort:hover .a-sort-ar{ opacity: .8; }
+    .a-sort.on .a-sort-ar{ opacity: 1; }
+    .a-num{
+      font-family: var(--mono);
+      font-size: 13px;
+      color: #e8e8e8;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .01em;
+    }
+    .a-num.dim{ color: #9a9a9a; }
+    @media (max-width: 720px){ .a-num{ font-size: 12px; } }
     .a-check{
       display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
       font-size:10px; font-family:'JetBrains Mono',monospace; letter-spacing:.08em;
@@ -2625,13 +2648,13 @@ function valuationVerdict(c){
   return {label, tone, why:why.charAt(0).toUpperCase()+why.slice(1)+'.'};
 }
 
-const VERDICT_TONE={good:'#00e676',ok:'#7ee787',dim:'var(--t-soft)',warn:'#ffb454',bad:'#ff6b6b'};
+const VERDICT_TONE={good:'#4ade80',ok:'#86efac',dim:'#9a9a9a',warn:'#fbbf24',bad:'#ff8787'};
 
 function alphaCell(c,key,ctx){
   if(key==='sector')  return `<span class="as" style="white-space:nowrap">${esc(c.sector||c.country||'')}</span>`;
   if(key==='verdict'){
     const v=valuationVerdict(c);
-    return `<span class="mv sm" title="${esc(v.why)}" style="color:${VERDICT_TONE[v.tone]||'var(--t-soft)'};white-space:nowrap;cursor:help;border-bottom:1px dotted #333">${esc(v.label)}</span>`;
+    return `<span class="mv a-num" title="${esc(v.why)}" style="color:${VERDICT_TONE[v.tone]||'#9a9a9a'};font-weight:500;white-space:nowrap;cursor:help;border-bottom:1px dotted #3a3a3a">${esc(v.label)}</span>`;
   }
   if(key==='market_cap'){
     const w=ctx.maxCap?((c.market_cap||0)/ctx.maxCap*100).toFixed(1):0;
@@ -2639,18 +2662,18 @@ function alphaCell(c,key,ctx){
       <span style="position:absolute;right:0;top:-4px;bottom:-4px;width:${w}%;background:#ffffff0d;border-right:2px solid #ffffff33"></span>
       <span style="position:relative">${aDash(aCap(c.market_cap))}</span></span>`;
   }
-  if(key==='revenue')  return `<span class="mv sm" style="color:var(--t-soft)">${aDash(aCap(c.revenue))}</span>`;
-  if(key==='earnings') return `<span class="mv sm">${aDash(aCap(c.earnings))}</span>`;
-  if(key==='pe')       return `<span class="mv sm" style="${relColour(c.pe,ctx.medPE[c.sector])}">${aDash(aNum(c.pe))}</span>`;
-  if(key==='forward_pe')return `<span class="mv sm" style="${relColour(c.forward_pe,ctx.medFPE[c.sector])}">${aDash(aNum(c.forward_pe))}</span>`;
-  if(key==='ev_ebitda')return `<span class="mv sm" style="${relColour(c.ev_ebitda,ctx.medEV[c.sector])}">${aDash(aNum(c.ev_ebitda))}</span>`;
-  if(key==='ps')       return `<span class="mv sm" style="${relColour(c.ps,ctx.medPS[c.sector])}">${aDash(aNum(c.ps))}</span>`;
+  if(key==='revenue')  return `<span class="mv a-num dim">${aDash(aCap(c.revenue))}</span>`;
+  if(key==='earnings') return `<span class="mv a-num">${aDash(aCap(c.earnings))}</span>`;
+  if(key==='pe')       return `<span class="mv a-num" style="${relColour(c.pe,ctx.medPE[c.sector])}">${aDash(aNum(c.pe))}</span>`;
+  if(key==='forward_pe')return `<span class="mv a-num" style="${relColour(c.forward_pe,ctx.medFPE[c.sector])}">${aDash(aNum(c.forward_pe))}</span>`;
+  if(key==='ev_ebitda')return `<span class="mv a-num" style="${relColour(c.ev_ebitda,ctx.medEV[c.sector])}">${aDash(aNum(c.ev_ebitda))}</span>`;
+  if(key==='ps')       return `<span class="mv a-num" style="${relColour(c.ps,ctx.medPS[c.sector])}">${aDash(aNum(c.ps))}</span>`;
   // Above ~5% FCF yield is genuinely cheap; below ~2% is priced for growth.
-  if(key==='fcf_yield')return `<span class="mv sm" style="${c.fcf_yield==null?'':(c.fcf_yield>=5?'color:#00e676':c.fcf_yield<2?'color:#ff6b6b':'')}">${aDash(aPct(c.fcf_yield))}</span>`;
-  if(key==='net_margin')return `<span class="mv sm" style="${c.net_margin==null?'':(c.net_margin>=25?'color:#00e676':c.net_margin<8?'color:var(--t-soft)':'')}">${aDash(aPct1(c.net_margin))}</span>`;
-  if(key==='roe')      return `<span class="mv sm" style="${c.roe==null?'':(c.roe>=20?'color:#00e676':'')}">${aDash(aPct1(c.roe))}</span>`;
-  if(key==='dividend_yield')return `<span class="mv sm" style="color:var(--t-soft)">${aDash(aPct(c.dividend_yield))}</span>`;
-  return `<span class="mv sm">${aDash(c[key])}</span>`;
+  if(key==='fcf_yield')return `<span class="mv a-num" style="${c.fcf_yield==null?'':(c.fcf_yield>=5?'color:#00e676':c.fcf_yield<2?'color:#ff6b6b':'')}">${aDash(aPct(c.fcf_yield))}</span>`;
+  if(key==='net_margin')return `<span class="mv a-num" style="${c.net_margin==null?'':(c.net_margin>=25?'color:#00e676':c.net_margin<8?'color:var(--t-soft)':'')}">${aDash(aPct1(c.net_margin))}</span>`;
+  if(key==='roe')      return `<span class="mv a-num" style="${c.roe==null?'':(c.roe>=20?'color:#00e676':'')}">${aDash(aPct1(c.roe))}</span>`;
+  if(key==='dividend_yield')return `<span class="mv a-num dim">${aDash(aPct(c.dividend_yield))}</span>`;
+  return `<span class="mv a-num">${aDash(c[key])}</span>`;
 }
 
 function alphaRow(c,view,ctx){
@@ -2671,8 +2694,15 @@ function renderAlpha(){
   if(!head||!body)return;
   const view=ALPHA_VIEWS[alphaViewMode]||ALPHA_VIEWS.size;
 
-  const sh=(col,lbl)=>`<span style="cursor:pointer;user-select:none;color:${alphaSort.col===col?'#fff':'var(--t-dim2)'}" onclick="sortAlpha('${col}')">${lbl}${alphaSort.col===col?(alphaSort.dir===-1?' \u2193':' \u2191'):''}</span>`;
-  head.style.cssText=`display:grid;grid-template-columns:${view.grid};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);min-width:760px`;
+  // Every column is sortable, but at --t-dim2 with no arrow they read as static
+  // labels. Active column goes white with its direction arrow; the rest show a
+  // faint ⇅ so the affordance is visible before you hover.
+  const sh=(col,lbl)=>{
+    const on=alphaSort.col===col;
+    const arrow=on?(alphaSort.dir===-1?'\u2193':'\u2191'):'\u21c5';
+    return `<span class="a-sort${on?' on':''}" onclick="sortAlpha('${col}')" title="Sort by ${esc(lbl)}">${lbl}<span class="a-sort-ar">${arrow}</span></span>`;
+  };
+  head.style.cssText=`display:grid;grid-template-columns:${view.grid};gap:8px;padding:10px 8px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--t-dim2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--rule-2);min-width:880px`;
   head.innerHTML=sh('name','Company')+view.cols.map(([k,l])=>sh(k,l)).join('');
 
   const sub=document.getElementById('alpha-sub'), leg=document.getElementById('alpha-legend');
@@ -2695,6 +2725,13 @@ function renderAlpha(){
       medEV:sectorMedians(all,'ev_ebitda'), medPS:sectorMedians(all,'ps'),
     };
     const cmp=(a,b)=>{
+      // 'verdict' is computed, not a stored field — rank it cheap → expensive
+      // so sorting the Read column groups the bargains together.
+      if(alphaSort.col==='verdict'){
+        const rank={'Underpriced':0,'Leans cheap':1,'Fairly valued':2,'Leans rich':3,'Overpriced':4,'Unprofitable':5,'Check data':6,'\u2014':7};
+        const rx=rank[valuationVerdict(a).label]??9, ry=rank[valuationVerdict(b).label]??9;
+        return (rx-ry)*alphaSort.dir;
+      }
       let x=a[alphaSort.col],y=b[alphaSort.col];
       if(typeof x==='string'||typeof y==='string')return String(x||'').localeCompare(String(y||''))*alphaSort.dir;
       if(x==null)return 1; if(y==null)return -1;
@@ -2708,7 +2745,7 @@ function renderAlpha(){
         .sort((a,b)=>b[1].reduce((t,c)=>t+(c.market_cap||0),0)-a[1].reduce((t,c)=>t+(c.market_cap||0),0))
         .forEach(([sector,list])=>{
           const cap=list.reduce((t,c)=>t+(c.market_cap||0),0);
-          rows+=`<div style="display:flex;justify-content:space-between;padding:14px 8px 6px;font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--t-soft);border-bottom:1px solid var(--rule-2);min-width:760px">
+          rows+=`<div style="display:flex;justify-content:space-between;padding:14px 8px 6px;font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--t-soft);border-bottom:1px solid var(--rule-2);min-width:880px">
             <span>${esc(sector)} \u00b7 ${list.length}</span><span>${aCap(cap)}</span></div>`;
           [...list].sort(cmp).forEach(c=>rows+=alphaRow(c,view,ctx));
         });
