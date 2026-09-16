@@ -1139,6 +1139,17 @@
       </button>
     </div>
 
+    <p class="sect-title">Data Sources</p>
+    <div style="margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;background:#0a0a0a;border:1px solid #222;border-radius:8px" onclick="toggleMoralis(event)">
+        <span id="moralis-box" style="width:18px;height:18px;border:1.5px solid #444;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;background:transparent;color:#04140b;font-size:12px;font-weight:800;flex-shrink:0;transition:all .12s"></span>
+        <span style="flex:1">
+          <span style="display:block;font-size:13px;color:#ddd">DeFi protocol positions</span>
+          <span style="display:block;font-size:10px;color:#666;font-family:'JetBrains Mono',monospace;margin-top:2px">Adds Aave / Uniswap / Lido etc. via Moralis. Slower refresh.</span>
+        </span>
+      </label>
+    </div>
+
     <p class="sect-title">Security</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
       <button class="btn" id="change-pass-btn" style="width:100%;justify-content:flex-start;gap:10px;padding:12px 16px;" onclick="toggleChangePassword()">
@@ -1691,37 +1702,43 @@ async function fetchWalletPositions(wallet){
     wallet._zerionError = e.message;
   }
 
-  // ── Extra sources: Hyperliquid + Lighter + Moralis DeFi positions ──
-  // Called for every EVM wallet. Each source returns [] when it has nothing,
-  // and all three run in parallel server-side, so this costs one round trip.
-  let hlPositions = [];
-  try{
-    const r = await fetch('/api/hyperliquid', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ address: wallet.address }),
-      signal: makeSig(20000),
-    });
-    if(r.ok){ const d=await r.json(); hlPositions = d.positions||[]; }
-  }catch(e){ console.warn('Extra-sources fetch failed:', e.message); }
+  // ── Extra sources, all issued at once ─────────────────────
+  // These used to run one after another behind Zerion, so each wallet paid
+  // three round trips. They're independent, so they go out together and the
+  // wallet waits for the slowest rather than the sum.
+  // Sources are gated: HL/Lighter only for wallets flagged for them, Moralis
+  // only when enabled — so no wallet pays for probes it can't benefit from.
+  const wantMoralis = window._moralisOn !== false;
+  const wantHL = !!wallet.includeHL;
 
-  // Lighter positions are fetched inside /api/hyperliquid (combined to save function slots)
+  const [extraRes, polyRes] = await Promise.allSettled([
+    (wantHL || wantMoralis)
+      ? fetch('/api/hyperliquid', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ address: wallet.address, sources:{ hl:wantHL, moralis:wantMoralis } }),
+          signal: makeSig(20000),
+        }).then(r=>r.ok?r.json():{positions:[]})
+      : Promise.resolve({positions:[]}),
+    wantHL
+      ? fetch('/api/polymarket', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ address: wallet.address }),
+          signal: makeSig(15000),
+        }).then(r=>r.ok?r.json():null)
+      : Promise.resolve(null),
+  ]);
+
+  let hlPositions = [];
+  if(extraRes.status==='fulfilled') hlPositions = extraRes.value?.positions || [];
+  else console.warn('Extra-sources fetch failed:', extraRes.reason?.message);
+
+  // Lighter + Moralis are fetched inside /api/hyperliquid (combined to save function slots)
   let lighterPositions = [];
 
-  // ── Polymarket positions ──────────────────────────────────
   let polyPositions = [];
-  if(wallet.includeHL){ // includeHL wallets also check Polymarket (same EVM address)
-    try{
-      const r = await fetch('/api/polymarket', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ address: wallet.address }),
-        signal: makeSig(15000),
-      });
-      if(r.ok){
-        const d = await r.json();
-        polyPositions = (d.positions||[]).filter(p=>p.currentValue>0.1);
-        wallet._polyTotal = d.totalValue || 0;
-      }
-    }catch(e){ console.warn('Polymarket fetch failed:', e.message); }
+  if(polyRes.status==='fulfilled' && polyRes.value){
+    polyPositions = (polyRes.value.positions||[]).filter(p=>p.currentValue>0.1);
+    wallet._polyTotal = polyRes.value.totalValue || 0;
   }
 
   // ── MERGE + DEDUP ────────────────────────────────────────
@@ -5019,7 +5036,27 @@ function openSettings(){
   // Show user email in modal
   const emailEl = document.getElementById('smo-email');
   if(emailEl && currentUser) emailEl.textContent = currentUser.email || '';
+  paintMoralisBox();
   document.getElementById('smo').classList.add('open');
+}
+
+// Moralis is opt-out: it adds protocol positions Zerion misses, at the cost of
+// extra requests per wallet. Off by default is wrong (data loss); a visible
+// toggle lets it be switched off when refresh speed matters more.
+window._moralisOn = localStorage.getItem('moralis_on') !== '0';
+function paintMoralisBox(){
+  const b = document.getElementById('moralis-box');
+  if(!b) return;
+  const on = window._moralisOn !== false;
+  b.textContent = on ? '✓' : '';
+  b.style.background = on ? '#00e676' : 'transparent';
+  b.style.borderColor = on ? '#00e676' : '#444';
+}
+function toggleMoralis(e){
+  if(e) e.preventDefault();
+  window._moralisOn = !(window._moralisOn !== false);
+  localStorage.setItem('moralis_on', window._moralisOn ? '1' : '0');
+  paintMoralisBox();
 }
 function closeSettings(){ document.getElementById('smo').classList.remove('open'); }
 document.getElementById('smo').addEventListener('click',e=>{if(e.target===document.getElementById('smo'))closeSettings();});
