@@ -1567,6 +1567,9 @@ async function zerionGetPositions(address){
       id:p.id, symbol:ft.symbol||'?', name:ft.name||ft.symbol||'?', chain,
       balance:parseFloat(q.float||'0'), priceUSD:price, priceINR:price*USD_INR,
       valueUSD:v, valueINR:v*USD_INR, ch24:change, logo:ft.icon?.url||'',
+      // Contract address is the most reliable cross-provider dedup key
+      contract:((ft.implementations||[]).find(i=>i.chain_id===chain)?.address||'').toLowerCase(),
+      source:'zerion',
       isSpam:flags.is_trash||false,
     };
   }).filter(t=>t.valueUSD>0.01&&!t.isSpam);
@@ -1688,18 +1691,18 @@ async function fetchWalletPositions(wallet){
     wallet._zerionError = e.message;
   }
 
-  // ── Hyperliquid (HyperCore + HyperEVM) ───────────────────
+  // ── Extra sources: Hyperliquid + Lighter + Moralis DeFi positions ──
+  // Called for every EVM wallet. Each source returns [] when it has nothing,
+  // and all three run in parallel server-side, so this costs one round trip.
   let hlPositions = [];
-  if(wallet.includeHL){
-    try{
-      const r = await fetch('/api/hyperliquid', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ address: wallet.address }),
-        signal: makeSig(20000),
-      });
-      if(r.ok){ const d=await r.json(); hlPositions = d.positions||[]; }
-    }catch(e){ console.warn('Hyperliquid fetch failed:', e.message); }
-  }
+  try{
+    const r = await fetch('/api/hyperliquid', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ address: wallet.address }),
+      signal: makeSig(20000),
+    });
+    if(r.ok){ const d=await r.json(); hlPositions = d.positions||[]; }
+  }catch(e){ console.warn('Extra-sources fetch failed:', e.message); }
 
   // Lighter positions are fetched inside /api/hyperliquid (combined to save function slots)
   let lighterPositions = [];
@@ -1721,26 +1724,63 @@ async function fetchWalletPositions(wallet){
     }catch(e){ console.warn('Polymarket fetch failed:', e.message); }
   }
 
-  // Merge all positions — dedup by wallet+symbol+chain+balance to collapse Zerion/HL
-  // duplicates within the same wallet while keeping cross-wallet same-token holdings separate.
-  // Lighter positions use source:'lighter-*' so they never collide with Zerion/HL tags.
+  // ── MERGE + DEDUP ────────────────────────────────────────
+  // Sources: Zerion (token balances), Hyperliquid, Lighter, Moralis (protocol
+  // positions), Polymarket. Zerion and Moralis genuinely overlap, so dedup runs
+  // in two passes: exact identity first, then cross-provider.
   const merged = [...evmPositions, ...hlPositions, ...lighterPositions, ...polyPositions];
+  wallet._dedupLog = [];
+  // Pass 1 — exact duplicates: same token, chain and amount from two feeds
+  // (e.g. Zerion and the Hyperliquid endpoint both seeing a HyperEVM token).
   const seen = new Map();
   const deduped = [];
   for(const p of merged){
     if(p.source==='polymarket'){ deduped.push(p); continue; } // never dedup prediction markets
-    // Identity = symbol + chain + rounded balance. Same token, same chain, same amount = dupe.
     const key = `${(p.symbol||'').toUpperCase()}|${(p.chain||'').toLowerCase()}|${Number(p.balance||0).toFixed(6)}`;
     if(!seen.has(key)){
       seen.set(key, deduped.length);
       deduped.push(p);
     } else {
-      // Keep whichever copy has a real USD value (the priced one wins)
       const idx = seen.get(key);
       if((p.valueUSD||0) > (deduped[idx].valueUSD||0)) deduped[idx] = p;
     }
   }
-  wallet.positions = deduped;
+
+  // Pass 2 — cross-provider overlap between Zerion and Moralis.
+  // Zerion often lists a protocol receipt token (aEthUSDC, stETH) as a plain
+  // balance while Moralis reports the same money as a protocol position. Two
+  // signals catch it: identical contract+chain, or same chain with USD values
+  // within 1% (receipt tokens track their underlying almost exactly).
+  const zerion = deduped.filter(p=>p.source==='zerion');
+  const kept = [];
+  for(const p of deduped){
+    if(p.source!=='moralis-defi'){ kept.push(p); continue; }
+    // Value proximity is the deciding signal, not contract address. Moralis
+    // reports the UNDERLYING token of a position (USDC) while Zerion lists the
+    // receipt token (aEthUSDC) — so contracts often differ for a true match, and
+    // can collide for unrelated holdings (plain wallet USDC vs USDC in Aave).
+    // Pick the closest-valued candidate, and only within 1%.
+    let dupe = null, bestDelta = Infinity;
+    for(const z of zerion){
+      if((z.chain||'') !== (p.chain||'')) continue;
+      if(z._claimed) continue;                       // one Zerion row matches one position
+      const zv=z.valueUSD||0, pv=p.valueUSD||0;
+      if(zv<=0||pv<=0) continue;
+      const delta = Math.abs(zv-pv)/Math.max(zv,pv);
+      if(delta < 0.01 && delta < bestDelta){ bestDelta = delta; dupe = z; }
+    }
+    if(dupe){
+      // Moralis knows which protocol it is, so enrich Zerion's row rather than
+      // dropping that information on the floor.
+      dupe._claimed = true;
+      dupe.protocol = p.protocol;
+      dupe.name = `${dupe.symbol} · ${p.protocol}`;
+      wallet._dedupLog.push({dropped:p.name, matched:dupe.symbol, usd:p.valueUSD});
+    } else {
+      kept.push(p);
+    }
+  }
+  wallet.positions = kept;
   wallet.totalUSD = wallet.positions.reduce((s,p)=>s+(p.valueUSD||0), 0);
   wallet.fetching = false;
 }
