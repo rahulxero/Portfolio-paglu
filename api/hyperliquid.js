@@ -24,9 +24,10 @@ module.exports = async function handler(req, res) {
     fetch(HL_API, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
 
   // Run Hyperliquid and Lighter fetches in parallel
-  const [hlResult, lighterResult] = await Promise.allSettled([
+  const [hlResult, lighterResult, moralisResult] = await Promise.allSettled([
     fetchHyperliquid(address, post, headers),
     fetchLighter(address, debugLog),
+    fetchMoralis(address, debugLog),
   ]);
 
   if (hlResult.status === 'fulfilled') positions.push(...hlResult.value);
@@ -34,6 +35,9 @@ module.exports = async function handler(req, res) {
 
   if (lighterResult.status === 'fulfilled') positions.push(...lighterResult.value);
   else console.warn('Lighter fetch failed:', lighterResult.reason?.message);
+
+  if (moralisResult.status === 'fulfilled') positions.push(...moralisResult.value);
+  else console.warn('Moralis fetch failed:', moralisResult.reason?.message);
 
   positions.sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0));
   return res.status(200).json(wantDebug ? { positions, _lighterDebug: debugLog } : { positions });
@@ -314,5 +318,82 @@ async function fetchLighter(address, debug) {
   }
 
   log('result', { positionsFound: positions.length, accountIndex });
+  return positions;
+}
+
+// ── MORALIS (DeFi protocol positions) ──────────────────────
+// Zerion reports plain token balances well but is thin on protocol positions
+// (lending, LP, staking). Moralis covers 3,000+ EVM protocols. Requires
+// MORALIS_API_KEY in Vercel env; returns [] silently if unset.
+const MORALIS_CHAINS = ['eth', 'arbitrum', 'base', 'optimism', 'polygon', 'bsc', 'avalanche', 'linea'];
+
+// Moralis chain slugs → the chain ids Zerion uses, so dedup + UI labels line up.
+const MORALIS_CHAIN_MAP = {
+  eth: 'ethereum', bsc: 'binance-smart-chain', polygon: 'polygon',
+  arbitrum: 'arbitrum', base: 'base', optimism: 'optimism',
+  avalanche: 'avalanche', linea: 'linea',
+};
+
+async function fetchMoralis(address, debug) {
+  const KEY = process.env.MORALIS_API_KEY;
+  const log = (step, info) => { if (debug) debug.push({ step, ...info }); };
+  if (!KEY) { log('moralis', { skipped: 'MORALIS_API_KEY not set' }); return []; }
+
+  const positions = [];
+  const headers = { accept: 'application/json', 'X-API-Key': KEY };
+
+  // One request per chain, all in parallel — same wall-clock cost as one.
+  const results = await Promise.allSettled(MORALIS_CHAINS.map(async (chain) => {
+    const url = `https://deep-index.moralis.io/api/v2.2/wallets/${address}/defi/positions?chain=${chain}`;
+    const r = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+    if (!r.ok) return { chain, error: r.status };
+    return { chain, data: await r.json() };
+  }));
+
+  for (const out of results) {
+    if (out.status !== 'fulfilled') continue;
+    const { chain, data, error } = out.value;
+    if (error) { log(`moralis ${chain}`, { status: error }); continue; }
+    const protocols = Array.isArray(data) ? data : (data?.result || []);
+    if (!protocols.length) continue;
+    log(`moralis ${chain}`, { protocols: protocols.length });
+
+    const normChain = MORALIS_CHAIN_MAP[chain] || chain;
+
+    for (const proto of protocols) {
+      // A protocol entry may carry one `position` or a `positions` array.
+      const posList = proto.positions || (proto.position ? [proto.position] : []);
+      for (const pos of posList) {
+        const label = pos.label || '';
+        for (const t of (pos.tokens || [])) {
+          // Debt legs are liabilities, not holdings — including them would
+          // inflate the portfolio total, so they're skipped.
+          const ttype = String(t.token_type || '').toLowerCase();
+          if (ttype.includes('debt') || ttype.includes('borrow')) continue;
+          if (pos.position_details?.is_debt === true) continue;
+
+          const bal = parseFloat(t.balance_formatted ?? t.balance ?? 0);
+          const usd = parseFloat(t.usd_value ?? 0);
+          if (!(usd > 0.01)) continue;
+
+          positions.push({
+            symbol: t.symbol || '?',
+            name: `${t.symbol || '?'} · ${proto.protocol_name || proto.protocol_id}${label ? ' (' + label + ')' : ''}`,
+            chain: normChain,
+            balance: bal,
+            priceUSD: parseFloat(t.usd_price ?? 0),
+            valueUSD: usd,
+            ch24: null,
+            logo: t.logo || proto.protocol_logo || '',
+            contract: (t.contract_address || '').toLowerCase(),
+            protocol: proto.protocol_name || proto.protocol_id,
+            source: 'moralis-defi',
+          });
+        }
+      }
+    }
+  }
+
+  log('moralis result', { positionsFound: positions.length });
   return positions;
 }
