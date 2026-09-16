@@ -155,7 +155,7 @@ async function fetchHyperliquid(address, post, headers) {
     HYPE: 'hyperliquid', BTC: 'bitcoin', ETH: 'ethereum', WETH: 'weth',
     USDC: 'usd-coin', USDT: 'tether', USDE: 'ethena-usde', SOL: 'solana',
     ARB: 'arbitrum', OP: 'optimism', AVAX: 'avalanche-2', LINK: 'chainlink',
-    UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-2', WBTC: 'wrapped-bitcoin',
+    UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-2', WBTC: 'wrapped-bitcoin', LIT: 'lighter',
   };
   const priceMap = { USDC:{price:1,ch24:0}, USDT:{price:1,ch24:0}, USDE:{price:1,ch24:0} };
   const wantIds = [...new Set(positions.map(p => COINGECKO_IDS[p.symbol]).filter(Boolean))].join(',');
@@ -271,11 +271,15 @@ async function fetchLighter(address, debug) {
     });
   }
 
-  // ── Step 4: spot assets ──
-  if (!positions.length || debug) {
-    const ra = await tryJson(`${EXPLORER}/accounts/${encodeURIComponent(address)}/assets`);
-    log('explorer assets', { status: ra.status, sample: ra.raw });
-    const assets = ra.json?.assets || ra.json?.data || (Array.isArray(ra.json) ? ra.json : []);
+  // ── Step 4: spot assets (always — an account can hold margin AND spot) ──
+  {
+    let assets = [];
+    for (const key of [address, accountIndex].filter(v => v != null)) {
+      const ra = await tryJson(`${EXPLORER}/accounts/${encodeURIComponent(key)}/assets`);
+      log(`explorer assets (${key === address ? 'address' : 'index'})`, { status: ra.status, sample: ra.raw });
+      const list = ra.json?.assets || ra.json?.data || (Array.isArray(ra.json) ? ra.json : null);
+      if (list && list.length) { assets = list; break; }
+    }
     for (const a of assets) {
       const sym = a.asset_symbol || a.symbol;
       const bal = num(a.balance);
@@ -285,6 +289,26 @@ async function fetchLighter(address, debug) {
         symbol: sym, name: `${sym} (Lighter)`, chain: 'lighter',
         balance: bal, priceUSD: px, valueUSD: bal * px,
         ch24: null, source: 'lighter-spot',
+      });
+    }
+  }
+
+  // ── Step 5: staked LIT ──
+  // Staking pools live behind publicPoolsMetadata?filter=stake. Per Lighter's docs,
+  // querying a specific account_index requires a signed auth token, so this only
+  // returns data if the endpoint happens to allow unauthenticated reads.
+  if (accountIndex != null) {
+    const rs = await tryJson(`${MAIN}/publicPoolsMetadata?filter=stake&account_index=${accountIndex}`);
+    log('LIT staking (publicPoolsMetadata)', { status: rs.status, sample: rs.raw });
+    const pools = rs.json?.public_pools || rs.json?.pools || rs.json?.data ||
+                  (Array.isArray(rs.json) ? rs.json : []);
+    for (const pool of pools) {
+      const staked = num(pool.staked_amount ?? pool.shares ?? pool.balance ?? pool.user_shares);
+      if (staked <= 0) continue;
+      positions.push({
+        symbol: 'LIT', name: 'LIT Staked (Lighter)', chain: 'lighter',
+        balance: staked, priceUSD: 0, valueUSD: 0,
+        ch24: null, source: 'lighter-staked',
       });
     }
   }
