@@ -10,8 +10,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { address } = req.body || {};
+  const { address, sources } = req.body || {};
   if (!address) return res.status(400).json({ error: 'Missing address' });
+  // Caller decides which sources to probe. Defaults to all for backwards compat.
+  const want = { hl: sources?.hl !== false, moralis: sources?.moralis !== false };
 
   const HL_API = 'https://api.hyperliquid.xyz/info';
   const LIGHTER_API = 'https://mainnet.zklighter.elliot.ai/api/v1';
@@ -25,9 +27,9 @@ module.exports = async function handler(req, res) {
 
   // Run Hyperliquid and Lighter fetches in parallel
   const [hlResult, lighterResult, moralisResult] = await Promise.allSettled([
-    fetchHyperliquid(address, post, headers),
-    fetchLighter(address, debugLog),
-    fetchMoralis(address, debugLog),
+    want.hl ? fetchHyperliquid(address, post, headers) : [],
+    want.hl ? fetchLighter(address, debugLog) : [],
+    want.moralis ? fetchMoralis(address, debugLog) : [],
   ]);
 
   if (hlResult.status === 'fulfilled') positions.push(...hlResult.value);
@@ -325,7 +327,10 @@ async function fetchLighter(address, debug) {
 // Zerion reports plain token balances well but is thin on protocol positions
 // (lending, LP, staking). Moralis covers 3,000+ EVM protocols. Requires
 // MORALIS_API_KEY in Vercel env; returns [] silently if unset.
-const MORALIS_CHAINS = ['eth', 'arbitrum', 'base', 'optimism', 'polygon', 'bsc', 'avalanche', 'linea'];
+// Chains worth querying. Trimmed to the ones that actually carry DeFi TVL —
+// each entry is one API call per wallet, so a long tail of dead chains costs
+// request budget and latency for nothing.
+const MORALIS_CHAINS = ['eth', 'arbitrum', 'base', 'optimism', 'polygon', 'bsc'];
 
 // Moralis chain slugs → the chain ids Zerion uses, so dedup + UI labels line up.
 const MORALIS_CHAIN_MAP = {
@@ -345,7 +350,7 @@ async function fetchMoralis(address, debug) {
   // One request per chain, all in parallel — same wall-clock cost as one.
   const results = await Promise.allSettled(MORALIS_CHAINS.map(async (chain) => {
     const url = `https://deep-index.moralis.io/api/v2.2/wallets/${address}/defi/positions?chain=${chain}`;
-    const r = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+    const r = await fetch(url, { headers, signal: AbortSignal.timeout(7000) });
     if (!r.ok) return { chain, error: r.status };
     return { chain, data: await r.json() };
   }));
