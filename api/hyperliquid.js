@@ -17,6 +17,8 @@ module.exports = async function handler(req, res) {
   const LIGHTER_API = 'https://mainnet.zklighter.elliot.ai/api/v1';
   const headers = { 'Content-Type': 'application/json' };
   const positions = [];
+  const wantDebug = req.query?.debug === '1' || req.body?.debug === true;
+  const debugLog = wantDebug ? [] : null;
 
   const post = (body, ms = 10000) =>
     fetch(HL_API, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
@@ -24,7 +26,7 @@ module.exports = async function handler(req, res) {
   // Run Hyperliquid and Lighter fetches in parallel
   const [hlResult, lighterResult] = await Promise.allSettled([
     fetchHyperliquid(address, post, headers),
-    fetchLighter(address, LIGHTER_API),
+    fetchLighter(address, debugLog),
   ]);
 
   if (hlResult.status === 'fulfilled') positions.push(...hlResult.value);
@@ -34,7 +36,7 @@ module.exports = async function handler(req, res) {
   else console.warn('Lighter fetch failed:', lighterResult.reason?.message);
 
   positions.sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0));
-  return res.status(200).json({ positions });
+  return res.status(200).json(wantDebug ? { positions, _lighterDebug: debugLog } : { positions });
 };
 
 // ── HYPERLIQUID ────────────────────────────────────────────
@@ -180,53 +182,113 @@ async function fetchHyperliquid(address, post, headers) {
 }
 
 // ── LIGHTER ────────────────────────────────────────────────
-async function fetchLighter(address, BASE) {
+// Lighter splits across two hosts and the account can be addressed two ways,
+// so each step falls back rather than failing silently. _debug reports what
+// each attempt actually returned, surfaced via ?debug=1.
+async function fetchLighter(address, debug) {
   const positions = [];
-  const get = (path, ms = 8000) =>
-    fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(ms) });
+  const MAIN = 'https://mainnet.zklighter.elliot.ai/api/v1';
+  const EXPLORER = 'https://explorer.elliot.ai/api';
+  const log = (step, info) => { if (debug) debug.push({ step, ...info }); };
 
-  // Resolve EVM address → Lighter account indices
-  const byAddrRes = await get(`/accountsByL1Address?l1_address=${encodeURIComponent(address)}`);
-  if (!byAddrRes.ok) return positions;
-  const byAddr = await byAddrRes.json();
-  const subAccounts = byAddr.sub_accounts || [];
-  if (!subAccounts.length) return positions;
-
-  for (const sub of subAccounts) {
-    const idx = sub.index;
-    if (idx == null) continue;
+  const tryJson = async (url, ms = 8000) => {
     try {
-      const accRes = await get(`/account?by=index&value=${idx}`);
-      if (!accRes.ok) continue;
-      const acc = await accRes.json();
+      const r = await fetch(url, { signal: AbortSignal.timeout(ms) });
+      const text = await r.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch (e) {}
+      return { ok: r.ok, status: r.status, json, raw: text.slice(0, 400) };
+    } catch (e) {
+      return { ok: false, status: 0, json: null, raw: 'fetch error: ' + e.message };
+    }
+  };
 
-      // Margin / collateral balance
-      const marginBalance = parseFloat(acc.margin || acc.margin_balance || 0);
-      if (marginBalance > 0.01) {
-        positions.push({
-          symbol: 'USDC', name: 'Lighter Margin (USDC)',
-          chain: 'lighter', balance: marginBalance,
-          priceUSD: 1, valueUSD: marginBalance, ch24: null, source: 'lighter-margin',
-        });
-      }
+  // ── Step 1: resolve the account (index + balances) ──
+  let acct = null, accountIndex = null;
 
-      // Open perpetual positions
-      for (const pos of (acc.open_positions || acc.positions || [])) {
-        const size = Math.abs(parseFloat(pos.size || pos.base_amount || 0));
-        const markPrice = parseFloat(pos.mark_price || pos.oracle_price || 0);
-        const notional = size * markPrice;
-        if (notional < 0.01) continue;
-        const symbol = (pos.market || pos.symbol || 'UNKNOWN')
-          .replace('/USDC', '').replace('-PERP', '').replace('-USD', '');
-        const isLong = parseFloat(pos.size || pos.base_amount || 0) > 0;
-        positions.push({
-          symbol, name: `${symbol} ${isLong ? 'Long' : 'Short'} (Lighter)`,
-          chain: 'lighter', balance: size,
-          priceUSD: markPrice, valueUSD: notional,
-          ch24: null, isLong, source: 'lighter-perp',
-        });
-      }
-    } catch (e) { console.warn(`Lighter account ${idx} failed:`, e.message); }
+  let r = await tryJson(`${MAIN}/account?by=l1_address&value=${encodeURIComponent(address)}`);
+  log('account?by=l1_address', { status: r.status, sample: r.raw });
+  if (r.ok && r.json) {
+    acct = Array.isArray(r.json.accounts) ? r.json.accounts[0] : (r.json.account || r.json);
+    accountIndex = acct?.index ?? acct?.account_index ?? null;
   }
+
+  if (!acct || accountIndex == null) {
+    const r2 = await tryJson(`${MAIN}/accountsByL1Address?l1_address=${encodeURIComponent(address)}`);
+    log('accountsByL1Address', { status: r2.status, sample: r2.raw });
+    const subs = r2.json?.sub_accounts || r2.json?.accounts || [];
+    if (subs.length) {
+      accountIndex = subs[0].index ?? subs[0].account_index ?? null;
+      if (accountIndex != null) {
+        const r3 = await tryJson(`${MAIN}/account?by=index&value=${accountIndex}`);
+        log('account?by=index', { status: r3.status, sample: r3.raw });
+        if (r3.ok && r3.json) acct = Array.isArray(r3.json.accounts) ? r3.json.accounts[0] : (r3.json.account || r3.json);
+      }
+    }
+  }
+
+  if (!acct) { log('result', { note: 'no Lighter account found for this address' }); return positions; }
+
+  // ── Step 2: collateral / margin balance ──
+  const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+  const collateral = num(acct.collateral_value) || num(acct.collateral) ||
+                     num(acct.available_balance) || num(acct.margin_balance) || num(acct.margin);
+  log('collateral', { value: collateral, fields: Object.keys(acct || {}).slice(0, 25) });
+  if (collateral > 0.01) {
+    positions.push({
+      symbol: 'USDC', name: 'Lighter Margin (USDC)', chain: 'lighter',
+      balance: collateral, priceUSD: 1, valueUSD: collateral,
+      ch24: null, source: 'lighter-margin',
+    });
+  }
+
+  // ── Step 3: open perp positions ──
+  let rawPositions = acct.positions || acct.open_positions || null;
+
+  if (!rawPositions || !rawPositions.length) {
+    for (const key of [address, accountIndex].filter(v => v != null)) {
+      const rp = await tryJson(`${EXPLORER}/accounts/${encodeURIComponent(key)}/positions`);
+      log(`explorer positions (${key === address ? 'address' : 'index'})`, { status: rp.status, sample: rp.raw });
+      const list = rp.json?.positions || rp.json?.data || (Array.isArray(rp.json) ? rp.json : null);
+      if (list && list.length) { rawPositions = list; break; }
+    }
+  }
+
+  for (const p of (rawPositions || [])) {
+    const signed = num(p.size ?? p.base_amount ?? p.position ?? p.amount);
+    const size = Math.abs(signed);
+    const mark = num(p.mark_price ?? p.oracle_price ?? p.price);
+    const notional = (size && mark) ? size * mark : (num(p.position_value) || num(p.notional));
+    if (notional < 0.01) continue;
+    const symbol = String(p.market ?? p.symbol ?? p.market_symbol ?? p.asset_symbol ?? '')
+      .replace('/USDC', '').replace('-PERP', '').replace('-USD', '').trim() || 'PERP';
+    const isLong = signed >= 0;
+    positions.push({
+      symbol, name: `${symbol} ${isLong ? 'Long' : 'Short'} (Lighter)`, chain: 'lighter',
+      balance: size, priceUSD: mark, valueUSD: notional,
+      ch24: null, unrealizedPnl: num(p.unrealized_pnl), isLong,
+      source: 'lighter-perp',
+    });
+  }
+
+  // ── Step 4: spot assets ──
+  if (!positions.length || debug) {
+    const ra = await tryJson(`${EXPLORER}/accounts/${encodeURIComponent(address)}/assets`);
+    log('explorer assets', { status: ra.status, sample: ra.raw });
+    const assets = ra.json?.assets || ra.json?.data || (Array.isArray(ra.json) ? ra.json : []);
+    for (const a of assets) {
+      const sym = a.asset_symbol || a.symbol;
+      const bal = num(a.balance);
+      if (!sym || bal <= 0) continue;
+      const px = (sym === 'USDC' || sym === 'USDT') ? 1 : 0;
+      positions.push({
+        symbol: sym, name: `${sym} (Lighter)`, chain: 'lighter',
+        balance: bal, priceUSD: px, valueUSD: bal * px,
+        ch24: null, source: 'lighter-spot',
+      });
+    }
+  }
+
+  log('result', { positionsFound: positions.length, accountIndex });
   return positions;
 }
