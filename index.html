@@ -1201,7 +1201,6 @@
   </div>
 </div>
 
-<!-- ── HISTORY MODAL ─────────────────────────────────────────────── -->
 <!-- ── ALPHA MODAL ───────────────────────────────────────────────── -->
 <div class="mo" id="alpha-mo">
   <div class="mc" style="max-width:1000px">
@@ -1227,7 +1226,9 @@
       <div id="alpha-rows"></div>
     </div>
   </div>
+</div>
 
+<!-- ── HISTORY MODAL ─────────────────────────────────────────────── -->
 <div class="mo" id="history-mo">
   <div class="mc" style="max-width:720px">
     <div class="mc-header">
@@ -2526,7 +2527,7 @@ function alphaRow(c,view,ctx){
   const initials=(c.ticker||'').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase();
   const fb=`<span style="display:grid;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`;
   const mark=c.logo
-    ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:3px;object-fit:contain;background:#111;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
+    ? `<img src="${esc(c.logo)}" alt="" loading="lazy" style="width:22px;height:22px;border-radius:4px;object-fit:contain;background:#f2f2f2;padding:2px;box-sizing:border-box;flex:none" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span style="display:none;width:22px;height:22px;border-radius:3px;background:var(--surf-2);color:var(--t-soft);font-size:9px;font-family:'JetBrains Mono',monospace;place-items:center;flex:none">${initials}</span>`
     : fb;
   return `<div class="trow" style="display:grid;grid-template-columns:${view.grid};gap:8px;align-items:center;min-width:760px">
     <div style="display:flex;align-items:center;gap:9px;min-width:0">${mark}
