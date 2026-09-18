@@ -2672,7 +2672,16 @@ function valuationVerdict(c){
   // Forward vs trailing P/E is the market's earnings expectation.
   let dir='';
   if(has(pe)&&has(fpe)&&pe>0){
-    if(fpe<pe*0.75){score+=1;dir='earnings expected to grow strongly';}
+    // A forward estimate the scraper flagged as unverified is one whose implied
+    // EPS growth (>25%) is more likely a mis-dated fiscal year than a forecast.
+    // Indian fiscal years end 31 March, so Yahoo's estimate can point two years
+    // out without saying so. Report the direction, but don't pay a point for it.
+    const trust = !c.forward_pe_unverified;
+    if(fpe<pe*0.75){
+      if(trust) score+=1;
+      dir = trust ? 'earnings expected to grow strongly'
+                  : 'forward estimate implies strong growth (unverified — check the estimate year)';
+    }
     else if(fpe<pe*0.95){dir='earnings expected to grow';}
     // 4% clears the noise floor: a forward P/E a hair above trailing is
     // forecast scatter, not a real expectation of shrinking earnings.
