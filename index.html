@@ -2872,14 +2872,24 @@ function renderAlpha(){
       // 'verdict' is computed, not a stored field — rank it cheap → expensive
       // so sorting the Read column groups the bargains together.
       if(alphaSort.col==='rating'){
-        const rank={'Strong Buy':0,'Buy':1,'Hold':2,'Sell':3,'\u2014':4};
-        const rx=rank[businessRating(a).label]??9, ry=rank[businessRating(b).label]??9;
-        return (rx-ry)*alphaSort.dir;
+        const rank={'Strong Buy':0,'Buy':1,'Hold':2,'Sell':3};
+        const la=businessRating(a).label, lb=businessRating(b).label;
+        const ra=rank[la], rb=rank[lb];
+        // Unrated rows sink to the bottom either way — flipping the sort
+        // shouldn't promote rows that carry no rating at all.
+        if(ra===undefined && rb===undefined) return 0;
+        if(ra===undefined) return 1;
+        if(rb===undefined) return -1;
+        return (ra-rb)*alphaSort.dir;
       }
       if(alphaSort.col==='verdict'){
-        const rank={'Underpriced':0,'Leans cheap':1,'Fairly valued':2,'Leans rich':3,'Overpriced':4,'Unprofitable':5,'Check data':6,'\u2014':7};
-        const rx=rank[valuationVerdict(a).label]??9, ry=rank[valuationVerdict(b).label]??9;
-        return (rx-ry)*alphaSort.dir;
+        const rank={'Underpriced':0,'Leans cheap':1,'Fairly valued':2,'Leans rich':3,'Overpriced':4,'Unprofitable':5};
+        const la=valuationVerdict(a).label, lb=valuationVerdict(b).label;
+        const ra=rank[la], rb=rank[lb];
+        if(ra===undefined && rb===undefined) return 0;
+        if(ra===undefined) return 1;      // '—' and 'Check data' always last
+        if(rb===undefined) return -1;
+        return (ra-rb)*alphaSort.dir;
       }
       let x=a[alphaSort.col],y=b[alphaSort.col];
       if(typeof x==='string'||typeof y==='string')return String(x||'').localeCompare(String(y||''))*alphaSort.dir;
