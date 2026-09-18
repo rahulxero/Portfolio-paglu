@@ -1,9 +1,10 @@
 {
-  "updated": "2026-09-18T09:23:49+00:00",
+  "updated": "2026-09-18T09:54:21+00:00",
   "companies": [
     {
       "rank": 1,
       "ticker": "NVDA",
+      "display_ticker": "NVDA",
       "name": "NVIDIA",
       "country": "USA",
       "market_cap": 5296000000000.0,
@@ -29,6 +30,7 @@
     {
       "rank": 2,
       "ticker": "AAPL",
+      "display_ticker": "AAPL",
       "name": "Apple",
       "country": "USA",
       "market_cap": 4918000000000.0,
@@ -54,6 +56,7 @@
     {
       "rank": 3,
       "ticker": "GOOG",
+      "display_ticker": "GOOG",
       "name": "Alphabet (Google)",
       "country": "USA",
       "market_cap": 4203000000000.0005,
@@ -79,6 +82,7 @@
     {
       "rank": 4,
       "ticker": "MSFT",
+      "display_ticker": "MSFT",
       "name": "Microsoft",
       "country": "USA",
       "market_cap": 3696000000000.0,
@@ -104,6 +108,7 @@
     {
       "rank": 5,
       "ticker": "AMZN",
+      "display_ticker": "AMZN",
       "name": "Amazon",
       "country": "USA",
       "market_cap": 2709000000000.0,
@@ -129,6 +134,7 @@
     {
       "rank": 6,
       "ticker": "TSM",
+      "display_ticker": "TSM",
       "name": "TSMC",
       "country": "Taiwan",
       "market_cap": 2231000000000.0,
@@ -138,8 +144,8 @@
       "forward_pe": 19.624084,
       "dividend_yield": 0.95,
       "sector": "Technology",
-      "fcf_yield": 1.59,
-      "ev_ebitda": 21.61,
+      "fcf_yield": 1.58,
+      "ev_ebitda": 21.64,
       "ps": 0.5025416,
       "roe": 40.0,
       "net_margin": 53.6,
@@ -154,6 +160,7 @@
     {
       "rank": 7,
       "ticker": "SPCX",
+      "display_ticker": "SPCX",
       "name": "SpaceX",
       "country": "USA",
       "market_cap": 2040000000000.0,
@@ -179,6 +186,7 @@
     {
       "rank": 8,
       "ticker": "META",
+      "display_ticker": "META",
       "name": "Meta Platforms (Facebook)",
       "country": "USA",
       "market_cap": 1738000000000.0,
@@ -204,6 +212,7 @@
     {
       "rank": 9,
       "ticker": "AVGO",
+      "display_ticker": "AVGO",
       "name": "Broadcom",
       "country": "USA",
       "market_cap": 1657000000000.0,
@@ -229,6 +238,7 @@
     {
       "rank": 10,
       "ticker": "2222.SR",
+      "display_ticker": "2222.SR",
       "name": "Saudi Aramco",
       "country": "S. Arabia",
       "market_cap": 1646000000000.0,
@@ -254,6 +264,7 @@
     {
       "rank": 11,
       "ticker": "TSLA",
+      "display_ticker": "TSLA",
       "name": "Tesla",
       "country": "USA",
       "market_cap": 1446000000000.0,
@@ -279,6 +290,7 @@
     {
       "rank": 12,
       "ticker": "005930.KS",
+      "display_ticker": "005930.KS",
       "name": "Samsung",
       "country": "S. Korea",
       "market_cap": 1240000000000.0,
@@ -288,8 +300,8 @@
       "forward_pe": 3.701786,
       "dividend_yield": 0.57,
       "sector": "Technology",
-      "fcf_yield": 8.19,
-      "ev_ebitda": 6.82,
+      "fcf_yield": 8.17,
+      "ev_ebitda": 6.83,
       "ps": 3.5317776,
       "roe": 30.8,
       "net_margin": 25.0,
@@ -304,6 +316,7 @@
     {
       "rank": 13,
       "ticker": "MU",
+      "display_ticker": "MU",
       "name": "Micron Technology",
       "country": "USA",
       "market_cap": 1103000000000.0,
@@ -329,6 +342,7 @@
     {
       "rank": 14,
       "ticker": "BRK-B",
+      "display_ticker": "BRK-B",
       "name": "Berkshire Hathaway",
       "country": "USA",
       "market_cap": 1090000000000.0001,
@@ -354,6 +368,7 @@
     {
       "rank": 15,
       "ticker": "LLY",
+      "display_ticker": "LLY",
       "name": "Eli Lilly",
       "country": "USA",
       "market_cap": 1026999999999.9999,
@@ -379,6 +394,7 @@
     {
       "rank": 16,
       "ticker": "000660.KS",
+      "display_ticker": "000660.KS",
       "name": "SK Hynix",
       "country": "S. Korea",
       "market_cap": 954440000000.0,
@@ -388,8 +404,8 @@
       "forward_pe": 3.956066,
       "dividend_yield": 0.08,
       "sector": "Technology",
-      "fcf_yield": 6.85,
-      "ev_ebitda": 8.73,
+      "fcf_yield": 6.83,
+      "ev_ebitda": 8.75,
       "ps": 6.968316,
       "roe": 92.7,
       "net_margin": 70.0,
@@ -404,6 +420,7 @@
     {
       "rank": 17,
       "ticker": "JPM",
+      "display_ticker": "JPM",
       "name": "JPMorgan Chase",
       "country": "USA",
       "market_cap": 928530000000.0,
@@ -413,7 +430,7 @@
       "forward_pe": 13.9791155,
       "dividend_yield": 1.72,
       "sector": "Financial Services",
-      "fcf_yield": -17.5,
+      "fcf_yield": null,
       "ev_ebitda": null,
       "ps": 4.9833145,
       "roe": 17.8,
@@ -429,6 +446,7 @@
     {
       "rank": 18,
       "ticker": "AMD",
+      "display_ticker": "AMD",
       "name": "AMD",
       "country": "USA",
       "market_cap": 889840000000.0,
@@ -454,6 +472,7 @@
     {
       "rank": 19,
       "ticker": "WMT",
+      "display_ticker": "WMT",
       "name": "Walmart",
       "country": "USA",
       "market_cap": 849840000000.0,
@@ -479,6 +498,7 @@
     {
       "rank": 20,
       "ticker": "V",
+      "display_ticker": "V",
       "name": "Visa",
       "country": "USA",
       "market_cap": 694490000000.0,
@@ -504,6 +524,7 @@
     {
       "rank": 21,
       "ticker": "XOM",
+      "display_ticker": "XOM",
       "name": "Exxon Mobil",
       "country": "USA",
       "market_cap": 671350000000.0,
@@ -529,6 +550,7 @@
     {
       "rank": 22,
       "ticker": "JNJ",
+      "display_ticker": "JNJ",
       "name": "Johnson & Johnson",
       "country": "USA",
       "market_cap": 651200000000.0,
@@ -554,17 +576,18 @@
     {
       "rank": 23,
       "ticker": "ASML",
+      "display_ticker": "ASML",
       "name": "ASML",
       "country": "Netherlands",
       "market_cap": 625950000000.0,
       "earnings": 14520000000.0,
-      "revenue": 40573674981.55664,
+      "revenue": 40587660928.743164,
       "pe": 43.11,
       "forward_pe": 27.471567,
       "dividend_yield": 0.56,
       "sector": "Technology",
       "fcf_yield": 1.63,
-      "ev_ebitda": 39.99,
+      "ev_ebitda": 39.98,
       "ps": 17.71867,
       "roe": 53.9,
       "net_margin": 35.8,
@@ -579,17 +602,18 @@
     {
       "rank": 24,
       "ticker": "688825.SS",
+      "display_ticker": "688825.SS",
       "name": "CXMT",
       "country": "China",
       "market_cap": 587200000000.0,
-      "earnings": 12217150529.987305,
-      "revenue": 29369294733.646484,
+      "earnings": 12234872527.772705,
+      "revenue": 29411897349.93994,
       "pe": 40.838234,
       "forward_pe": 11.797994,
       "dividend_yield": null,
       "sector": "Technology",
       "fcf_yield": null,
-      "ev_ebitda": 23.88,
+      "ev_ebitda": 23.85,
       "ps": 19.170462,
       "roe": null,
       "net_margin": 41.6,
@@ -604,6 +628,7 @@
     {
       "rank": 25,
       "ticker": "INTC",
+      "display_ticker": "INTC",
       "name": "Intel",
       "country": "USA",
       "market_cap": 575120000000.0,
