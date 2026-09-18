@@ -306,12 +306,29 @@ def quality_metrics(tk, info, rate):
                 sh = full.dropna()
         except Exception:
             pass
+        # Splits multiply the raw count and are indistinguishable from dilution
+        # unless corrected — Samsung's 50:1 split in 2018 read as +4,309%.
+        split_factor = 1.0
+        try:
+            splits = tk.splits
+            if splits is not None and len(splits):
+                start = sh.index[0] if sh is not None and len(sh) else None
+                for dt, ratio in splits.items():
+                    if start is None or dt >= start:
+                        split_factor *= float(ratio)
+        except Exception:
+            pass
+
         if sh is not None and len(sh) > 1:
             first, last = float(sh.iloc[0]), float(sh.iloc[-1])
+            first *= split_factor          # restate the old count in today's shares
             years = max(1, round((sh.index[-1] - sh.index[0]).days / 365.25))
             if first > 0:
-                out["share_change"] = round((last - first) / first * 100, 1)
-                out["share_change_years"] = years
+                pct = (last - first) / first * 100
+                # Past ±200% over a decade it's a residual split/unit artefact,
+                # not a buyback or an issuance. Better blank than wrong.
+                out["share_change"] = round(pct, 1) if -95 <= pct <= 200 else None
+                out["share_change_years"] = years if out["share_change"] is not None else None
         else:
             bs = tk.balance_sheet
             if bs is not None and not bs.empty and "Ordinary Shares Number" in bs.index:
@@ -319,8 +336,9 @@ def quality_metrics(tk, info, rate):
                 if len(v) > 1:
                     newest, oldest = float(v.iloc[0]), float(v.iloc[-1])
                     if oldest > 0:
-                        out["share_change"] = round((newest - oldest) / oldest * 100, 1)
-                        out["share_change_years"] = len(v) - 1
+                        pct = (newest - oldest) / oldest * 100
+                        out["share_change"] = round(pct, 1) if -95 <= pct <= 200 else None
+                        out["share_change_years"] = (len(v) - 1) if out["share_change"] is not None else None
     except Exception as e:
         print(f"    share count failed: {e}")
 
