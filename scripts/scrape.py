@@ -57,16 +57,22 @@ BOARDS = {
             "revenue":    f"{BASE}/largest-companies-by-revenue/",
         },
     },
-    "india": {
-        "out": "alpha-in.json",
-        "top_n": 50,
-        "suffix": ".NS",
-        "pages": {
-            "market_cap": f"{BASE}/india/largest-companies-in-india-by-market-cap/",
-            "earnings":   f"{BASE}/india/most-profitable-indian-companies/",
-            "revenue":    f"{BASE}/india/largest-indian-companies-by-revenue/",
-        },
-    },
+    # The India board was removed from the site. To bring it back, restore this
+    # entry and add a header button calling openAlpha('india') in index.html
+    # along with its ALPHA_BOARDS / ALPHA_CACHE entries. The .NS ticker handling,
+    # bonus-issue reconciliation and financial-sector guards below all remain in
+    # place and are what it needs to be trustworthy.
+    #
+    # "india": {
+    #     "out": "alpha-in.json",
+    #     "top_n": 50,
+    #     "suffix": ".NS",
+    #     "pages": {
+    #         "market_cap": f"{BASE}/india/largest-companies-in-india-by-market-cap/",
+    #         "earnings":   f"{BASE}/india/most-profitable-indian-companies/",
+    #         "revenue":    f"{BASE}/india/largest-indian-companies-by-revenue/",
+    #     },
+    # },
 }
 
 PAGES = {
