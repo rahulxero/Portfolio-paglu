@@ -231,6 +231,120 @@ def ttm_free_cash_flow(tk, info):
     return info.get("freeCashflow")
 
 
+def quality_metrics(tk, info, rate):
+    """
+    The metrics Buffett actually talks about, which valuation multiples miss.
+
+    ROIC              — return on invested capital. ROE flatters leveraged
+                        balance sheets; ROIC doesn't. His stated single metric.
+    net_debt_ebitda   — leverage. EV/EBITDA half-accounts for debt but never
+                        tells you whether the balance sheet is fragile.
+    share_change      — buybacks vs dilution. A company quietly shrinking its
+                        share count returns capital; 3%/yr dilution is a hidden
+                        tax that appears in no other column here.
+    margin_stability  — standard deviation of gross margin. Durable pricing
+                        power shows up as margins that hold; it's the closest a
+                        screen gets to measuring a moat.
+
+    Everything is ratio-based or percentage-based so currency cancels out.
+    Returns a dict of Nones where data is unavailable rather than guessing.
+    """
+    out = {"roic": None, "net_debt_ebitda": None,
+           "share_change": None, "share_change_years": None,
+           "margin_stability": None, "gross_margin": None}
+
+    # ── ROIC = NOPAT / invested capital ──
+    try:
+        inc, bs = tk.income_stmt, tk.balance_sheet
+        def pick(df, *names):
+            if df is None or df.empty:
+                return None
+            for n in names:
+                if n in df.index:
+                    v = df.loc[n].dropna()
+                    if len(v):
+                        return float(v.iloc[0])
+            return None
+
+        ebit = pick(inc, "EBIT", "Operating Income")
+        pretax = pick(inc, "Pretax Income")
+        taxexp = pick(inc, "Tax Provision")
+        equity = pick(bs, "Stockholders Equity", "Total Stockholder Equity")
+        debt = info.get("totalDebt") or pick(bs, "Total Debt")
+        cash = info.get("totalCash") or pick(bs, "Cash And Cash Equivalents")
+
+        if ebit and equity:
+            tax_rate = (taxexp / pretax) if (pretax and taxexp and pretax > 0) else 0.21
+            tax_rate = min(max(tax_rate, 0.0), 0.5)
+            nopat = ebit * (1 - tax_rate)
+            invested = equity + (debt or 0) - (cash or 0)
+            if invested and invested > 0:
+                out["roic"] = round(nopat / invested * 100, 1)
+    except Exception as e:
+        print(f"    roic failed: {e}")
+
+    # ── Net debt / EBITDA ──
+    try:
+        ebitda = info.get("ebitda")
+        debt = info.get("totalDebt")
+        cash = info.get("totalCash")
+        if ebitda and ebitda > 0 and debt is not None:
+            out["net_debt_ebitda"] = round((debt - (cash or 0)) / ebitda, 2)
+    except Exception:
+        pass
+
+    # ── Share count trend ──
+    # yfinance's annual statements only reach back ~4 years; get_shares_full
+    # goes further when available, so try it first and record the span used
+    # rather than claiming 10 years we don't have.
+    try:
+        import pandas as pd
+        sh = None
+        try:
+            full = tk.get_shares_full(start="2014-01-01")
+            if full is not None and len(full) > 1:
+                sh = full.dropna()
+        except Exception:
+            pass
+        if sh is not None and len(sh) > 1:
+            first, last = float(sh.iloc[0]), float(sh.iloc[-1])
+            years = max(1, round((sh.index[-1] - sh.index[0]).days / 365.25))
+            if first > 0:
+                out["share_change"] = round((last - first) / first * 100, 1)
+                out["share_change_years"] = years
+        else:
+            bs = tk.balance_sheet
+            if bs is not None and not bs.empty and "Ordinary Shares Number" in bs.index:
+                v = bs.loc["Ordinary Shares Number"].dropna()
+                if len(v) > 1:
+                    newest, oldest = float(v.iloc[0]), float(v.iloc[-1])
+                    if oldest > 0:
+                        out["share_change"] = round((newest - oldest) / oldest * 100, 1)
+                        out["share_change_years"] = len(v) - 1
+    except Exception as e:
+        print(f"    share count failed: {e}")
+
+    # ── Gross margin level + stability ──
+    try:
+        inc = tk.income_stmt
+        if inc is not None and not inc.empty:
+            gp = inc.loc["Gross Profit"].dropna() if "Gross Profit" in inc.index else None
+            rev = inc.loc["Total Revenue"].dropna() if "Total Revenue" in inc.index else None
+            if gp is not None and rev is not None:
+                margins = [float(g) / float(r) * 100
+                           for g, r in zip(gp, rev) if r and float(r) > 0]
+                if margins:
+                    out["gross_margin"] = round(sum(margins) / len(margins), 1)
+                if len(margins) >= 3:
+                    mean = sum(margins) / len(margins)
+                    var = sum((m - mean) ** 2 for m in margins) / len(margins)
+                    out["margin_stability"] = round(var ** 0.5, 2)   # lower = steadier
+    except Exception as e:
+        print(f"    margin stability failed: {e}")
+
+    return out
+
+
 def enrich_from_yahoo(companies):
     """
     Forward P/E and dividend yield aren't on companiesmarketcap, so pull them
@@ -325,7 +439,11 @@ def enrich_from_yahoo(companies):
         if c.get("earnings") is None and info.get("netIncomeToCommon"):
             c["earnings"] = info["netIncomeToCommon"] * rate if rate else None
 
-        print(f"  {c['ticker']:<12} fwd P/E {c.get('forward_pe')}  div {c.get('dividend_yield')}")
+        c.update(quality_metrics(tk, info, rate))
+
+        print(f"  {c['ticker']:<12} fwd P/E {c.get('forward_pe')}  div {c.get('dividend_yield')}  "
+              f"ROIC {c.get('roic')}  nd/ebitda {c.get('net_debt_ebitda')}  "
+              f"shares {c.get('share_change')}%")
 
 
 def main():
@@ -366,6 +484,12 @@ def main():
             "ps": None,
             "roe": None,
             "net_margin": None,
+            "roic": None,
+            "net_debt_ebitda": None,
+            "share_change": None,
+            "share_change_years": None,
+            "margin_stability": None,
+            "gross_margin": None,
             "logo": None,
             "logo_url": r["logo_url"],
         })
