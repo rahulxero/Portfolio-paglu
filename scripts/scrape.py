@@ -198,6 +198,39 @@ def fx_to_usd(currency, yf):
     return rate
 
 
+def ttm_free_cash_flow(tk, info):
+    """
+    Yahoo's `freeCashflow` field is inconsistent: for some tickers it's the
+    trailing twelve months, for others the most recent quarter. Microsoft came
+    back as $19.6B (one quarter) against a true TTM of $67B, understating its
+    cash yield by 4x.
+
+    Sum the last four quarters from the cash-flow statement instead, and only
+    fall back to the info field when the statement isn't available.
+    """
+    try:
+        q = tk.quarterly_cashflow
+        if q is not None and not q.empty:
+            def row(*names):
+                for n in names:
+                    if n in q.index:
+                        vals = q.loc[n].dropna()
+                        if len(vals) >= 4:
+                            return float(vals.iloc[:4].sum())
+                return None
+
+            fcf = row("Free Cash Flow")
+            if fcf is not None:
+                return fcf
+            ocf = row("Operating Cash Flow", "Total Cash From Operating Activities")
+            capex = row("Capital Expenditure", "Capital Expenditures")
+            if ocf is not None and capex is not None:
+                return ocf + capex      # capex is reported negative
+    except Exception as e:
+        print(f"  ttm fcf fallback ({e})")
+    return info.get("freeCashflow")
+
+
 def enrich_from_yahoo(companies):
     """
     Forward P/E and dividend yield aren't on companiesmarketcap, so pull them
@@ -216,9 +249,20 @@ def enrich_from_yahoo(companies):
 
     for c in companies:
         try:
-            info = yf.Ticker(c["ticker"]).info or {}
+            tk = yf.Ticker(c["ticker"])
+            info = tk.info or {}
         except Exception as e:
             print(f"  yahoo failed for {c['ticker']}: {e}")
+            continue
+
+        # Guard against a ticker that resolved to the wrong security. SpaceX is
+        # private but appears in the market-cap ranking, and "SPCX" on Yahoo is a
+        # closed-end fund — it was filling the row with nonsense (681x EBITDA).
+        # quoteType is the reliable signal here; name matching produced false
+        # positives on abbreviations (TSMC vs "Taiwan Semiconductor Manufacturing").
+        qt = (info.get("quoteType") or "").upper()
+        if qt and qt != "EQUITY":
+            print(f"  {c['ticker']:<12} SKIPPED — Yahoo quoteType is {qt}, not a listed equity")
             continue
 
         c["forward_pe"] = info.get("forwardPE")
@@ -238,7 +282,12 @@ def enrich_from_yahoo(companies):
             ev_ratio = info.get("enterpriseToEbitda")
         # A negative multiple means net cash exceeds EV or EBITDA is negative —
         # not "cheap", just not meaningful. Berkshire was showing -1.8 in green.
-        c["ev_ebitda"] = round(ev_ratio, 2) if ev_ratio and ev_ratio > 0 else None
+        # Anything past ~150x isn't a valuation signal, it's a broken input —
+        # a near-zero EBITDA denominator or a mismatched security.
+        if ev_ratio and 0 < ev_ratio <= 150:
+            c["ev_ebitda"] = round(ev_ratio, 2)
+        else:
+            c["ev_ebitda"] = None
         c["ps"] = info.get("priceToSalesTrailing12Months")
         c["roe"] = round(info["returnOnEquity"] * 100, 1) if info.get("returnOnEquity") else None
 
@@ -249,7 +298,7 @@ def enrich_from_yahoo(companies):
         # 5800%. Convert FCF to USD explicitly, then divide by the USD market cap.
         fin_cur = info.get("financialCurrency") or info.get("currency")
         rate = fx_to_usd(fin_cur, yf)
-        fcf = info.get("freeCashflow")
+        fcf = ttm_free_cash_flow(tk, info)
         mc_usd = c.get("market_cap")
         if fcf and mc_usd and mc_usd > 0 and rate:
             c["fcf_yield"] = round(fcf * rate / mc_usd * 100, 2)
