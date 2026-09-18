@@ -75,6 +75,21 @@ PAGES = {
     "revenue":    f"{BASE}/largest-companies-by-revenue/",
 }
 
+# companiesmarketcap identifies some Indian companies by their US ADR symbol.
+# Appending .NS to those produces a ticker Yahoo has never heard of (HDB.NS),
+# so the row arrives with every enriched field null — HDFC Bank and ICICI Bank,
+# two of the five largest companies in the country, had no sector, no ROIC and
+# no forward P/E for exactly this reason. Map them to the NSE line instead.
+TICKER_OVERRIDES = {
+    "HDB": "HDFCBANK.NS",
+    "IBN": "ICICIBANK.NS",
+    "INFY": "INFY.NS",
+    "WIT": "WIPRO.NS",
+    "RDY": "DRREDDY.NS",
+    "TTM": "TATAMOTORS.NS",
+    "MMYT": None,          # MakeMyTrip is US-listed only; no NSE equivalent
+}
+
 # "$5.456 T" / "$965.21 B" / "-$1.2 M"  ->  float dollars
 UNITS = {"T": 1e12, "B": 1e9, "M": 1e6, "K": 1e3}
 MONEY = re.compile(r"(-?)\$?\s*([\d,]+(?:\.\d+)?)\s*([TBMK])?", re.I)
@@ -427,11 +442,71 @@ def enrich_from_yahoo(companies):
         fin_cur = info.get("financialCurrency") or info.get("currency")
         rate = fx_to_usd(fin_cur, yf)
 
-        c["forward_pe"] = info.get("forwardPE")
-        if c.get("pe") is None:
-            c["pe"] = info.get("trailingPE")
-
         c["sector"] = info.get("sector")
+        c["industry"] = info.get("industry")
+
+        # ── Market cap reconciliation ──────────────────────────────────
+        # companiesmarketcap does not always reprice after a corporate action.
+        # LIC's 1:1 bonus (record date 29 May 2026) doubled the share count and
+        # halved the price; their page picked up the new price against the old
+        # count and reported $26.4B against a true ~$53B. Every ratio built on
+        # that market cap — P/E, EV/EBITDA, FCF yield — was then wrong by 2x,
+        # and LIC ranked 33rd instead of roughly 12th.
+        #
+        # Yahoo's marketCap is price x current shares in the TRADING currency,
+        # which is not always the reporting currency (ADRs report in TWD or KRW
+        # but trade in USD), so convert with `currency`, not `financialCurrency`.
+        y_mc = info.get("marketCap")
+        mc_rate = fx_to_usd(info.get("currency") or fin_cur, yf)
+        if y_mc and mc_rate and c.get("market_cap"):
+            y_mc_usd = y_mc * mc_rate
+            drift = abs(y_mc_usd - c["market_cap"]) / c["market_cap"]
+            if drift > 0.15:
+                print(f"  {c['ticker']:<14} market cap {c['market_cap']/1e9:.1f}B -> "
+                      f"{y_mc_usd/1e9:.1f}B ({drift*100:.0f}% drift, using Yahoo — "
+                      f"check for a split or bonus issue)")
+                c["market_cap"] = y_mc_usd
+                c["market_cap_source"] = "yahoo"
+        elif y_mc and mc_rate and not c.get("market_cap"):
+            c["market_cap"] = y_mc * mc_rate
+            c["market_cap_source"] = "yahoo"
+
+        # ── Trailing P/E ───────────────────────────────────────────────
+        # The scraped `earnings` column is NOT net income attributable to
+        # shareholders. TCS came through at $7.54B against a true PAT near
+        # $5.1B; ONGC at $9.01B against $4.55B, because it counts the HPCL and
+        # MRPL minority interests. Dividing market cap by it produced TCS at
+        # 10.9x (true ~16x) and ONGC at 3.4x (true ~6.8x) — the whole board read
+        # a third cheaper than it was, and every "Underpriced" verdict inherited
+        # the error. Worse, forward P/E already came from Yahoo, so trailing and
+        # forward sat on different earnings bases and forward came out HIGHER
+        # than trailing on 20 of 50 rows, which the valuation scorer then read as
+        # "earnings expected to fall".
+        #
+        # Rebuild from Yahoo's netIncomeToCommon so both multiples share a base,
+        # and keep the scraped figure only when Yahoo has nothing.
+        ni = info.get("netIncomeToCommon")
+        if ni and rate:
+            c["earnings"] = ni * rate
+            c["earnings_source"] = "yahoo"
+            if c.get("market_cap") and c["earnings"] > 0:
+                c["pe"] = round(c["market_cap"] / c["earnings"], 2)
+            else:
+                c["pe"] = None
+        elif info.get("trailingPE"):
+            c["pe"] = round(info["trailingPE"], 2)
+            c["earnings_source"] = "yahoo-pe"
+        else:
+            c["earnings_source"] = "companiesmarketcap"
+
+        c["forward_pe"] = info.get("forwardPE")
+        # With both multiples on one base, a forward P/E far above trailing is a
+        # real signal (a cyclical at peak earnings) rather than an artefact — but
+        # a 2x gap is still more likely to be a stale or mismatched estimate.
+        if c.get("pe") and c.get("forward_pe") and c["forward_pe"] > c["pe"] * 2:
+            print(f"  {c['ticker']:<14} forward P/E {c['forward_pe']:.1f} vs trailing "
+                  f"{c['pe']:.1f} — dropping, estimate looks mismatched")
+            c["forward_pe"] = None
         # EV/EBITDA straight from Yahoo is unreliable across listings (TSM came
         # back at 4.9 against a true ~18). Rebuild it from components in one
         # currency, and fall back to Yahoo's figure only if that isn't possible.
@@ -458,7 +533,24 @@ def enrich_from_yahoo(companies):
         else:
             c["ev_ebitda"] = None
         c["ps"] = info.get("priceToSalesTrailing12Months")
+        # Yahoo returns no returnOnEquity for most Indian tickers — 42 of the 50
+        # rows on the India board were blank while ROIC sat right next to them,
+        # which reads as "this company has no ROE" rather than "Yahoo didn't
+        # send one". Fall back to net income over shareholders' equity.
         c["roe"] = round(info["returnOnEquity"] * 100, 1) if info.get("returnOnEquity") else None
+        if c["roe"] is None and ni:
+            try:
+                bs = tk.balance_sheet
+                if bs is not None and not bs.empty:
+                    for n in ("Stockholders Equity", "Total Stockholder Equity",
+                              "Common Stock Equity"):
+                        if n in bs.index:
+                            eq = bs.loc[n].dropna()
+                            if len(eq) and float(eq.iloc[0]) > 0:
+                                c["roe"] = round(ni / float(eq.iloc[0]) * 100, 1)
+                                break
+            except Exception as e:
+                print(f"    roe fallback failed: {e}")
 
         # FCF yield: free cash flow over market cap.
         # Yahoo reports financials in `financialCurrency`, which for an ADR is the
@@ -500,6 +592,28 @@ def enrich_from_yahoo(companies):
 
         c.update(quality_metrics(tk, info, rate))
 
+        # ── Banks and insurers ─────────────────────────────────────────
+        # Enterprise value, net debt and invested capital have no meaning on a
+        # balance sheet where the liabilities ARE the business. LIC was showing
+        # 2.7x EV/EBITDA, "net cash", and 55.3% ROIC — policyholder float read as
+        # a cash pile and reserves read as equity — which fed a Strong Buy built
+        # on nothing. Deposits are not debt and float is not cash. Blank these
+        # rather than print a number that means nothing; the quality scorer needs
+        # two filled inputs, so these rows correctly fall through to "—".
+        # P/E, P/B and dividend yield survive, which is what you'd screen a
+        # financial on anyway.
+        industry = (c.get("industry") or "").lower()
+        is_financial = (
+            c.get("sector") == "Financial Services"
+            or any(k in industry for k in ("bank", "insurance", "capital markets",
+                                           "asset management", "credit services"))
+        )
+        if is_financial:
+            c["is_financial"] = True
+            for k in ("ev_ebitda", "net_debt_ebitda", "roic", "fcf_yield",
+                      "margin_stability", "gross_margin"):
+                c[k] = None
+
         print(f"  {c['ticker']:<12} fwd P/E {c.get('forward_pe')}  div {c.get('dividend_yield')}  "
               f"ROIC {c.get('roic')}  nd/ebitda {c.get('net_debt_ebitda')}  "
               f"shares {c.get('share_change')}%")
@@ -535,8 +649,15 @@ def build_board(key, cfg):
         e = earnings.get(t)
         mc = r["value"]
         # Yahoo needs the exchange suffix for NSE listings; tickers that already
-        # carry a dot (RELIANCE.NS, 2222.SR) are left alone.
-        y_ticker = t if "." in t else f"{t}{suffix}"
+        # carry a dot (RELIANCE.NS, 2222.SR) are left alone. ADR symbols get an
+        # explicit NSE mapping first, otherwise they'd become e.g. HDB.NS.
+        if suffix and t in TICKER_OVERRIDES:
+            y_ticker = TICKER_OVERRIDES[t]
+            if y_ticker is None:
+                print(f"  {t} has no {suffix} listing — skipping")
+                continue
+        else:
+            y_ticker = t if "." in t else f"{t}{suffix}"
         companies.append({
             "rank": r["rank"], "ticker": y_ticker, "display_ticker": t,
             "name": r["name"], "country": r["country"],
@@ -547,6 +668,11 @@ def build_board(key, cfg):
             "net_margin": None, "roic": None, "net_debt_ebitda": None,
             "share_change": None, "share_change_years": None,
             "margin_stability": None, "gross_margin": None,
+            "industry": None, "is_financial": False,
+            # Which source the two load-bearing figures came from, so a bad row
+            # can be traced without re-running the scrape.
+            "market_cap_source": "companiesmarketcap",
+            "earnings_source": "companiesmarketcap",
             "logo": None, "logo_url": r["logo_url"],
         })
 
@@ -557,11 +683,21 @@ def build_board(key, cfg):
     print("  enriching from Yahoo Finance")
     enrich_from_yahoo(companies)
 
+    stale_pe = 0
     for c in companies:
-        if c["pe"] is None and c["market_cap"] and c["earnings"] and c["earnings"] > 0:
+        # Only rebuild from `earnings` when that figure came from Yahoo. Doing it
+        # unconditionally would put the companiesmarketcap number back into P/E
+        # for exactly the rows the reconciliation above was meant to catch.
+        if (c["pe"] is None and c["market_cap"] and c["earnings"]
+                and c["earnings"] > 0 and c.get("earnings_source", "").startswith("yahoo")):
             c["pe"] = round(c["market_cap"] / c["earnings"], 2)
         if c.get("revenue") and c.get("earnings") is not None and c["revenue"] > 0:
             c["net_margin"] = round(c["earnings"] / c["revenue"] * 100, 1)
+        if c.get("pe") is not None and c.get("earnings_source") == "companiesmarketcap":
+            stale_pe += 1
+    if stale_pe:
+        print(f"  !! {stale_pe} row(s) still carry a scraped P/E — Yahoo returned no "
+              f"net income for them. Treat those multiples as indicative only.")
 
     companies.sort(key=lambda c: c["market_cap"] or 0, reverse=True)
 
