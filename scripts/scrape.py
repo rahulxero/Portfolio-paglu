@@ -226,16 +226,35 @@ def enrich_from_yahoo(companies):
             c["pe"] = info.get("trailingPE")
 
         c["sector"] = info.get("sector")
-        c["ev_ebitda"] = info.get("enterpriseToEbitda")
+        # EV/EBITDA straight from Yahoo is unreliable across listings (TSM came
+        # back at 4.9 against a true ~18). Rebuild it from components in one
+        # currency, and fall back to Yahoo's figure only if that isn't possible.
+        ebitda = info.get("ebitda")
+        ev_native = info.get("enterpriseValue")
+        ev_ratio = None
+        if ebitda and ebitda > 0 and ev_native:
+            ev_ratio = ev_native / ebitda          # same currency, cancels out
+        elif info.get("enterpriseToEbitda"):
+            ev_ratio = info.get("enterpriseToEbitda")
+        # A negative multiple means net cash exceeds EV or EBITDA is negative —
+        # not "cheap", just not meaningful. Berkshire was showing -1.8 in green.
+        c["ev_ebitda"] = round(ev_ratio, 2) if ev_ratio and ev_ratio > 0 else None
         c["ps"] = info.get("priceToSalesTrailing12Months")
         c["roe"] = round(info["returnOnEquity"] * 100, 1) if info.get("returnOnEquity") else None
 
-        # FCF yield: free cash flow over market cap. Both taken from Yahoo so they
-        # share a currency and the ratio is valid without any conversion — using
-        # companiesmarketcap's USD cap here is what produced 5800% for Samsung.
+        # FCF yield: free cash flow over market cap.
+        # Yahoo reports financials in `financialCurrency`, which for an ADR is the
+        # company's home currency (TWD for TSM) while `marketCap` is in the trading
+        # currency (USD). Using either side raw produced TSMC at 32% and Samsung at
+        # 5800%. Convert FCF to USD explicitly, then divide by the USD market cap.
+        fin_cur = info.get("financialCurrency") or info.get("currency")
+        rate = fx_to_usd(fin_cur, yf)
         fcf = info.get("freeCashflow")
-        mc_native = info.get("marketCap")
-        c["fcf_yield"] = round(fcf / mc_native * 100, 2) if fcf and mc_native and mc_native > 0 else None
+        mc_usd = c.get("market_cap")
+        if fcf and mc_usd and mc_usd > 0 and rate:
+            c["fcf_yield"] = round(fcf * rate / mc_usd * 100, 2)
+        else:
+            c["fcf_yield"] = None
 
         # dividendYield has changed units between yfinance releases, so derive it
         # from the rate and price when both are present and only fall back otherwise.
