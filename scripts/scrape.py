@@ -500,6 +500,30 @@ def enrich_from_yahoo(companies):
             c["earnings_source"] = "companiesmarketcap"
 
         c["forward_pe"] = info.get("forwardPE")
+        # ── Forward P/E provenance ─────────────────────────────────────
+        # forwardPE is Yahoo's own figure: price / forwardEps, both in INR for a
+        # .NS line, so no FX exposure. What it does NOT tell you is which fiscal
+        # year the estimate belongs to. Indian fiscal years end 31 March, so a
+        # September scrape sits mid-FY27 and some tickers resolve to FY27 while
+        # others resolve to FY28 — the column silently mixes horizons.
+        #
+        # Keep the ratio as-is, but record the estimate behind it and the growth
+        # it implies against trailing, so an implausible row is visible instead
+        # of invisible. LIC implied +40.7% EPS growth and TCS +23.6% against a
+        # business the market is derating; both are almost certainly two-year-out
+        # estimates being read as one-year.
+        c["forward_eps"] = info.get("forwardEps")
+        c["implied_eps_growth"] = None
+        c["forward_pe_unverified"] = False
+        if c.get("pe") and c.get("forward_pe") and c["forward_pe"] > 0:
+            growth = (c["pe"] / c["forward_pe"] - 1) * 100
+            c["implied_eps_growth"] = round(growth, 1)
+            # Above ~25% for a large-cap the estimate is more likely mis-dated
+            # than the company is about to grow earnings a quarter in one year.
+            if growth > 25:
+                c["forward_pe_unverified"] = True
+                print(f"  {c['ticker']:<14} forward P/E implies {growth:+.0f}% EPS growth "
+                      f"— flagged unverified, estimate year is probably not FY+1")
         # With both multiples on one base, a forward P/E far above trailing is a
         # real signal (a cyclical at peak earnings) rather than an artefact — but
         # a 2x gap is still more likely to be a stale or mismatched estimate.
@@ -507,6 +531,9 @@ def enrich_from_yahoo(companies):
             print(f"  {c['ticker']:<14} forward P/E {c['forward_pe']:.1f} vs trailing "
                   f"{c['pe']:.1f} — dropping, estimate looks mismatched")
             c["forward_pe"] = None
+            c["forward_eps"] = None
+            c["implied_eps_growth"] = None
+            c["forward_pe_unverified"] = False
         # EV/EBITDA straight from Yahoo is unreliable across listings (TSM came
         # back at 4.9 against a true ~18). Rebuild it from components in one
         # currency, and fall back to Yahoo's figure only if that isn't possible.
@@ -669,6 +696,8 @@ def build_board(key, cfg):
             "share_change": None, "share_change_years": None,
             "margin_stability": None, "gross_margin": None,
             "industry": None, "is_financial": False,
+            "forward_eps": None, "implied_eps_growth": None,
+            "forward_pe_unverified": False,
             # Which source the two load-bearing figures came from, so a bad row
             # can be traced without re-running the scrape.
             "market_cap_source": "companiesmarketcap",
