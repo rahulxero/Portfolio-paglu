@@ -2613,11 +2613,11 @@ function valuationVerdict(c){
   // Implausible cash yields are almost always a data artefact — a currency or
   // share-count mismatch, or a one-off asset sale — not a real 50x return.
   if(has(fcf)&&Math.abs(fcf)>100)
-    return {label:'Check data', tone:'warn', why:`FCF yield of ${fcf.toFixed(0)}% is not realistic — likely a data error or one-off event. Verify before trusting.`};
+    return {label:'Check data', tone:'warn', score:0, why:`FCF yield of ${fcf.toFixed(0)}% is not realistic — likely a data error or one-off event. Verify before trusting.`};
 
   // No trailing earnings at all: loss-making. EV/EBITDA is the only read left.
   if(!has(pe)&&has(ev)&&ev>100&&ev>0)
-    return {label:'Unprofitable', tone:'bad', why:`No trailing profit and ${ev.toFixed(0)}× EBITDA — priced entirely on future expectations.`};
+    return {label:'Unprofitable', tone:'bad', score:-4, why:`No trailing profit and ${ev.toFixed(0)}× EBITDA — priced entirely on future expectations.`};
 
   let score=0, notes=[];
   if(has(pe)){
@@ -2655,7 +2655,7 @@ function valuationVerdict(c){
 
   // Need at least two of the four to say anything useful.
   const filled=[pe,fpe,fcf,evOk?ev:null].filter(has).length;
-  if(filled<2) return {label:'—', tone:'dim', why:'Not enough data to judge.'};
+  if(filled<2) return {label:'—', tone:'dim', score:null, why:'Not enough data to judge.'};
 
   let label,tone;
   if(score>=3){label='Underpriced';tone='good';}
@@ -2665,7 +2665,7 @@ function valuationVerdict(c){
   else {label='Overpriced';tone='bad';}
 
   const why=[notes.join(', '), dir].filter(Boolean).join(' · ') || 'Metrics broadly in line.';
-  return {label, tone, why:why.charAt(0).toUpperCase()+why.slice(1)+'.'};
+  return {label, tone, score, why:why.charAt(0).toUpperCase()+why.slice(1)+'.'};
 }
 
 
@@ -2680,11 +2680,16 @@ function qualityScore(c){
   let s=0, n=0, notes=[];
   const has=v=>v!=null&&isFinite(v);
 
+  // Thresholds are set for THIS universe, not the market at large. A top-25
+  // by market cap list is pre-filtered for quality — these companies got that
+  // big by being excellent — so a 20% ROIC bar marks almost everyone as elite
+  // and the rating collapses to a single value. The bar has to sit where it
+  // actually separates this peer group.
   if(has(c.roic)){ n++;
-    if(c.roic>=20){s+=2;notes.push('excellent ROIC');}
-    else if(c.roic>=15){s+=1;notes.push('strong ROIC');}
-    else if(c.roic<8){s-=2;notes.push('weak ROIC');}
-    else if(c.roic<12){s-=1;}
+    if(c.roic>=40){s+=2;notes.push('exceptional ROIC');}
+    else if(c.roic>=25){s+=1;notes.push('excellent ROIC');}
+    else if(c.roic<12){s-=2;notes.push('weak ROIC');}
+    else if(c.roic<18){s-=1;notes.push('modest ROIC');}
   }
   if(has(c.net_debt_ebitda)){ n++;
     if(c.net_debt_ebitda<0){s+=1;notes.push('net cash');}
@@ -2692,14 +2697,15 @@ function qualityScore(c){
     else if(c.net_debt_ebitda>3){s-=1;notes.push('elevated debt');}
   }
   if(has(c.share_change)){ n++;
-    if(c.share_change<-5){s+=2;notes.push('meaningful buybacks');}
-    else if(c.share_change<-1){s+=1;notes.push('buying back stock');}
+    if(c.share_change<-10){s+=2;notes.push('meaningful buybacks');}
+    else if(c.share_change<-3){s+=1;notes.push('buying back stock');}
     else if(c.share_change>15){s-=2;notes.push('heavy dilution');}
-    else if(c.share_change>5){s-=1;notes.push('dilution');}
+    else if(c.share_change>3){s-=1;notes.push('dilution');}
   }
   if(has(c.margin_stability)){ n++;
     if(c.margin_stability<2){s+=1;notes.push('steady margins');}
-    else if(c.margin_stability>8){s-=1;notes.push('volatile margins');}
+    else if(c.margin_stability>15){s-=2;notes.push('highly cyclical margins');}
+    else if(c.margin_stability>6){s-=1;notes.push('volatile margins');}
   }
   return {score:s, filled:n, notes};
 }
@@ -2712,30 +2718,35 @@ function businessRating(c){
   if(q.filled<2) return {label:'—', tone:'dim', why:'Not enough business-quality data to rate.'};
   if(v.label==='Check data') return {label:'—', tone:'dim', why:'Valuation inputs look unreliable — verify the data first.'};
 
-  const quality = q.score>=3?'high' : q.score>=1?'good' : q.score>=-1?'average' : 'weak';
+  const quality = q.score>=4?'high' : q.score>=2?'good' : q.score>=-1?'average' : 'weak';
   const cheap   = ['Underpriced','Leans cheap'].includes(v.label);
   const fair    = v.label==='Fairly valued';
   const rich    = ['Leans rich','Overpriced','Unprofitable'].includes(v.label);
   const veryRich= ['Overpriced','Unprofitable'].includes(v.label);
 
+  // Blend the two scores rather than bucketing them. A strict matrix collapsed
+  // this universe into a single label — nearly every top-25 company is both
+  // high quality and fully priced, so bucket boundaries put them all in one
+  // cell. A weighted sum keeps the ordering meaningful.
+  //
+  // Valuation carries more weight (1.5x) because quality barely varies across
+  // a list selected on market cap, while price does. Quality still gates: a
+  // weak business can never rate above Hold no matter how cheap it looks.
+  const vs = v.score ?? 0;
+  let combined = q.score + 1.5*vs;
+
   let label,tone;
-  if(quality==='high'){
-    if(cheap){label='Strong Buy';tone='strong';}
-    else if(fair){label='Buy';tone='buy';}
-    else if(veryRich){label='Hold';tone='hold';}
-    else {label='Buy';tone='buy';}              // great business, slight premium
-  } else if(quality==='good'){
-    if(cheap){label='Buy';tone='buy';}
-    else if(fair){label='Hold';tone='hold';}
-    else {label='Hold';tone='hold';}
-  } else if(quality==='average'){
-    if(cheap){label='Hold';tone='hold';}
-    else if(veryRich){label='Sell';tone='sell';}
-    else {label='Hold';tone='hold';}
-  } else {                                      // weak business
-    if(cheap){label='Hold';tone='hold';}        // cheap but poor: classic value trap
-    else {label='Sell';tone='sell';}
-  }
+  if(quality==='weak'){
+    label = vs<=-1 ? 'Sell' : 'Hold';           // cheap + weak = value trap, not a buy
+    tone  = label==='Sell' ? 'sell' : 'hold';
+  } else if(combined>=6 && q.score>=1){ label='Strong Buy'; tone='strong'; }
+  // Strong Buy needs a decent business, not just a cheap-looking price. Samsung
+  // screened as Strong Buy on a forward P/E of 3.7 with a -1 quality score —
+  // that's the cyclical trap, where trough multiples appear at the peak of the
+  // cycle because the market is extrapolating one good year.
+  else if(combined>=3){   label='Buy';        tone='buy'; }
+  else if(combined>=-3){  label='Hold';       tone='hold'; }
+  else {                  label='Sell';       tone='sell'; }
 
   const qtxt = q.notes.length ? q.notes.join(', ') : 'mixed quality signals';
   const why = `Business: ${quality} (${qtxt}). Price: ${v.label.toLowerCase()}. ` +
