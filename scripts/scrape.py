@@ -43,6 +43,32 @@ SESSION.headers.update({
 })
 DELAY = 2.0  # seconds between requests to companiesmarketcap
 
+# Two boards from the same source: the global top 25, and the Indian top 50.
+# India needs its own ranking pages and a .NS suffix so Yahoo resolves NSE
+# tickers (RELIANCE -> RELIANCE.NS).
+BOARDS = {
+    "global": {
+        "out": "alpha.json",
+        "top_n": 25,
+        "suffix": "",
+        "pages": {
+            "market_cap": f"{BASE}/",
+            "earnings":   f"{BASE}/most-profitable-companies/",
+            "revenue":    f"{BASE}/largest-companies-by-revenue/",
+        },
+    },
+    "india": {
+        "out": "alpha-in.json",
+        "top_n": 50,
+        "suffix": ".NS",
+        "pages": {
+            "market_cap": f"{BASE}/india/largest-companies-in-india-by-market-cap/",
+            "earnings":   f"{BASE}/india/most-profitable-indian-companies/",
+            "revenue":    f"{BASE}/india/largest-indian-companies-by-revenue/",
+        },
+    },
+}
+
 PAGES = {
     "market_cap": f"{BASE}/",
     "earnings":   f"{BASE}/most-profitable-companies/",
@@ -479,82 +505,88 @@ def enrich_from_yahoo(companies):
               f"shares {c.get('share_change')}%")
 
 
-def main():
-    os.makedirs(LOGO_DIR, exist_ok=True)   # so `git add logos` never fails in CI
-    print("Fetching rankings from companiesmarketcap.com")
+def build_board(key, cfg):
+    """Scrape one board (global or India) and write its JSON."""
+    pages, top_n, suffix = cfg["pages"], cfg["top_n"], cfg["suffix"]
+    print(f"\n=== {key.upper()} — top {top_n} ===")
 
-    caps = parse_ranking(PAGES["market_cap"], "market cap")[:TOP_N]
+    caps = parse_ranking(pages["market_cap"], "market cap")[:top_n]
     print(f"  market cap: {len(caps)} companies")
     time.sleep(DELAY)
 
-    earnings = {r["ticker"]: r["value"] for r in parse_ranking(PAGES["earnings"], "earnings")}
-    print(f"  earnings: {len(earnings)} companies")
-    time.sleep(DELAY)
-
-    revenue = {r["ticker"]: r["value"] for r in parse_ranking(PAGES["revenue"], "revenue")}
-    print(f"  revenue: {len(revenue)} companies")
+    # The earnings/revenue pages are a convenience, not a requirement — if a
+    # country page doesn't exist the board still builds and Yahoo backfills.
+    earnings, revenue = {}, {}
+    try:
+        earnings = {r["ticker"]: r["value"] for r in parse_ranking(pages["earnings"], "earnings")}
+        print(f"  earnings: {len(earnings)} companies")
+        time.sleep(DELAY)
+    except Exception as e:
+        print(f"  earnings page unavailable ({e}) — Yahoo will backfill")
+    try:
+        revenue = {r["ticker"]: r["value"] for r in parse_ranking(pages["revenue"], "revenue")}
+        print(f"  revenue: {len(revenue)} companies")
+    except Exception as e:
+        print(f"  revenue page unavailable ({e}) — Yahoo will backfill")
 
     companies = []
     for r in caps:
         t = r["ticker"]
         e = earnings.get(t)
         mc = r["value"]
+        # Yahoo needs the exchange suffix for NSE listings; tickers that already
+        # carry a dot (RELIANCE.NS, 2222.SR) are left alone.
+        y_ticker = t if "." in t else f"{t}{suffix}"
         companies.append({
-            "rank": r["rank"],
-            "ticker": t,
-            "name": r["name"],
-            "country": r["country"],
-            "market_cap": mc,
-            "earnings": e,
-            "revenue": revenue.get(t),
-            # companiesmarketcap computes P/E the same way: price / EPS == mcap / net income.
+            "rank": r["rank"], "ticker": y_ticker, "display_ticker": t,
+            "name": r["name"], "country": r["country"],
+            "market_cap": mc, "earnings": e, "revenue": revenue.get(t),
             "pe": round(mc / e, 2) if mc and e and e > 0 else None,
-            "forward_pe": None,
-            "dividend_yield": None,
-            "sector": None,
-            "fcf_yield": None,
-            "ev_ebitda": None,
-            "ps": None,
-            "roe": None,
-            "net_margin": None,
-            "roic": None,
-            "net_debt_ebitda": None,
-            "share_change": None,
-            "share_change_years": None,
-            "margin_stability": None,
-            "gross_margin": None,
-            "logo": None,
-            "logo_url": r["logo_url"],
+            "forward_pe": None, "dividend_yield": None, "sector": None,
+            "fcf_yield": None, "ev_ebitda": None, "ps": None, "roe": None,
+            "net_margin": None, "roic": None, "net_debt_ebitda": None,
+            "share_change": None, "share_change_years": None,
+            "margin_stability": None, "gross_margin": None,
+            "logo": None, "logo_url": r["logo_url"],
         })
 
-    print("Downloading logos")
+    print("  downloading logos")
     for c in companies:
-        c["logo"] = download_logo(c.pop("logo_url"), c["ticker"])
+        c["logo"] = download_logo(c.pop("logo_url"), c["display_ticker"])
 
-    print("Enriching from Yahoo Finance")
+    print("  enriching from Yahoo Finance")
     enrich_from_yahoo(companies)
 
-    # Recompute trailing P/E for anyone whose earnings were backfilled by Yahoo.
     for c in companies:
         if c["pe"] is None and c["market_cap"] and c["earnings"] and c["earnings"] > 0:
             c["pe"] = round(c["market_cap"] / c["earnings"], 2)
-        # Net margin needs no extra source — it's profit over revenue.
         if c.get("revenue") and c.get("earnings") is not None and c["revenue"] > 0:
             c["net_margin"] = round(c["earnings"] / c["revenue"] * 100, 1)
 
     companies.sort(key=lambda c: c["market_cap"] or 0, reverse=True)
 
-    payload = {
-        "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "companies": companies,
-    }
-
-    out = os.path.join(OUT_DIR, "alpha.json")
+    out = os.path.join(OUT_DIR, cfg["out"])
     with open(out, "w") as f:
-        json.dump(payload, f, indent=2)
+        json.dump({"updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                   "companies": companies}, f, indent=2)
+    print(f"  wrote {out} — {len(companies)} companies")
+    return len(companies)
 
-    print(f"\nWrote {out} — {len(companies)} companies.")
-    print("Commit alpha.json and logos/ to publish the update.")
+
+def main():
+    os.makedirs(LOGO_DIR, exist_ok=True)   # so `git add logos` never fails in CI
+    total = 0
+    for key, cfg in BOARDS.items():
+        try:
+            total += build_board(key, cfg)
+        except Exception as e:
+            # One board failing shouldn't lose the other — the workflow's
+            # no-change check will still catch a total failure.
+            print(f"  !! {key} board failed: {e}")
+        time.sleep(DELAY)
+    print(f"\nDone — {total} companies across {len(BOARDS)} boards.")
+    print("Commit alpha.json, alpha-in.json and logos/ to publish.")
+
 
 
 if __name__ == "__main__":
