@@ -924,7 +924,12 @@
       <option value="AED">د AED</option>
       <option value="AUD">A$ AUD</option>
     </select>
-    <button class="hdr-ico" onclick="openAlpha()" data-tip="Alpha 25" aria-label="Alpha">
+    <button class="hdr-ico" onclick="openAlpha('india')" data-tip="Alpha 50 (Indian)" aria-label="Alpha 50 Indian">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 20h4v-6H3zM10 20h4V8h-4zM17 20h4V4h-4z"/><path d="M3 4h7"/><path d="M6.5 4v3"/>
+      </svg>
+    </button>
+    <button class="hdr-ico" onclick="openAlpha('global')" data-tip="Alpha 25" aria-label="Alpha">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 20h4V10H3zM10 20h4V4h-4zM17 20h4v-7h-4z"/>
       </svg>
@@ -1254,7 +1259,7 @@
 <div class="mo" id="alpha-mo">
   <div class="mc mc-alpha" style="max-width:1000px">
     <div class="mc-header">
-      <div><p class="mc-title">Alpha 25</p><p class="mc-sub" id="alpha-sub">The 25 largest listed companies.</p></div>
+      <div><p class="mc-title" id="alpha-title">Alpha 25</p><p class="mc-sub" id="alpha-sub">The 25 largest listed companies.</p></div>
       <button class="btn btn-icon" onclick="document.getElementById('alpha-mo').classList.remove('open')">&#10005;</button>
     </div>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
@@ -2510,27 +2515,48 @@ function xirrCell(pct){
 // Data comes from alpha.json, scraped by scripts/scrape.py and committed. It is not
 // fetched from companiesmarketcap at page load — that site sends no CORS headers, so
 // the browser would block the request.
-let ALPHA=null, alphaState='idle', alphaSort={col:'market_cap',dir:-1};
+// Two boards share one modal and all the scoring logic — only the source file
+// and title differ. Each caches independently so switching doesn't refetch.
+const ALPHA_BOARDS={
+  global:{file:'/alpha.json',    title:'Alpha 25',          sub:'The 25 largest listed companies.'},
+  india: {file:'/alpha-in.json', title:'Alpha 50 (Indian)', sub:'The 50 largest listed Indian companies.'},
+};
+let alphaBoard='global';
+const ALPHA_CACHE={global:{data:null,state:'idle'}, india:{data:null,state:'idle'}};
+let alphaSort={col:'market_cap',dir:-1};
 
-function openAlpha(){
+// Kept as getters so every existing reference to ALPHA / alphaState still works.
+Object.defineProperty(window,'ALPHA',{get:()=>ALPHA_CACHE[alphaBoard].data});
+Object.defineProperty(window,'alphaState',{
+  get:()=>ALPHA_CACHE[alphaBoard].state,
+  set:v=>{ALPHA_CACHE[alphaBoard].state=v;},
+});
+
+function openAlpha(board){
+  alphaBoard = board || 'global';
+  const cfg = ALPHA_BOARDS[alphaBoard];
+  const t=document.getElementById('alpha-title'); if(t) t.textContent=cfg.title;
+  const s=document.getElementById('alpha-sub');   if(s) s.textContent=cfg.sub;
   document.getElementById('alpha-mo').classList.add('open');
   renderAlpha();
   loadAlpha();
 }
 
 async function loadAlpha(){
-  if(alphaState==='loading'||alphaState==='done')return;
-  alphaState='loading';
+  const board = alphaBoard;
+  const slot = ALPHA_CACHE[board];
+  if(slot.state==='loading'||slot.state==='done')return;
+  slot.state='loading';
   try{
-    const r=await fetch('/alpha.json?v='+Date.now());
+    const r=await fetch(ALPHA_BOARDS[board].file+'?v='+Date.now());
     if(!r.ok)throw new Error('HTTP '+r.status);
-    ALPHA=await r.json();
-    alphaState='done';
+    slot.data=await r.json();
+    slot.state='done';
   }catch(e){
-    console.error('alpha.json failed:',e);
-    alphaState='error';
+    console.error(ALPHA_BOARDS[board].file+' failed:',e);
+    slot.state='error';
   }
-  renderAlpha();
+  if(board===alphaBoard) renderAlpha();
 }
 
 function sortAlpha(col){
@@ -2859,7 +2885,7 @@ function renderAlpha(){
       <div style="font-size:32px;margin-bottom:12px">\u{1F4C9}</div>
       <div style="color:#fff;font-size:14px;font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Market data unavailable</div>
       <div style="color:var(--t-dim);font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.8">
-        alpha.json is missing or failed to load.<br>
+        ${ALPHA_BOARDS[alphaBoard].file.replace('/','')} is missing or failed to load.<br>
         Run <span style="color:var(--t-soft)">python scripts/scrape.py</span> and commit the result.</div></div>`;
   }else{
     const all=ALPHA.companies;
