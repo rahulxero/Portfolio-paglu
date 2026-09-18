@@ -164,11 +164,49 @@ def download_logo(url, ticker):
         return None
 
 
+# Cache FX lookups so a page full of Korean tickers costs one request, not 25.
+_FX_CACHE = {"USD": 1.0}
+
+
+def fx_to_usd(currency, yf):
+    """
+    Yahoo reports financials in each company's own reporting currency, while
+    companiesmarketcap reports market cap in USD. Mixing the two silently
+    inflates any ratio between them — a Korean company's FCF yield came out
+    ~1400x too high before this existed. Returns the multiplier that converts
+    `currency` into USD, or None if it can't be determined.
+    """
+    if not currency:
+        return None
+    currency = currency.upper()
+    if currency in _FX_CACHE:
+        return _FX_CACHE[currency]
+    try:
+        # e.g. KRWUSD=X -> how many USD one KRW is worth
+        fx = yf.Ticker(f"{currency}USD=X").fast_info
+        rate = fx.get("last_price") or fx.get("lastPrice")
+        if not rate:
+            info = yf.Ticker(f"{currency}USD=X").info or {}
+            rate = info.get("regularMarketPrice") or info.get("previousClose")
+        rate = float(rate) if rate else None
+    except Exception as e:
+        print(f"  fx lookup failed for {currency}: {e}")
+        rate = None
+    _FX_CACHE[currency] = rate
+    if rate:
+        print(f"  fx {currency} -> USD @ {rate}")
+    return rate
+
+
 def enrich_from_yahoo(companies):
     """
     Forward P/E and dividend yield aren't on companiesmarketcap, so pull them
     from Yahoo. Tickers mostly match already (2222.SR, 005930.KS, BRK-B).
     Anything Yahoo doesn't recognise just stays None.
+
+    Ratios (FCF yield, P/E, margin) are computed from Yahoo's own fields so the
+    currency cancels out. Absolute figures backfilled into the table are
+    converted to USD first, since everything else in the table is USD.
     """
     try:
         import yfinance as yf
@@ -192,11 +230,12 @@ def enrich_from_yahoo(companies):
         c["ps"] = info.get("priceToSalesTrailing12Months")
         c["roe"] = round(info["returnOnEquity"] * 100, 1) if info.get("returnOnEquity") else None
 
-        # FCF yield: free cash flow over market cap. Harder to massage than earnings,
-        # and it's the inverse of what you pay — above ~5% is genuinely cheap.
+        # FCF yield: free cash flow over market cap. Both taken from Yahoo so they
+        # share a currency and the ratio is valid without any conversion — using
+        # companiesmarketcap's USD cap here is what produced 5800% for Samsung.
         fcf = info.get("freeCashflow")
-        mc = c.get("market_cap") or info.get("marketCap")
-        c["fcf_yield"] = round(fcf / mc * 100, 2) if fcf and mc and mc > 0 else None
+        mc_native = info.get("marketCap")
+        c["fcf_yield"] = round(fcf / mc_native * 100, 2) if fcf and mc_native and mc_native > 0 else None
 
         # dividendYield has changed units between yfinance releases, so derive it
         # from the rate and price when both are present and only fall back otherwise.
@@ -209,11 +248,14 @@ def enrich_from_yahoo(companies):
             if dy is not None:
                 c["dividend_yield"] = round(dy * 100 if dy < 1 else dy, 2)
 
-        # Backfill anything the ranking pages didn't cover (companies outside their top 100).
-        if c.get("revenue") is None:
-            c["revenue"] = info.get("totalRevenue")
-        if c.get("earnings") is None:
-            c["earnings"] = info.get("netIncomeToCommon")
+        # Backfill anything the ranking pages didn't cover (companies outside their
+        # top 100). These arrive in the company's reporting currency, so convert
+        # before they sit next to USD figures from companiesmarketcap.
+        rate = fx_to_usd(info.get("financialCurrency") or info.get("currency"), yf)
+        if c.get("revenue") is None and info.get("totalRevenue"):
+            c["revenue"] = info["totalRevenue"] * rate if rate else None
+        if c.get("earnings") is None and info.get("netIncomeToCommon"):
+            c["earnings"] = info["netIncomeToCommon"] * rate if rate else None
 
         print(f"  {c['ticker']:<12} fwd P/E {c.get('forward_pe')}  div {c.get('dividend_yield')}")
 
