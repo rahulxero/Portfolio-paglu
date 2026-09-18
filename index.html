@@ -213,6 +213,21 @@
     /* Alpha table numbers. The shared .mv.sm is 11px at #ccc, which is hard to
        scan across a wide table — these are bumped up and brightened, with
        tabular figures so digits line up column to column. */
+    /* Column header stays visible while scrolling 25 rows — without it you lose
+       track of which column you're reading halfway down. Needs an opaque
+       background or rows show through, and a z-index above the row content. */
+    /* The modal card owns both scroll axes so the column header can stick to it.
+       Putting overflow-x on an inner wrapper would make that wrapper the scroll
+       context, and the header would never actually stick. */
+    .mc-alpha{ overflow: auto; }
+    .alpha-head-sticky{
+      position: sticky;
+      top: -32px;              /* cancels .mc's 32px padding so it pins flush */
+      z-index: 5;
+      background: #000;        /* opaque — rows scroll underneath it */
+      padding-top: 8px;
+      box-shadow: 0 1px 0 #1a1a1a;
+    }
     .a-sort{
       cursor: pointer; user-select: none;
       display: inline-flex; align-items: center; gap: 3px;
@@ -909,7 +924,7 @@
       <option value="AED">د AED</option>
       <option value="AUD">A$ AUD</option>
     </select>
-    <button class="hdr-ico" onclick="openAlpha()" data-tip="Alpha · Top 25" aria-label="Alpha">
+    <button class="hdr-ico" onclick="openAlpha()" data-tip="Alpha 25" aria-label="Alpha">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 20h4V10H3zM10 20h4V4h-4zM17 20h4v-7h-4z"/>
       </svg>
@@ -1237,9 +1252,9 @@
 
 <!-- ── ALPHA MODAL ───────────────────────────────────────────────── -->
 <div class="mo" id="alpha-mo">
-  <div class="mc" style="max-width:1000px">
+  <div class="mc mc-alpha" style="max-width:1000px">
     <div class="mc-header">
-      <div><p class="mc-title">Alpha</p><p class="mc-sub" id="alpha-sub">The 25 largest listed companies.</p></div>
+      <div><p class="mc-title">Alpha 25</p><p class="mc-sub" id="alpha-sub">The 25 largest listed companies.</p></div>
       <button class="btn btn-icon" onclick="document.getElementById('alpha-mo').classList.remove('open')">&#10005;</button>
     </div>
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
@@ -1255,8 +1270,8 @@
       </label>
       <span id="alpha-legend" style="margin-left:auto;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t-dim2)"></span>
     </div>
-    <div style="overflow-x:auto">
-      <div id="alpha-head"></div>
+    <div>
+      <div id="alpha-head" class="alpha-head-sticky"></div>
       <div id="alpha-rows"></div>
     </div>
   </div>
@@ -2573,6 +2588,7 @@ function sectorMedians(list,key){
 }
 function relColour(v,median,lowerIsCheap=true){
   if(v==null||median==null||median<=0)return '';
+  if(lowerIsCheap && v<=0) return '';   // negative multiple: not cheap, just meaningless
   const r=v/median;
   const cheap=lowerIsCheap?r<0.8:r>1.2;
   const rich =lowerIsCheap?r>1.25:r<0.8;
@@ -2599,7 +2615,7 @@ function valuationVerdict(c){
     return {label:'Check data', tone:'warn', why:`FCF yield of ${fcf.toFixed(0)}% is not realistic — likely a data error or one-off event. Verify before trusting.`};
 
   // No trailing earnings at all: loss-making. EV/EBITDA is the only read left.
-  if(!has(pe)&&has(ev)&&ev>100)
+  if(!has(pe)&&has(ev)&&ev>100&&ev>0)
     return {label:'Unprofitable', tone:'bad', why:`No trailing profit and ${ev.toFixed(0)}× EBITDA — priced entirely on future expectations.`};
 
   let score=0, notes=[];
@@ -2609,7 +2625,10 @@ function valuationVerdict(c){
     else if(pe>50){score-=2;notes.push('very high P/E');}
     else if(pe>30){score-=1;notes.push('high P/E');}
   }
-  if(has(ev)){
+  // A negative multiple isn't cheap — it means net cash exceeds enterprise value
+  // or EBITDA is negative. Treat it as unusable rather than a bargain signal.
+  const evOk = has(ev) && ev > 0;
+  if(evOk){
     if(ev<8){score+=2;notes.push('low EV/EBITDA');}
     else if(ev<12){score+=1;}
     else if(ev>40){score-=2;notes.push('very high EV/EBITDA');}
@@ -2634,7 +2653,7 @@ function valuationVerdict(c){
   }
 
   // Need at least two of the four to say anything useful.
-  const filled=[pe,fpe,fcf,ev].filter(has).length;
+  const filled=[pe,fpe,fcf,evOk?ev:null].filter(has).length;
   if(filled<2) return {label:'—', tone:'dim', why:'Not enough data to judge.'};
 
   let label,tone;
