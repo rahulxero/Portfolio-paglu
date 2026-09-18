@@ -2564,9 +2564,10 @@ const ALPHA_VIEWS={
            cols:[['market_cap','Market Cap'],['pe','P/E'],['forward_pe','Fwd P/E'],
                  ['fcf_yield','FCF Yld'],['ev_ebitda','EV/EBITDA'],['dividend_yield','Div %'],
                  ['verdict','Read'],['sector','Sector']]},
-  quality:{grid:'1.7fr .9fr .7fr .7fr .7fr .7fr 1fr',
-           cols:[['market_cap','Market Cap'],['net_margin','Margin'],['roe','ROE'],
-                 ['fcf_yield','FCF Yld'],['ps','P/S'],['sector','Sector']]},
+  quality:{grid:'1.45fr .75fr .55fr .55fr .65fr .6fr .6fr 1.05fr .7fr',
+           cols:[['market_cap','Market Cap'],['roic','ROIC'],['roe','ROE'],
+                 ['net_debt_ebitda','Net Debt'],['share_change','Shares'],
+                 ['margin_stability','Margin σ'],['rating','Rating'],['sector','Sector']]},
 };
 
 function alphaView(mode,btn){
@@ -2667,10 +2668,123 @@ function valuationVerdict(c){
   return {label, tone, why:why.charAt(0).toUpperCase()+why.slice(1)+'.'};
 }
 
+
+// ── Business rating ────────────────────────────────────────
+// Cross-matches BUSINESS QUALITY against VALUATION, in that order of priority.
+// The ordering is the whole point: a screen sorted on cheapness alone surfaces
+// exactly the trap Buffett spent his early career in — statistically cheap
+// businesses that were cheap for a reason. So quality gates the rating, and
+// price then decides how enthusiastic it gets. A wonderful business at a fair
+// price outranks a fair business at a wonderful price.
+function qualityScore(c){
+  let s=0, n=0, notes=[];
+  const has=v=>v!=null&&isFinite(v);
+
+  if(has(c.roic)){ n++;
+    if(c.roic>=20){s+=2;notes.push('excellent ROIC');}
+    else if(c.roic>=15){s+=1;notes.push('strong ROIC');}
+    else if(c.roic<8){s-=2;notes.push('weak ROIC');}
+    else if(c.roic<12){s-=1;}
+  }
+  if(has(c.net_debt_ebitda)){ n++;
+    if(c.net_debt_ebitda<0){s+=1;notes.push('net cash');}
+    else if(c.net_debt_ebitda>4){s-=2;notes.push('heavy debt');}
+    else if(c.net_debt_ebitda>3){s-=1;notes.push('elevated debt');}
+  }
+  if(has(c.share_change)){ n++;
+    if(c.share_change<-5){s+=2;notes.push('meaningful buybacks');}
+    else if(c.share_change<-1){s+=1;notes.push('buying back stock');}
+    else if(c.share_change>15){s-=2;notes.push('heavy dilution');}
+    else if(c.share_change>5){s-=1;notes.push('dilution');}
+  }
+  if(has(c.margin_stability)){ n++;
+    if(c.margin_stability<2){s+=1;notes.push('steady margins');}
+    else if(c.margin_stability>8){s-=1;notes.push('volatile margins');}
+  }
+  return {score:s, filled:n, notes};
+}
+
+function businessRating(c){
+  const q=qualityScore(c);
+  const v=valuationVerdict(c);
+
+  // Without at least two quality inputs there's nothing to judge the business on.
+  if(q.filled<2) return {label:'—', tone:'dim', why:'Not enough business-quality data to rate.'};
+  if(v.label==='Check data') return {label:'—', tone:'dim', why:'Valuation inputs look unreliable — verify the data first.'};
+
+  const quality = q.score>=3?'high' : q.score>=1?'good' : q.score>=-1?'average' : 'weak';
+  const cheap   = ['Underpriced','Leans cheap'].includes(v.label);
+  const fair    = v.label==='Fairly valued';
+  const rich    = ['Leans rich','Overpriced','Unprofitable'].includes(v.label);
+  const veryRich= ['Overpriced','Unprofitable'].includes(v.label);
+
+  let label,tone;
+  if(quality==='high'){
+    if(cheap){label='Strong Buy';tone='strong';}
+    else if(fair){label='Buy';tone='buy';}
+    else if(veryRich){label='Hold';tone='hold';}
+    else {label='Buy';tone='buy';}              // great business, slight premium
+  } else if(quality==='good'){
+    if(cheap){label='Buy';tone='buy';}
+    else if(fair){label='Hold';tone='hold';}
+    else {label='Hold';tone='hold';}
+  } else if(quality==='average'){
+    if(cheap){label='Hold';tone='hold';}
+    else if(veryRich){label='Sell';tone='sell';}
+    else {label='Hold';tone='hold';}
+  } else {                                      // weak business
+    if(cheap){label='Hold';tone='hold';}        // cheap but poor: classic value trap
+    else {label='Sell';tone='sell';}
+  }
+
+  const qtxt = q.notes.length ? q.notes.join(', ') : 'mixed quality signals';
+  const why = `Business: ${quality} (${qtxt}). Price: ${v.label.toLowerCase()}. ` +
+    (quality==='weak'&&cheap ? 'Cheap but low quality — the classic value trap.' :
+     quality==='high'&&rich  ? 'Good business, but you are paying up for it.' : '');
+  return {label, tone, why:why.trim()};
+}
+
+const RATING_TONE={strong:'#22c55e',buy:'#4ade80',hold:'#9a9a9a',sell:'#ff8787',dim:'#666'};
+
 const VERDICT_TONE={good:'#4ade80',ok:'#86efac',dim:'#9a9a9a',warn:'#fbbf24',bad:'#ff8787'};
 
 function alphaCell(c,key,ctx){
   if(key==='sector')  return `<span class="as" style="white-space:nowrap">${esc(c.sector||c.country||'')}</span>`;
+  if(key==='roic'){
+    const v=c.roic;
+    if(v==null) return `<span class="mv a-num dim">—</span>`;
+    // Buffett's threshold-ish: >15% is a genuinely good business, <8% is capital
+    // going in and not much coming back.
+    const col = v>=15?'color:#4ade80;font-weight:500' : v<8?'color:#ff8787;font-weight:500' : '';
+    return `<span class="mv a-num" style="${col}" title="Return on invested capital — profit earned per dollar of capital employed. Unlike ROE it isn't flattered by debt.">${v.toFixed(1)}%</span>`;
+  }
+  if(key==='net_debt_ebitda'){
+    const v=c.net_debt_ebitda;
+    if(v==null) return `<span class="mv a-num dim">—</span>`;
+    // Negative = net cash, which is a strength.
+    const col = v<0?'color:#4ade80;font-weight:500' : v>3?'color:#ff8787;font-weight:500' : '';
+    const txt = v<0 ? `net cash` : `${v.toFixed(1)}×`;
+    return `<span class="mv a-num" style="${col}" title="Net debt divided by EBITDA. Above ~3x the balance sheet starts constraining choices; negative means more cash than debt.">${txt}</span>`;
+  }
+  if(key==='share_change'){
+    const v=c.share_change;
+    if(v==null) return `<span class="mv a-num dim">—</span>`;
+    // Shrinking share count returns capital; dilution is a silent cost.
+    const col = v<-1?'color:#4ade80;font-weight:500' : v>10?'color:#ff8787;font-weight:500' : '';
+    const yrs = c.share_change_years ? `${c.share_change_years}y` : '';
+    return `<span class="mv a-num" style="${col}" title="Change in shares outstanding over ${yrs||'the available history'}. Negative means buybacks; positive means dilution.">${v>0?'+':''}${v.toFixed(0)}%</span>`;
+  }
+  if(key==='margin_stability'){
+    const v=c.margin_stability;
+    if(v==null) return `<span class="mv a-num dim">—</span>`;
+    // Lower deviation = steadier pricing power.
+    const col = v<2?'color:#4ade80;font-weight:500' : v>8?'color:#ff8787;font-weight:500' : '';
+    return `<span class="mv a-num" style="${col}" title="Standard deviation of gross margin across available years. Low = pricing power holds through cycles; high = margins swing with conditions.">${v.toFixed(1)}</span>`;
+  }
+  if(key==='rating'){
+    const r=businessRating(c);
+    return `<span class="mv a-num" title="${esc(r.why)}" style="color:${RATING_TONE[r.tone]};font-weight:600;white-space:nowrap;cursor:help;border-bottom:1px dotted #3a3a3a">${esc(r.label)}</span>`;
+  }
   if(key==='verdict'){
     const v=valuationVerdict(c);
     return `<span class="mv a-num" title="${esc(v.why)}" style="color:${VERDICT_TONE[v.tone]||'#9a9a9a'};font-weight:500;white-space:nowrap;cursor:help;border-bottom:1px dotted #3a3a3a">${esc(v.label)}</span>`;
@@ -2746,6 +2860,11 @@ function renderAlpha(){
     const cmp=(a,b)=>{
       // 'verdict' is computed, not a stored field — rank it cheap → expensive
       // so sorting the Read column groups the bargains together.
+      if(alphaSort.col==='rating'){
+        const rank={'Strong Buy':0,'Buy':1,'Hold':2,'Sell':3,'\u2014':4};
+        const rx=rank[businessRating(a).label]??9, ry=rank[businessRating(b).label]??9;
+        return (rx-ry)*alphaSort.dir;
+      }
       if(alphaSort.col==='verdict'){
         const rank={'Underpriced':0,'Leans cheap':1,'Fairly valued':2,'Leans rich':3,'Overpriced':4,'Unprofitable':5,'Check data':6,'\u2014':7};
         const rx=rank[valuationVerdict(a).label]??9, ry=rank[valuationVerdict(b).label]??9;
