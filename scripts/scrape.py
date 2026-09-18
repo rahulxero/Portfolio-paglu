@@ -442,7 +442,13 @@ def enrich_from_yahoo(companies):
         fcf = ttm_free_cash_flow(tk, info)
         mc_usd = c.get("market_cap")
         if fcf and mc_usd and mc_usd > 0 and rate:
-            c["fcf_yield"] = round(fcf * rate / mc_usd * 100, 2)
+            fy = fcf * rate / mc_usd * 100
+            # Banks and insurers: operating cash flow moves with deposits and
+            # loan books, so "free cash flow" carries no valuation meaning.
+            # JPMorgan was reporting -17.5%, which reads as a red flag and isn't.
+            # Outside roughly -10%..+50% the number is an artefact either way;
+            # legitimately negative FCF (Amazon at -0.09%) still comes through.
+            c["fcf_yield"] = round(fy, 2) if -10 <= fy <= 50 else None
         else:
             c["fcf_yield"] = None
 
