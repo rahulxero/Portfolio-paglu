@@ -379,6 +379,10 @@ def enrich_from_yahoo(companies):
             print(f"  {c['ticker']:<12} SKIPPED — Yahoo quoteType is {qt}, not a listed equity")
             continue
 
+        # Reporting currency drives every cross-source conversion below.
+        fin_cur = info.get("financialCurrency") or info.get("currency")
+        rate = fx_to_usd(fin_cur, yf)
+
         c["forward_pe"] = info.get("forwardPE")
         if c.get("pe") is None:
             c["pe"] = info.get("trailingPE")
@@ -387,12 +391,19 @@ def enrich_from_yahoo(companies):
         # EV/EBITDA straight from Yahoo is unreliable across listings (TSM came
         # back at 4.9 against a true ~18). Rebuild it from components in one
         # currency, and fall back to Yahoo's figure only if that isn't possible.
+        # Build EV in USD from the market cap we trust (companiesmarketcap) plus
+        # net debt converted from the reporting currency, then divide by EBITDA
+        # also converted. Yahoo's own enterpriseValue/ebitda pair is not reliably
+        # in one currency for ADRs — TSM kept coming back at 4.9 against ~18.6.
         ebitda = info.get("ebitda")
-        ev_native = info.get("enterpriseValue")
         ev_ratio = None
-        if ebitda and ebitda > 0 and ev_native:
-            ev_ratio = ev_native / ebitda          # same currency, cancels out
-        elif info.get("enterpriseToEbitda"):
+        if ebitda and ebitda > 0 and rate and c.get("market_cap"):
+            net_debt_usd = ((info.get("totalDebt") or 0) - (info.get("totalCash") or 0)) * rate
+            ev_usd = c["market_cap"] + net_debt_usd
+            ebitda_usd = ebitda * rate
+            if ebitda_usd > 0:
+                ev_ratio = ev_usd / ebitda_usd
+        if ev_ratio is None and info.get("enterpriseToEbitda"):
             ev_ratio = info.get("enterpriseToEbitda")
         # A negative multiple means net cash exceeds EV or EBITDA is negative —
         # not "cheap", just not meaningful. Berkshire was showing -1.8 in green.
@@ -410,8 +421,6 @@ def enrich_from_yahoo(companies):
         # company's home currency (TWD for TSM) while `marketCap` is in the trading
         # currency (USD). Using either side raw produced TSMC at 32% and Samsung at
         # 5800%. Convert FCF to USD explicitly, then divide by the USD market cap.
-        fin_cur = info.get("financialCurrency") or info.get("currency")
-        rate = fx_to_usd(fin_cur, yf)
         fcf = ttm_free_cash_flow(tk, info)
         mc_usd = c.get("market_cap")
         if fcf and mc_usd and mc_usd > 0 and rate:
