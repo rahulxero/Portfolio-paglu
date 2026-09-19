@@ -49,6 +49,16 @@ module.exports = async function handler(req, res) {
 async function fetchHyperliquid(address, post, headers) {
   const positions = [];
 
+  // spotMeta is needed twice — to resolve lending token indexes to symbols, and
+  // to get EVM contract addresses for the ERC-20 scan. Fetch it once.
+  let _spotMeta;
+  const getSpotMeta = async () => {
+    if (_spotMeta !== undefined) return _spotMeta;
+    const r = await post({ type: 'spotMeta' }, 8000);
+    _spotMeta = r.ok ? await r.json() : null;
+    return _spotMeta;
+  };
+
   // 1. HyperCore spot balances
   try {
     const spotRes = await post({ type: 'spotClearinghouseState', user: address });
@@ -90,6 +100,107 @@ async function fetchHyperliquid(address, post, headers) {
     }
   } catch (e) { console.warn('clearinghouseState failed:', e.message); }
 
+  // 2b. HyperCore borrow/lend positions
+  // Hyperliquid launched native lending on HyperCore on 18 Sep 2026: supply
+  // HYPE/BTC as collateral, supply USDC/USDT to earn, borrow the quote assets.
+  // Supplied balances LEAVE spotClearinghouseState — they move into the reserve
+  // and are not an ERC-20 balance either, so step 4's balanceOf scan can't see
+  // them. A wallet with everything supplied reports zero across spot, perp and
+  // EVM and the entire position goes invisible. That's the gap this closes.
+  //
+  // Payload shape, verified against a live response:
+  //   { tokenToState: [[tokenId, {borrow:{basis,value}, supply:{basis,value}}], ...],
+  //     health: "healthy", healthFactor: number|null }
+  // tokenId is the spotMeta token INDEX (0 = USDC), not a symbol, so it has to
+  // be resolved against spotMeta. `value` is the live balance including accrued
+  // interest; `basis` is what went in, so value - basis is interest earned.
+  try {
+    const [lendRes, reserveRes] = await Promise.all([
+      post({ type: 'borrowLendUserState', user: address }, 8000),
+      post({ type: 'allBorrowLendReserveStates' }, 8000).catch(() => null),
+    ]);
+
+    if (lendRes && lendRes.ok) {
+      const lend = await lendRes.json();
+      const entries = lend?.tokenToState || [];
+
+      if (entries.length) {
+        // tokenId -> symbol, and tokenId -> oracle price from the reserve states.
+        const idToSym = {};
+        try {
+          const meta = await getSpotMeta();
+          for (const t of (meta?.tokens || [])) {
+            if (t.index !== undefined && t.name) idToSym[t.index] = t.name;
+          }
+        } catch (e) { console.warn('spotMeta for lending failed:', e.message); }
+
+        const idToOracle = {};
+        if (reserveRes && reserveRes.ok) {
+          try {
+            const reserves = await reserveRes.json();
+            // Top level is an array of [tokenId, reserveState] pairs.
+            for (const pair of (Array.isArray(reserves) ? reserves : [])) {
+              const [tid, st] = pair || [];
+              const px = parseFloat(st?.oraclePx);
+              if (tid !== undefined && isFinite(px)) idToOracle[tid] = px;
+            }
+          } catch (e) { console.warn('reserve states parse failed:', e.message); }
+        }
+
+        const hf = lend?.healthFactor ?? null;
+        const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+
+        for (const pair of entries) {
+          const [tid, st] = pair || [];
+          if (!st) continue;
+          const sym = idToSym[tid] || `TOKEN${tid}`;
+          const oracle = idToOracle[tid];
+
+          const supplied = num(st.supply?.value);
+          if (supplied > 0) {
+            const basis = num(st.supply?.basis);
+            positions.push({
+              id: `hl-lend-supply-${tid}`,
+              symbol: sym,
+              name: `${sym} (Supplied — HyperCore Lending)`,
+              // Distinct chain label so this can never collapse into a spot
+              // balance of the same token during frontend dedup.
+              chain: 'hyperliquid-lend',
+              balance: supplied,
+              priceUSD: oracle || 0,
+              valueUSD: oracle ? supplied * oracle : 0,
+              ch24: null, logo: '',
+              source: 'hypercore-lend-supply',
+              interestEarned: basis ? supplied - basis : null,
+              healthFactor: hf,
+            });
+          }
+
+          const borrowed = num(st.borrow?.value);
+          if (borrowed > 0) {
+            const basis = num(st.borrow?.basis);
+            positions.push({
+              id: `hl-lend-borrow-${tid}`,
+              symbol: sym,
+              name: `${sym} (Borrowed — HyperCore Lending)`,
+              chain: 'hyperliquid-lend',
+              // Debt: negative so it nets against holdings rather than inflating
+              // the total. isDebt lets the frontend treat it explicitly.
+              balance: -borrowed,
+              priceUSD: oracle || 0,
+              valueUSD: oracle ? -(borrowed * oracle) : 0,
+              ch24: null, logo: '',
+              source: 'hypercore-lend-borrow',
+              isDebt: true,
+              interestOwed: basis ? borrowed - basis : null,
+              healthFactor: hf,
+            });
+          }
+        }
+      }
+    }
+  } catch (e) { console.warn('borrowLendUserState failed:', e.message); }
+
   // 3. HyperEVM native HYPE
   const HYPER_EVM_RPC = 'https://rpc.hyperliquid.xyz/evm';
   const rpc = (method, params, id = 1) =>
@@ -120,9 +231,8 @@ async function fetchHyperliquid(address, post, headers) {
 
   // 4. HyperEVM ERC-20 token balances via spotMeta contracts
   try {
-    const metaRes = await post({ type: 'spotMeta' }, 8000);
-    if (metaRes.ok) {
-      const meta = await metaRes.json();
+    const meta = await getSpotMeta();
+    if (meta) {
       const evmTokens = (meta.tokens || []).filter(t => t.evmContract?.address);
       const addrNoPrefix = address.toLowerCase().replace(/^0x/, '').padStart(64, '0');
       const callData = '0x70a08231' + addrNoPrefix;
