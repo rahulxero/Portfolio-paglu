@@ -491,25 +491,97 @@ async function fetchLighter(address, debug) {
     }
   }
 
-  // ── Step 5: staked LIT ──
-  // Staking pools live behind publicPoolsMetadata?filter=stake. Per Lighter's docs,
-  // querying a specific account_index requires a signed auth token, so this only
-  // returns data if the endpoint happens to allow unauthenticated reads.
-  if (accountIndex != null) {
-    const rs = await tryJson(`${MAIN}/publicPoolsMetadata?filter=stake&account_index=${accountIndex}`);
-    log('LIT staking (publicPoolsMetadata)', { status: rs.status, sample: rs.raw });
-    const pools = rs.json?.public_pools || rs.json?.pools || rs.json?.data ||
-                  (Array.isArray(rs.json) ? rs.json : []);
-    for (const pool of pools) {
-      const staked = num(pool.staked_amount ?? pool.shares ?? pool.balance ?? pool.user_shares);
-      if (staked <= 0) continue;
+  // ── Step 5: staked LIT and pool shares ──
+  // This previously called publicPoolsMetadata?filter=stake&account_index=... and
+  // got nothing back, for three separate reasons:
+  //   1. `filter` and `account_index` are not parameters of that endpoint — the
+  //      documented ones are `index` (the POOL index) and `limit`.
+  //   2. Reading your own account's data from it requires a signed auth token.
+  //   3. The field names it looked for (staked_amount / shares / user_shares)
+  //      don't exist. The real field is `principal_amount`.
+  //
+  // None of that is needed: the account response already fetched above carries a
+  // `shares` array of PublicPoolShare — {public_pool_index, shares_amount,
+  // entry_usdc, entry_timestamp, principal_amount} — unauthenticated. Lighter
+  // models staking pools as public pools, with principal_amount holding the
+  // number of coins staked.
+  const shares = acct.shares || acct.pool_shares || [];
+  log('pool shares', { count: shares.length, sample: JSON.stringify(shares.slice(0, 2)).slice(0, 400) });
+
+  for (const sh of shares) {
+    const principal = num(sh.principal_amount);
+    const shareQty  = num(sh.shares_amount);
+    const entryUsdc = num(sh.entry_usdc);
+    if (principal <= 0 && shareQty <= 0) continue;
+
+    const poolIdx = sh.public_pool_index;
+    // Pool metadata by index IS unauthenticated — it's only the per-account
+    // variant that needs a token. Used for the name and the latest share price.
+    let poolName = '', sharePx = 0;
+    if (poolIdx != null) {
+      const rp = await tryJson(`${MAIN}/publicPoolsMetadata?index=${poolIdx}&limit=1`);
+      log(`pool meta ${poolIdx}`, { status: rp.status, sample: rp.raw });
+      const pool = (rp.json?.public_pools || rp.json?.pools || [])[0] || null;
+      poolName = pool?.name || '';
+      const prices = pool?.pool_info?.share_prices || pool?.share_prices || [];
+      if (prices.length) sharePx = num(prices[prices.length - 1]?.share_price);
+    }
+
+    // A staking pool reports principal in coins; a liquidity pool like LLP is
+    // valued in USDC off the share price. entry_usdc is cost basis, not current
+    // value, so it's only a last resort and is flagged as such.
+    const looksStaking = principal > 0;
+    if (looksStaking) {
       positions.push({
-        symbol: 'LIT', name: 'LIT Staked (Lighter)', chain: 'lighter',
-        balance: staked, priceUSD: 0, valueUSD: 0,
+        symbol: 'LIT',
+        name: poolName ? `LIT Staked — ${poolName}` : 'LIT Staked (Lighter)',
+        chain: 'lighter-stake',
+        balance: principal,
+        priceUSD: 0, valueUSD: 0,   // priced by priceAll() via COINGECKO_IDS.LIT
         ch24: null, source: 'lighter-staked',
+        poolIndex: poolIdx,
+      });
+    } else {
+      const val = sharePx ? shareQty * sharePx : entryUsdc;
+      positions.push({
+        symbol: 'USDC',
+        name: poolName ? `${poolName} shares` : `Pool ${poolIdx} shares (Lighter)`,
+        chain: 'lighter-pool',
+        balance: val,
+        priceUSD: 1, valueUSD: val,
+        ch24: null, source: 'lighter-pool-share',
+        poolIndex: poolIdx,
+        sharesAmount: shareQty,
+        valuedAtCost: !sharePx || undefined,
       });
     }
   }
+
+  // ── Step 5b: pending unlocks ──
+  // Coins in the unstaking queue have left `shares` but are still yours. The
+  // account response carries them as {unlock_timestamp, asset_index, amount}.
+  for (const u of (acct.pending_unlocks || [])) {
+    const amt = num(u.amount);
+    if (amt <= 0) continue;
+    positions.push({
+      symbol: 'LIT',
+      name: 'LIT Unstaking (pending unlock)',
+      chain: 'lighter-stake',
+      balance: amt,
+      priceUSD: 0, valueUSD: 0,
+      ch24: null, source: 'lighter-pending-unlock',
+      unlockTimestamp: u.unlock_timestamp,
+    });
+  }
+
+  // Locked balance in `assets` is a third place a stake can show up, depending
+  // on how Lighter books it. Logged rather than emitted, to avoid double
+  // counting the same coins that `shares` already reported.
+  log('assets (locked check)', {
+    sample: JSON.stringify((acct.assets || []).map(a => ({
+      symbol: a.symbol, balance: a.balance, locked: a.locked_balance,
+    }))).slice(0, 400),
+  });
 
   log('result', { positionsFound: positions.length, accountIndex });
   return positions;
