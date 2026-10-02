@@ -41,6 +41,10 @@ module.exports = async function handler(req, res) {
   if (moralisResult.status === 'fulfilled') positions.push(...moralisResult.value);
   else console.warn('Moralis fetch failed:', moralisResult.reason?.message);
 
+  // Price after merging, so Lighter and Moralis rows get quoted too.
+  try { await priceAll(positions); }
+  catch (e) { console.warn('pricing failed:', e.message); }
+
   positions.sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0));
   return res.status(200).json(wantDebug ? { positions, _lighterDebug: debugLog } : { positions });
 };
@@ -201,6 +205,62 @@ async function fetchHyperliquid(address, post, headers) {
     }
   } catch (e) { console.warn('borrowLendUserState failed:', e.message); }
 
+  // 2c. Staked HYPE (delegated to validators)
+  // Staked HYPE sits in the staking account, not the spot balance, so none of
+  // the other probes see it. delegatorSummary gives the totals in one call;
+  // `delegations` would break it down per validator, which isn't needed here.
+  // Undelegated HYPE and HYPE in an unstaking queue are still the user's money,
+  // so all three buckets are reported separately rather than summed away.
+  try {
+    const stakeRes = await post({ type: 'delegatorSummary', user: address }, 8000);
+    if (stakeRes.ok) {
+      const s = await stakeRes.json();
+      const n = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+      const buckets = [
+        ['delegated',  n(s?.delegated),              'HYPE Staked (delegated)'],
+        ['undelegated', n(s?.undelegated),           'HYPE in staking account (undelegated)'],
+        ['pending',    n(s?.totalPendingWithdrawal), 'HYPE unstaking (pending withdrawal)'],
+      ];
+      for (const [key, amt, label] of buckets) {
+        if (amt <= 0.0001) continue;
+        positions.push({
+          id: `hl-stake-${key}`,
+          symbol: 'HYPE',
+          name: label,
+          chain: 'hyperliquid-stake',
+          balance: amt,
+          priceUSD: 0, valueUSD: 0, ch24: null, logo: '',
+          source: `hypercore-stake-${key}`,
+        });
+      }
+    }
+  } catch (e) { console.warn('delegatorSummary failed:', e.message); }
+
+  // 2d. Vault deposits
+  // Equity in HLP or any user vault is USDC that left the perp account, so it
+  // is invisible to clearinghouseState. Shape is an array of {vaultAddress, equity}.
+  try {
+    const vaultRes = await post({ type: 'userVaultEquities', user: address }, 8000);
+    if (vaultRes.ok) {
+      const vaults = await vaultRes.json();
+      for (const v of (Array.isArray(vaults) ? vaults : [])) {
+        const eq = parseFloat(v?.equity);
+        if (!isFinite(eq) || eq <= 0.01) continue;
+        const addr = v?.vaultAddress || v?.vault_address || '';
+        positions.push({
+          id: `hl-vault-${addr || Math.random().toString(36).slice(2)}`,
+          symbol: 'USDC',
+          name: `Vault Deposit${addr ? ` (${addr.slice(0, 6)}…${addr.slice(-4)})` : ''}`,
+          chain: 'hyperliquid-vault',
+          balance: eq,
+          priceUSD: 1, valueUSD: eq, ch24: null, logo: '',
+          source: 'hypercore-vault',
+          vaultAddress: addr,
+        });
+      }
+    }
+  } catch (e) { console.warn('userVaultEquities failed:', e.message); }
+
   // 3. HyperEVM native HYPE
   const HYPER_EVM_RPC = 'https://rpc.hyperliquid.xyz/evm';
   const rpc = (method, params, id = 1) =>
@@ -266,15 +326,37 @@ async function fetchHyperliquid(address, post, headers) {
     }
   } catch (e) { console.warn('HyperEVM tokens failed:', e.message); }
 
-  // 5. Price everything via CoinGecko
-  const COINGECKO_IDS = {
-    HYPE: 'hyperliquid', BTC: 'bitcoin', ETH: 'ethereum', WETH: 'weth',
-    USDC: 'usd-coin', USDT: 'tether', USDE: 'ethena-usde', SOL: 'solana',
-    ARB: 'arbitrum', OP: 'optimism', AVAX: 'avalanche-2', LINK: 'chainlink',
-    UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-2', WBTC: 'wrapped-bitcoin', LIT: 'lighter',
+  // Pricing happens once at the handler level — see priceAll(). It used to run
+  // here, which meant it only ever saw Hyperliquid's own positions: Lighter
+  // builds its array in a separate function, so staked LIT and any non-stable
+  // Lighter spot asset came back at priceUSD 0. collectCryptoPositions drops
+  // anything with valUSD <= 0, so those holdings were fetched correctly and then
+  // silently discarded before they ever reached the UI.
+  return positions;
+}
+
+// ── PRICING ────────────────────────────────────────────────
+// Applied to the merged set from every source, not just Hyperliquid.
+const COINGECKO_IDS = {
+  HYPE: 'hyperliquid', BTC: 'bitcoin', ETH: 'ethereum', WETH: 'weth',
+  USDC: 'usd-coin', USDT: 'tether', USDE: 'ethena-usde', SOL: 'solana',
+  ARB: 'arbitrum', OP: 'optimism', AVAX: 'avalanche-2', LINK: 'chainlink',
+  UNI: 'uniswap', AAVE: 'aave', PURR: 'purr-2', WBTC: 'wrapped-bitcoin', LIT: 'lighter',
+  UBTC: 'bitcoin', WHYPE: 'hyperliquid', USDT0: 'tether', USDC0: 'usd-coin',
+};
+
+async function priceAll(positions) {
+  // Only fill gaps. Moralis returns protocol positions already valued, and the
+  // lending rows carry an on-chain oracle price — overwriting either with a
+  // symbol-level CoinGecko quote would be a downgrade.
+  const needs = positions.filter(p => !(p.priceUSD > 0));
+  if (!needs.length) return positions;
+
+  const priceMap = {
+    USDC:{price:1,ch24:0}, USDT:{price:1,ch24:0}, USDE:{price:1,ch24:0},
+    USDT0:{price:1,ch24:0}, USDC0:{price:1,ch24:0},
   };
-  const priceMap = { USDC:{price:1,ch24:0}, USDT:{price:1,ch24:0}, USDE:{price:1,ch24:0} };
-  const wantIds = [...new Set(positions.map(p => COINGECKO_IDS[p.symbol]).filter(Boolean))].join(',');
+  const wantIds = [...new Set(needs.map(p => COINGECKO_IDS[p.symbol]).filter(Boolean))].join(',');
   if (wantIds) {
     try {
       const cgRes = await fetch(
@@ -289,11 +371,11 @@ async function fetchHyperliquid(address, post, headers) {
       }
     } catch (e) { console.warn('CoinGecko failed:', e.message); }
   }
-  positions.forEach(p => {
+  needs.forEach(p => {
     const info = priceMap[p.symbol];
+    // balance is negative on debt rows, so valueUSD stays negative here.
     if (info) { p.priceUSD = info.price; p.valueUSD = p.balance * info.price; p.ch24 = info.ch24; }
   });
-
   return positions;
 }
 
