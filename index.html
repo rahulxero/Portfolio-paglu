@@ -4123,12 +4123,21 @@ function renderAddForm(){
             <option value="">Select PFM</option>
             <option value="SBI">SBI Pension Funds</option>
             <option value="LIC">LIC Pension Fund</option>
+            <option value="UTI">UTI Pension Fund</option>
             <option value="HDFC">HDFC Pension Management</option>
             <option value="ICICI Pru">ICICI Prudential Pension</option>
             <option value="Kotak">Kotak Mahindra Pension</option>
-            <option value="UTI">UTI Retirement Solutions</option>
             <option value="Aditya Birla">Aditya Birla Sun Life Pension</option>
-            <option value="Max Life">Max Life Pension Fund</option>
+            <option value="Tata">Tata Pension Management</option>
+            <option value="Axis">Axis Pension Fund</option>
+            <option value="DSP">DSP Pension Fund Managers</option>
+            <!-- Max Life is kept so existing records don't lose their PFM, but
+                 it is not on PFRDA's current register of ten pension funds.
+                 Reporting on it is contradictory — an Aug 2026 performance
+                 piece still counts it among eleven managers, while NPS Trust's
+                 own list omits it — so it stays selectable and flagged rather
+                 than silently deleted. -->
+            <option value="Max Life">Max Life Pension Fund (discontinued)</option>
           </select>
         </div>
       </div>
